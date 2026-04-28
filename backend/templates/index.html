@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConspectAI</title>
+<meta name="description" content="ConspectAI — структурированные ответы по STEM-тематике с LaTeX-формулами и автоматической картой тем.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="canonical" href="https://conspectai.tech/app">
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked-katex-extension@5.1.2/lib/index.umd.js"></script>
+<!-- Markmap for topic mindmaps. esm.sh serves correct MIME types for ESM imports. -->
+<script type="module">
+  try {
+    const lib  = await import('https://esm.sh/markmap-lib@0.18.11');
+    const view = await import('https://esm.sh/markmap-view@0.18.10');
+    window.MarkmapAPI = { Transformer: lib.Transformer, Markmap: view.Markmap };
+    window.dispatchEvent(new Event('markmap-ready'));
+  } catch (e) {
+    console.error('Failed to load markmap:', e);
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;450;500&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script>tailwind.config={theme:{extend:{fontFamily:{display:['"Cormorant Garamond"','serif'],sans:['"DM Sans"','sans-serif'],mono:['"DM Mono"','monospace']}}}}</script>
+<style>
+:root{
+  --bg:#0c0b09;--sidebar:#100f0d;--surface:#171512;--surface-2:#1e1b17;--surface-3:#252118;
+  --border:#272420;--border-2:#322e28;
+  --accent:#c8913a;--accent-hi:#dda74d;--accent-dim:rgba(200,145,58,.13);--accent-glow:rgba(200,145,58,.28);
+  --text-1:#e6e1d5;--text-2:#8a8274;--text-3:#4a4640;
+  --green:#4ade80;--red:#f87171;--blue:#60a5fa;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:2px}
+
+/* Auth */
+.auth-card{background:var(--surface);border:1px solid var(--border-2);border-radius:24px;padding:36px;width:400px;max-width:calc(100vw - 32px)}
+.auth-input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text-1);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s;font-family:'DM Sans',sans-serif}
+.auth-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.auth-input::placeholder{color:var(--text-3)}
+.auth-btn{width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:500;background:var(--accent);color:#0c0b09;border:none;cursor:pointer;transition:background .15s,box-shadow .15s}
+.auth-btn:hover{background:var(--accent-hi);box-shadow:0 0 18px var(--accent-glow)}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-link{color:var(--accent);cursor:pointer;text-decoration:underline}
+.auth-err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);border-radius:8px;padding:8px 12px;font-size:13px}
+.auth-trial-badge{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:var(--green);border-radius:8px;padding:8px 12px;font-size:12px;text-align:center}
+
+/* Sidebar — collapsible */
+.sidebar{
+  width:260px;
+  min-width:260px;
+  flex-shrink:0;
+  background:var(--sidebar);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  transition:width .22s cubic-bezier(.2,.8,.2,1),
+             min-width .22s cubic-bezier(.2,.8,.2,1);
+  overflow:hidden;
+  position:relative;
+  z-index:10;
+}
+.sidebar.collapsed{
+  width:48px;
+  min-width:48px;
+}
+/* hide everything except header + icon strip when collapsed */
+.sidebar.collapsed .sidebar-body{ display:none!important; }
+/* icon strip hidden by default, shown when collapsed */
+.sidebar-icon-strip{
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  padding:6px 0;
+  flex:1;
+}
+.sidebar.collapsed .sidebar-icon-strip{ display:flex; }
+/* collapse toggle btn — always visible in header */
+.sidebar-toggle{
+  display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:7px;
+  background:none;border:1px solid transparent;
+  color:var(--text-3);cursor:pointer;
+  transition:all .15s;flex-shrink:0;
+}
+.sidebar-toggle:hover{ background:var(--surface);border-color:var(--border);color:var(--text-1); }
+/* strip buttons */
+.strip-btn{
+  width:36px;height:36px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-3);cursor:pointer;
+  transition:all .15s;
+  border:1px solid transparent;background:none;
+  text-decoration:none;
+}
+.strip-btn:hover{ background:var(--surface);border-color:var(--border);color:var(--text-1); }
+.strip-btn.active-strip{ color:var(--accent);border-color:rgba(200,145,58,.3);background:var(--accent-dim); }
+.chat-item{padding:8px 10px;border-radius:9px;cursor:pointer;border:1px solid transparent;transition:background .14s,border-color .14s;position:relative}
+.chat-item:hover{background:var(--surface);border-color:var(--border)}
+.chat-item.active{background:var(--surface);border-color:var(--border-2)}
+.chat-item .del-btn{opacity:0;transition:opacity .15s}
+.chat-item:hover .del-btn{opacity:1}
+.token-bar{height:3px;background:var(--border-2);border-radius:2px;overflow:hidden}
+.token-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-hi));border-radius:2px;transition:width .5s}
+
+/* Buttons */
+.btn-new{display:flex;align-items:center;gap:6px;justify-content:center;width:100%;padding:7px 14px;border-radius:9px;font-size:13px;font-weight:500;color:var(--accent);background:var(--accent-dim);border:1px solid rgba(200,145,58,.22);cursor:pointer;transition:background .15s;white-space:nowrap}
+.btn-new:hover{background:rgba(200,145,58,.2);border-color:var(--accent)}
+.btn-buy{padding:4px 9px;border-radius:7px;font-size:11px;font-weight:600;background:var(--accent);color:#0c0b09;cursor:pointer;border:none;transition:background .15s}
+.btn-buy:hover{background:var(--accent-hi)}
+.btn-send{width:36px;height:36px;border-radius:9px;flex-shrink:0;background:var(--accent);color:#0c0b09;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s,transform .15s,opacity .15s;border:none}
+.btn-send:hover:not(:disabled){background:var(--accent-hi);transform:scale(1.06)}
+.btn-send:disabled{opacity:.35;cursor:not-allowed}
+.btn-icon{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);transition:all .15s;white-space:nowrap}
+.btn-icon:hover{border-color:var(--border-2);color:var(--text-1);background:var(--surface-3)}
+
+/* Input */
+.input-wrap{background:var(--surface);border:1px solid var(--border-2);border-radius:16px;transition:border-color .2s,box-shadow .2s}
+.input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.chat-input{background:transparent;border:none;outline:none;resize:none;color:var(--text-1);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;width:100%;max-height:180px;field-sizing:content}
+.chat-input::placeholder{color:var(--text-3)}
+
+/* Messages */
+.msg-user{background:#181e30;border:1px solid rgba(100,120,220,.12);border-radius:18px 18px 4px 18px}
+.ai-avatar{width:28px;height:28px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)}
+
+/* Markdown */
+.md-body h2{font-size:1.05em;font-weight:600;margin:14px 0 6px;color:var(--text-1);border-bottom:1px solid var(--border);padding-bottom:4px}
+.md-body h3{font-size:.97em;font-weight:500;margin:10px 0 4px;color:var(--text-1)}
+.md-body p{margin-bottom:.45rem}.md-body p:last-child{margin-bottom:0}
+.md-body ul,.md-body ol{margin-left:1.3rem;margin-bottom:.45rem}
+.md-body li{margin-bottom:.2rem}
+.md-body code{font-family:'DM Mono',monospace;font-size:.82em;background:rgba(255,255,255,.07);padding:2px 5px;border-radius:4px}
+.md-body pre{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:9px;padding:12px 15px;overflow-x:auto;margin:7px 0}
+.md-body pre code{background:none;padding:0}
+.md-body strong{color:var(--text-1);font-weight:600}
+.md-body a{color:var(--accent);text-decoration:underline}
+.md-body blockquote{border-left:3px solid var(--accent);padding-left:12px;color:var(--text-2);margin:8px 0;font-style:italic}
+.md-body table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+.md-body th,.md-body td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.md-body th{background:var(--surface-2);font-weight:500}
+.md-body hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+.md-body .katex-display{margin:.8em 0;overflow-x:auto}
+.md-body .katex{font-size:1.05em}
+
+/* File chip */
+.file-chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--text-2)}
+
+/* Typing */
+@keyframes blink{0%,80%,100%{opacity:.15;transform:scale(.9)}40%{opacity:1;transform:scale(1)}}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--text-3)}
+.dot-1{animation:blink 1.3s ease-in-out infinite}
+.dot-2{animation:blink 1.3s ease-in-out .18s infinite}
+.dot-3{animation:blink 1.3s ease-in-out .36s infinite}
+@keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.msg-in{animation:fadeUp .28s ease}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 var(--accent-glow)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.logo-icon{animation:pulse-ring 3s ease-out infinite}
+
+/* Modal */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
+.modal{background:var(--surface);border:1px solid var(--border-2);border-radius:20px;padding:24px;width:430px;max-width:calc(100vw - 32px);max-height:90vh;overflow-y:auto}
+.modal-wide{width:580px}
+.plan-card{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:10px;cursor:pointer;background:var(--surface-2);border:1px solid var(--border);transition:background .15s,border-color .15s;text-align:left}
+.plan-card.selected{background:var(--accent-dim);border-color:var(--accent)}
+.plan-card:hover:not(.selected){background:var(--surface-3);border-color:var(--border-2)}
+.settings-tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:background .15s,color .15s;color:var(--text-3);border:1px solid transparent}
+.settings-tab.active{background:var(--surface-2);color:var(--text-1);border-color:var(--border)}
+.form-label{font-size:11px;color:var(--text-3);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;display:block}
+.form-select,.form-input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text-1);font-size:13px;outline:none;transition:border-color .15s}
+.form-select:focus,.form-input:focus{border-color:var(--accent)}
+.color-swatch{width:30px;height:30px;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:border-color .15s,transform .15s}
+.color-swatch.active{border-color:var(--accent);transform:scale(1.12)}
+.model-card{width:100%;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;background:var(--surface-2);border:1px solid var(--border);transition:background .15s,border-color .15s;text-align:left}
+.model-card.selected{background:var(--accent-dim);border-color:var(--accent)}
+.model-card:hover:not(.selected){background:var(--surface-3);border-color:var(--border-2)}
+
+/* misc */
+.logo{font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.04em}
+.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:var(--accent);color:#0c0b09}
+.badge-rec{font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3)}
+.badge-model{font-size:10px;padding:1px 6px;border-radius:5px;border:1px solid var(--border);color:var(--text-3);background:var(--surface-2)}
+.badge-trial{font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;background:rgba(96,165,250,.15);color:var(--blue);border:1px solid rgba(96,165,250,.3)}
+[x-cloak]{display:none!important}
+
+/* ── Courses panel ── */
+.courses-panel{
+  position:fixed;top:0;left:0;height:100%;
+  width:340px;max-width:85vw;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  z-index:40;
+  box-shadow:8px 0 40px rgba(0,0,0,.6);
+  transform:translateX(-100%);
+  transition:transform .25s cubic-bezier(.2,.8,.2,1);
+}
+.courses-panel.open{transform:translateX(0)}
+.courses-backdrop{
+  position:fixed;inset:0;z-index:39;
+  background:rgba(0,0,0,.55);
+  backdrop-filter:blur(2px);
+}
+.cp-header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.cp-title{font-size:13px;font-weight:500;color:var(--text-1);flex:1}
+.cp-icon-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);cursor:pointer;transition:all .15s;font-size:12px}
+.cp-icon-btn:hover{color:var(--text-1);border-color:var(--border-2);background:var(--surface-3)}
+.course-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .15s;position:relative}
+.course-card:hover{border-color:var(--border-2);background:var(--surface-2)}
+.course-card.active-course{border-color:var(--accent);background:var(--accent-dim)}
+.doc-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border)}
+.doc-status{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.doc-status.ready{background:#4ade80}
+.doc-status.indexing{background:#60a5fa;animation:pulse-dot 1.2s ease-in-out infinite}
+.doc-status.error{background:#f87171}
+.doc-status.pending{background:var(--text-3)}
+.upload-zone{border:2px dashed var(--border-2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .15s}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-dim)}
+.cp-tab{padding:5px 12px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-3);border:1px solid transparent}
+.cp-tab.active{background:var(--surface-2);color:var(--text-1);border-color:var(--border)}
+.mm-panel{position:fixed;top:0;right:0;height:100%;width:420px;max-width:100vw;background:var(--sidebar);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:25;box-shadow:-12px 0 32px rgba(0,0,0,.4);transform:translateX(100%);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.mm-panel.open{transform:translateX(0)}
+.mm-panel.fullscreen{width:100vw;border-left:none}
+.mm-header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.mm-title{font-size:13px;font-weight:500;color:var(--text-1);flex:1}
+.mm-icon-btn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);cursor:pointer;transition:all .15s}
+.mm-icon-btn:hover{color:var(--text-1);border-color:var(--border-2);background:var(--surface-3)}
+.mm-icon-btn.spin svg{animation:spin .9s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.mm-svg-wrap{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at center,rgba(200,145,58,.04) 0%,transparent 70%)}
+.mm-svg-wrap svg{width:100%;height:100%;display:block}
+.mm-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:40px}
+.mm-empty-content{max-width:280px}
+.mm-status{padding:8px 16px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0}
+.mm-pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-dot 2s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+
+/* Markmap SVG styling */
+.mm-svg-wrap .markmap-foreign{font-family:'DM Sans',sans-serif!important}
+.mm-svg-wrap .markmap-foreign p{color:var(--text-1);font-size:13px}
+.mm-svg-wrap .markmap-foreign code{background:rgba(255,255,255,.07);color:var(--accent);padding:1px 4px;border-radius:3px;font-size:.85em}
+.mm-svg-wrap .markmap-foreign a{color:var(--accent)}
+.mm-svg-wrap circle{stroke:var(--accent)!important}
+.mm-svg-wrap path{stroke:var(--accent)!important;opacity:.55}
+</style>
+</head>
+<body>
+
+<div x-data="app()" x-cloak class="h-full">
+
+  <!-- ═══ AUTH SCREEN ════════════════════════════════════════════════════════ -->
+  <template x-if="!token">
+    <div class="h-full flex items-center justify-center" style="background:radial-gradient(ellipse at 50% 0%,rgba(200,145,58,.07) 0%,transparent 65%)">
+      <div class="auth-card">
+
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-7">
+          <div class="logo-icon w-10 h-10 rounded-xl flex items-center justify-center" style="background:var(--accent)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <div>
+            <p class="logo text-[26px]" style="color:var(--text-1)">ConspectAI</p>
+            <p class="text-[11px]" style="color:var(--text-3)">STEM Knowledge Architect</p>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 mb-5 p-1 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
+          <button class="settings-tab flex-1" :class="authTab==='login'?'active':''" @click="authTab='login';authErr=''">Вход</button>
+          <button class="settings-tab flex-1" :class="authTab==='register'?'active':''" @click="authTab='register';authErr=''">Регистрация</button>
+        </div>
+
+        <!-- Trial badge on register -->
+        <template x-if="authTab==='register'">
+          <div class="auth-trial-badge mb-4">
+            🎁 При регистрации — <strong>10 000 бесплатных токенов</strong> для тестирования
+          </div>
+        </template>
+
+        <!-- Error -->
+        <template x-if="authErr">
+          <div class="auth-err mb-4" x-text="authErr"></div>
+        </template>
+
+        <!-- Login form -->
+        <template x-if="authTab==='login'">
+          <div class="space-y-3">
+            <div>
+              <label class="form-label">Email</label>
+              <input class="auth-input" type="email" placeholder="you@example.com" x-model="loginEmail" @keydown.enter="login">
+            </div>
+            <div>
+              <label class="form-label">Пароль</label>
+              <input class="auth-input" type="password" placeholder="••••••" x-model="loginPass" @keydown.enter="login">
+            </div>
+            <button class="auth-btn mt-2" @click="login" :disabled="authLoading">
+              <span x-text="authLoading?'Вход…':'Войти'"></span>
+            </button>
+            <p class="text-center text-[12px]" style="color:var(--text-3)">Нет аккаунта? <span class="auth-link" @click="authTab='register'">Зарегистрироваться</span></p>
+          </div>
+        </template>
+
+        <!-- Register form -->
+        <template x-if="authTab==='register'">
+          <div class="space-y-3">
+            <div>
+              <label class="form-label">Имя пользователя</label>
+              <input class="auth-input" type="text" placeholder="Alex" x-model="regName" @keydown.enter="register">
+            </div>
+            <div>
+              <label class="form-label">Email</label>
+              <input class="auth-input" type="email" placeholder="you@example.com" x-model="regEmail" @keydown.enter="register">
+            </div>
+            <div>
+              <label class="form-label">Пароль <span style="color:var(--text-3)">(мин. 6 символов)</span></label>
+              <input class="auth-input" type="password" placeholder="••••••" x-model="regPass" @keydown.enter="register">
+            </div>
+
+            <!-- Agreement checkbox — required by law -->
+            <label class="flex items-start gap-2.5 cursor-pointer pt-1" style="user-select:none">
+              <input type="checkbox" x-model="regAgree" class="mt-0.5 accent-amber-500 cursor-pointer flex-shrink-0" style="width:15px;height:15px">
+              <span class="text-[12px] leading-[1.55]" style="color:var(--text-2)">
+                Я принимаю условия
+                <a href="/offer"   target="_blank" class="auth-link">публичной оферты</a>
+                и
+                <a href="/privacy" target="_blank" class="auth-link">политики конфиденциальности</a>
+              </span>
+            </label>
+
+            <button class="auth-btn mt-2" @click="register" :disabled="authLoading || !regAgree">
+              <span x-text="authLoading?'Создание аккаунта…':'Создать аккаунт'"></span>
+            </button>
+            <p class="text-center text-[12px]" style="color:var(--text-3)">Есть аккаунт? <span class="auth-link" @click="authTab='login'">Войти</span></p>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </template>
+
+  <!-- ═══ MAIN APP ═══════════════════════════════════════════════════════════ -->
+  <template x-if="token">
+    <div class="flex h-full"
+         @dragover.window.prevent="globalDrag=true"
+         @dragleave.window="handleDragLeave($event)"
+         @drop.window.prevent="handleDrop($event)">
+
+      <!-- Global drop overlay -->
+      <template x-if="globalDrag && currentChatId">
+        <div class="fixed inset-0 z-30 flex items-center justify-center pointer-events-none" style="background:rgba(200,145,58,.06);border:3px dashed var(--accent)">
+          <div class="text-center" style="color:var(--accent)">
+            <svg class="mx-auto mb-2" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p class="text-lg font-medium">Перетащите файлы сюда</p>
+          </div>
+        </div>
+      </template>
+
+      <!-- ── SIDEBAR ─────────────────────────────────────────────────────── -->
+      <aside class="sidebar" :class="sidebarCollapsed?'collapsed':''">
+
+        <!-- ── Header row (always visible) ── -->
+        <div class="flex items-center px-2 py-2 gap-1 flex-shrink-0" style="border-bottom:1px solid var(--border);min-height:48px">
+          <!-- Logo icon (always shown) -->
+          <div class="logo-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--accent)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <!-- Name + action buttons (hidden when collapsed) -->
+          <template x-if="!sidebarCollapsed">
+            <div class="flex items-center flex-1 min-w-0 gap-1">
+              <span class="logo text-[17px] ml-1 flex-1 truncate" style="color:var(--text-1)">ConspectAI</span>
+              <template x-if="user.is_admin">
+                <a href="/admin" class="btn-icon !p-1.5" title="Админка" style="color:var(--accent);border-color:rgba(200,145,58,.25)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1l3 6 6 .9-4.5 4.4 1 6.7L12 16l-5.5 3 1-6.7L3 7.9 9 7z"/></svg>
+                </a>
+              </template>
+              <button @click="toggleCourses" class="btn-icon !p-1.5" :style="showCourses?'color:var(--accent);border-color:rgba(200,145,58,.3)':''" title="Курсы">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              </button>
+              <button @click="showSettings=true" class="btn-icon !p-1.5" title="Настройки">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </button>
+              <button @click="logout" class="btn-icon !p-1.5" title="Выйти">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              </button>
+            </div>
+          </template>
+          <!-- Collapse toggle (always visible, rotates on state) -->
+          <button @click="sidebarCollapsed=!sidebarCollapsed;localStorage.setItem('sb_collapsed',sidebarCollapsed?'true':'false')"
+                  class="sidebar-toggle flex-shrink-0 ml-auto" :title="sidebarCollapsed?'Развернуть':'Свернуть'">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                 :style="sidebarCollapsed?'transform:rotate(180deg);transition:transform .22s':'transition:transform .22s'">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- ── COLLAPSED: icon strip ── -->
+        <div class="sidebar-icon-strip">
+          <button @click="sidebarCollapsed=false" class="strip-btn" title="Новый чат" @click.once="createChat">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button @click="sidebarCollapsed=false;$nextTick(()=>toggleCourses())" class="strip-btn" :class="showCourses?'active-strip':''" title="Курсы">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </button>
+          <button @click="sidebarCollapsed=false;$nextTick(()=>{showSettings=true})" class="strip-btn" title="Настройки">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <template x-if="user.is_admin">
+            <a href="/admin" class="strip-btn" title="Админка" style="color:var(--accent)">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1l3 6 6 .9-4.5 4.4 1 6.7L12 16l-5.5 3 1-6.7L3 7.9 9 7z"/></svg>
+            </a>
+          </template>
+          <button @click="logout" class="strip-btn mt-auto" title="Выйти">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+
+        <!-- ── EXPANDED: full content ── -->
+        <div class="sidebar-body flex flex-col flex-1 overflow-hidden">
+
+          <!-- New chat -->
+          <div class="px-3 pt-3 pb-1">
+            <button class="btn-new" @click="createChat">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Новый чат
+            </button>
+          </div>
+
+          <!-- Chat list -->
+          <div class="flex-1 overflow-y-auto px-3 py-1 space-y-0.5">
+            <template x-if="chats.length===0">
+              <div class="text-center py-10" style="color:var(--text-3)">
+                <svg class="mx-auto mb-2" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <p class="text-xs">Нет чатов</p>
+              </div>
+            </template>
+            <template x-for="chat in chats" :key="chat.id">
+              <div class="chat-item" :class="currentChatId===chat.id?'active':''" @click="selectChat(chat.id)">
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1 mb-0.5">
+                      <span class="text-[11px]" x-text="templateMeta[chat.template]?.icon||'⚙️'"></span>
+                      <p class="text-[12.5px] truncate font-[450]" style="color:var(--text-1)" x-text="chat.title"></p>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <p class="text-[10.5px]" style="color:var(--text-3)" x-text="relTime(chat.updated_at)"></p>
+                      <span class="badge-model" x-text="modelShort(chat.model)"></span>
+                      <template x-if="chat.course_id">
+                        <span class="text-[9px]" style="color:var(--accent)">📚</span>
+                      </template>
+                    </div>
+                  </div>
+                  <button class="del-btn p-1 rounded-md flex-shrink-0" style="color:var(--text-3)" @click.stop="deleteChat(chat.id)">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Tokens + user -->
+          <div style="border-top:1px solid var(--border);padding:12px">
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[11px]" style="color:var(--text-3)">Токены</span>
+                <span class="text-[11px] cursor-default" style="color:var(--text-3)" title="Цена за ответ: Flash Lite 500 · Flash 2000 · Pro 8000">ⓘ</span>
+                <template x-if="user.is_trial"><span class="badge-trial">Пробный</span></template>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono text-[12px]" style="color:var(--accent)" x-text="fmtTokens(user.tokens_remaining)"></span>
+                <button class="btn-buy" @click="showBuyModal=true">+ Купить</button>
+              </div>
+            </div>
+            <div class="token-bar mb-2"><div class="token-fill" :style="`width:${Math.min(100,(user.tokens_remaining/500000)*100)}%`"></div></div>
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style="background:var(--surface-2);color:var(--accent);border:1px solid var(--border-2)" x-text="user.username?user.username[0].toUpperCase():'U'"></div>
+              <div class="min-w-0 flex-1">
+                <p class="text-[12px] font-[450] truncate" style="color:var(--text-1)" x-text="user.username"></p>
+                <p class="text-[10.5px] truncate" style="color:var(--text-3)" x-text="user.email"></p>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /sidebar-body -->
+      </aside>
+
+      <!-- ── MAIN AREA ──────────────────────────────────────────────────── -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+
+        <!-- Header -->
+        <header class="flex items-center justify-between px-5 py-3 flex-shrink-0" style="border-bottom:1px solid var(--border);background:var(--bg)">
+          <div class="min-w-0 flex-1">
+            <template x-if="currentChatId && currentChat">
+              <div>
+                <h1 class="text-[13.5px] font-[500] truncate max-w-lg" style="color:var(--text-1)" x-text="currentChat.title"></h1>
+                <p class="text-[11px]" style="color:var(--text-3)" x-text="`${messages.length} сообщений · ${templateMeta[currentChat.template]?.icon} ${templateMeta[currentChat.template]?.name}`"></p>
+              </div>
+            </template>
+            <template x-if="!currentChatId">
+              <span class="logo text-[18px]" style="color:var(--text-2)">ConspectAI</span>
+            </template>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0 ml-4">
+            <template x-if="currentChatId">
+              <div class="flex items-center gap-2">
+                <button class="btn-icon" @click="toggleMindmap" :style="showMindmap?'border-color:var(--accent);color:var(--accent)':''" title="Карта тем">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="7" y1="6" x2="9.5" y2="11"/><line x1="17" y1="6" x2="14.5" y2="11"/><line x1="7" y1="18" x2="9.5" y2="13"/><line x1="17" y1="18" x2="14.5" y2="13"/></svg>
+                  Карта
+                </button>
+                <button class="btn-icon" @click="exportMD">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  .md
+                </button>
+                <button class="btn-icon" @click="exportPDF">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  PDF
+                </button>
+              </div>
+            </template>
+            <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full" style="background:var(--surface);border:1px solid var(--border)">
+              <div class="w-1.5 h-1.5 rounded-full" style="background:var(--accent)"></div>
+              <span class="text-[11px]" style="color:var(--text-2)" x-text="modelCatalog[currentChat?.model]?.name||'Gemini 3.1 Flash Lite'"></span>
+            </div>
+            <template x-if="currentChat?.course_id">
+              <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.3)" @click="showCourses=true;cpTab='list'" title="RAG активен — отвечаю по материалам курса">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <span class="text-[11px]" style="color:var(--accent)" x-text="courses.find(c=>c.id===currentChat.course_id)?.title||'Курс'"></span>
+              </div>
+            </template>
+          </div>
+        </header>
+
+        <!-- Messages -->
+        <div class="flex-1 overflow-y-auto" id="msg-scroll">
+
+          <template x-if="!currentChatId">
+            <div class="h-full flex items-center justify-center">
+              <div class="text-center max-w-sm px-8">
+                <div class="w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.25)">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="1.4" style="stroke:var(--accent)"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <h2 class="logo text-[30px] mb-2" style="color:var(--text-1)">Добро пожаловать, <span x-text="user.username"></span></h2>
+                <p class="text-[13px] mb-2" style="color:var(--text-2)">STEM Knowledge Architect — структурированные ответы с LaTeX</p>
+                <template x-if="user.is_trial">
+                  <p class="text-[12px] mb-5" style="color:var(--blue)">🎁 Пробный режим: <span class="font-mono" x-text="fmtTokens(user.tokens_remaining)"></span> токенов</p>
+                </template>
+                <button class="btn-new" style="width:auto;margin:0 auto" @click="createChat">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Начать чат
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="currentChatId && messages.length===0 && !loading">
+            <div class="h-full flex items-center justify-center">
+              <div class="text-center" style="color:var(--text-3)">
+                <svg class="mx-auto mb-3" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <p class="text-sm">Напишите первое сообщение</p>
+                <p class="text-xs mt-1" x-text="templateMeta[currentChat?.template]?.icon+' '+templateMeta[currentChat?.template]?.name"></p>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="currentChatId && (messages.length>0||loading)">
+            <div class="max-w-[740px] mx-auto px-4 py-6 space-y-5">
+
+              <template x-for="msg in messages" :key="msg.id">
+                <div class="msg-in">
+                  <!-- User -->
+                  <template x-if="msg.role==='user'">
+                    <div class="flex justify-end">
+                      <div class="max-w-[82%]">
+                        <template x-if="msg.files&&msg.files.length">
+                          <div class="flex flex-wrap gap-2 mb-2 justify-end">
+                            <template x-for="f in msg.files" :key="f.sha256">
+                              <div>
+                                <template x-if="f.mime_type&&f.mime_type.startsWith('image/')">
+                                  <img :src="`/api/files/${f.sha256}/raw`" class="max-h-48 rounded-xl" style="border:1px solid var(--border)">
+                                </template>
+                                <template x-if="!(f.mime_type&&f.mime_type.startsWith('image/'))">
+                                  <div class="file-chip">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                                    <span x-text="f.original_filename" class="max-w-[130px] truncate"></span>
+                                  </div>
+                                </template>
+                              </div>
+                            </template>
+                          </div>
+                        </template>
+                        <template x-if="msg.content">
+                          <div class="msg-user px-4 py-2.5">
+                            <p class="text-[14px] whitespace-pre-wrap" style="color:var(--text-1)" x-text="msg.content"></p>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Assistant -->
+                  <template x-if="msg.role==='assistant'">
+                    <div class="flex gap-3">
+                      <div class="ai-avatar mt-1 flex-shrink-0">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke-width="2" style="stroke:var(--accent)"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1.5">
+                          <p class="text-[11px] font-[500]" style="color:var(--text-3)">NEXUS</p>
+                          <template x-if="msg.model"><span class="badge-model" x-text="modelShort(msg.model)"></span></template>
+                        </div>
+                        <div class="md-body text-[14px] leading-relaxed" style="color:var(--text-1)" x-html="renderMd(msg.content)"></div>
+
+                        <!-- RAG: retrieved images from course materials -->
+                        <template x-if="msg.rag_images && msg.rag_images.length">
+                          <div class="mt-3 space-y-2">
+                            <p class="text-[10px] font-[500] uppercase tracking-wide" style="color:var(--text-3)">Из ваших материалов</p>
+                            <div class="flex flex-wrap gap-2">
+                              <template x-for="img in msg.rag_images" :key="img.id">
+                                <div>
+                                  <img :src="img.url" :alt="img.caption" class="max-h-40 rounded-lg cursor-pointer" style="border:1px solid var(--border)" @click="cpLightboxImg=img.url;cpLightboxOpen=true">
+                                  <p class="text-[10px] mt-0.5 max-w-[180px]" style="color:var(--text-3)" x-text="img.caption"></p>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+
+                        <!-- RAG: sources indicator -->
+                        <template x-if="msg.sources_found === false">
+                          <p class="text-[10px] mt-2 italic" style="color:var(--text-3)">ℹ️ Ответ из общих знаний — в материалах курса не найдено</p>
+                        </template>
+
+                        <div class="flex items-center gap-3 mt-2 flex-wrap">
+                          <template x-if="msg.tokens_used>0">
+                            <p class="text-[11px]" style="color:var(--text-3)">
+                              <span x-text="fmtTokens(msg.tokens_used)+' токенов'"></span>
+                              <template x-if="msg.extra_charge_multiplier && msg.extra_charge_multiplier>1">
+                                <span style="color:var(--accent)" :title="'Большой контекст. Списано '+msg.extra_charge_multiplier+'× от обычной ставки.'" x-text="' · ×'+msg.extra_charge_multiplier"></span>
+                              </template>
+                            </p>
+                          </template>
+                          <button class="text-[11px] hover:opacity-70 transition-opacity" style="color:var(--text-3)" @click="copyText(msg.content)">
+                            <svg class="inline mr-0.5" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            Копировать
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Typing -->
+              <template x-if="loading">
+                <div class="flex gap-3 msg-in">
+                  <div class="ai-avatar flex-shrink-0">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke-width="2" style="stroke:var(--accent)"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  </div>
+                  <div class="flex items-center gap-1.5 py-2"><span class="dot dot-1"></span><span class="dot dot-2"></span><span class="dot dot-3"></span></div>
+                </div>
+              </template>
+              <div id="msg-bottom"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Input -->
+        <div class="flex-shrink-0 px-4 pb-4" style="background:var(--bg)" x-show="currentChatId">
+          <div class="max-w-[740px] mx-auto">
+
+            <!-- Template switcher -->
+            <div class="flex items-center gap-1.5 mb-2 px-1 overflow-x-auto">
+              <template x-for="(meta,key) in templateMeta" :key="key">
+                <button class="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-[500] border cursor-pointer transition-all"
+                  :style="currentChat&&currentChat.template===key?'background:var(--accent-dim);border-color:var(--accent);color:var(--accent)':'background:transparent;border-color:var(--border);color:var(--text-3)'"
+                  @click="switchTemplate(key)">
+                  <span x-text="meta.icon"></span><span x-text="meta.name"></span>
+                </button>
+              </template>
+            </div>
+
+            <!-- Pending files -->
+            <template x-if="pendingFiles.length">
+              <div class="flex flex-wrap gap-2 mb-2 px-1">
+                <template x-for="(f,i) in pendingFiles" :key="i">
+                  <div class="file-chip">
+                    <template x-if="f.mime_type&&f.mime_type.startsWith('image/')">
+                      <img :src="f.preview_url||''" class="w-5 h-5 rounded object-cover">
+                    </template>
+                    <template x-if="!(f.mime_type&&f.mime_type.startsWith('image/'))">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                    </template>
+                    <span x-text="f.original_filename" class="max-w-[110px] truncate"></span>
+                    <template x-if="f.compression_pct>5">
+                      <span class="text-[9px]" style="color:var(--green)" x-text="'-'+f.compression_pct+'%'"></span>
+                    </template>
+                    <button @click="pendingFiles.splice(i,1)" style="color:var(--text-3)" class="hover:opacity-70 text-base leading-none">×</button>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <div class="input-wrap flex items-end gap-2 px-4 py-2.5">
+              <label class="cursor-pointer flex-shrink-0 mb-0.5 hover:opacity-70 transition-opacity" style="color:var(--text-3)">
+                <input type="file" multiple class="hidden" accept="image/*,.pdf,.txt,.doc,.docx,.csv,.json,.md,.py,.js,.ts,.tex" @change="onFileSelect($event)">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </label>
+              <textarea class="chat-input flex-1 py-0.5" x-model="inputText" placeholder="Напишите вопрос или перетащите файл…" rows="1" :disabled="loading" @keydown.enter.exact.prevent="send" @keydown.enter.shift.exact=""></textarea>
+              <button class="btn-send" @click="send" :disabled="loading||(!inputText.trim()&&!pendingFiles.length)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+              </button>
+            </div>
+            <p class="text-center text-[10.5px] mt-1.5" style="color:var(--text-3)">Enter — отправить · Shift+Enter — перенос · Drag&drop — прикрепить файл</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MINDMAP PANEL ═══════════════════════════════════════════════ -->
+      <aside class="mm-panel" :class="(showMindmap?'open ':'')+(mmFullscreen?'fullscreen':'')">
+        <div class="mm-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="7" y1="6" x2="9.5" y2="11"/><line x1="17" y1="6" x2="14.5" y2="11"/><line x1="7" y1="18" x2="9.5" y2="13"/><line x1="17" y1="18" x2="14.5" y2="13"/></svg>
+          <span class="mm-title">Карта тем</span>
+          <button class="mm-icon-btn" @click="regenerateMindmap" :class="mmLoading?'spin':''" :disabled="mmLoading" title="Перестроить с нуля">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+          <button class="mm-icon-btn" @click="mmFullscreen=!mmFullscreen" title="Полный экран">
+            <template x-if="!mmFullscreen">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            </template>
+            <template x-if="mmFullscreen">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            </template>
+          </button>
+          <button class="mm-icon-btn" @click="showMindmap=false" title="Закрыть">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="mm-svg-wrap">
+          <svg id="mm-svg"></svg>
+          <template x-if="!mmMd && !mmLoading">
+            <div class="mm-empty">
+              <div class="mm-empty-content">
+                <div class="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="1.5" style="stroke:var(--accent)"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="7" y1="6" x2="9.5" y2="11"/><line x1="17" y1="6" x2="14.5" y2="11"/><line x1="7" y1="18" x2="9.5" y2="13"/><line x1="17" y1="18" x2="14.5" y2="13"/></svg>
+                </div>
+                <p class="text-[14px] font-[500] mb-1.5" style="color:var(--text-1)">Карта пока пустая</p>
+                <p class="text-[12px]" style="color:var(--text-3)">Отправьте первое сообщение&nbsp;— карта появится автоматически и будет обновляться по мере изучения тем.</p>
+              </div>
+            </div>
+          </template>
+          <template x-if="mmLoading && !mmMd">
+            <div class="mm-empty">
+              <div class="mm-empty-content">
+                <div class="flex items-center justify-center gap-1.5 mb-3"><span class="dot dot-1"></span><span class="dot dot-2"></span><span class="dot dot-3"></span></div>
+                <p class="text-[12px]" style="color:var(--text-3)">Картограф изучает диалог…</p>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="mm-status">
+          <template x-if="mmLoading"><span class="mm-pulse-dot"></span></template>
+          <span x-text="mmStatusText"></span>
+        </div>
+      </aside>
+
+      <!-- Backdrop for courses panel -->
+      <template x-if="showCourses">
+        <div class="courses-backdrop" @click="showCourses=false"></div>
+      </template>
+
+      <!-- ═══ COURSES PANEL ════════════════════════════════════════════════ -->
+      <aside class="courses-panel" :class="showCourses?'open':''">
+
+        <div class="cp-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span class="cp-title">Мои курсы</span>
+          <!-- Tab switcher -->
+          <div class="flex gap-1 mr-2">
+            <button class="cp-tab" :class="cpTab==='list'?'active':''" @click="cpTab='list'">Курсы</button>
+            <template x-if="cpActiveCourse">
+              <button class="cp-tab" :class="cpTab==='docs'?'active':''" @click="cpTab='docs'">Материалы</button>
+            </template>
+          </div>
+          <button class="cp-icon-btn" @click="showCourses=false" title="Закрыть">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <!-- ── COURSES LIST ─────────────────────────────────────────────── -->
+        <template x-if="cpTab==='list'">
+          <div class="flex-1 overflow-y-auto p-3 space-y-2">
+
+            <!-- Create new course -->
+            <div class="mb-3">
+              <template x-if="!cpCreating">
+                <button class="btn-new" @click="cpCreating=true">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Новый курс
+                </button>
+              </template>
+              <template x-if="cpCreating">
+                <div class="p-3 rounded-xl" style="background:var(--surface);border:1px solid var(--border-2)">
+                  <p class="text-[12px] font-[500] mb-2" style="color:var(--text-2)">Создать курс</p>
+                  <input class="auth-input mb-2" type="text" placeholder="Название (напр. «Физика 2 семестр»)" x-model="cpNewTitle" @keydown.enter="createCourse" @keydown.escape="cpCreating=false">
+                  <input class="auth-input mb-2" type="text" placeholder="Описание (необязательно)" x-model="cpNewDesc">
+                  <div class="flex gap-2 mt-1">
+                    <button class="auth-btn !py-2 flex-1" @click="createCourse" :disabled="!cpNewTitle.trim()">Создать</button>
+                    <button class="btn-icon flex-1 justify-center" @click="cpCreating=false">Отмена</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Loading -->
+            <template x-if="cpLoading && courses.length===0">
+              <div class="text-center py-8" style="color:var(--text-3)">
+                <div class="flex items-center justify-center gap-1.5 mb-2"><span class="dot dot-1"></span><span class="dot dot-2"></span><span class="dot dot-3"></span></div>
+                <p class="text-xs">Загрузка курсов…</p>
+              </div>
+            </template>
+
+            <!-- Empty -->
+            <template x-if="!cpLoading && courses.length===0">
+              <div class="text-center py-8" style="color:var(--text-3)">
+                <svg class="mx-auto mb-2" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <p class="text-xs mb-1">Нет курсов</p>
+                <p class="text-[11px]">Создайте курс и загрузите учебные материалы — ИИ будет отвечать на их основе</p>
+              </div>
+            </template>
+
+            <!-- Course cards -->
+            <template x-for="course in courses" :key="course.id">
+              <div class="course-card" :class="cpActiveCourse?.id===course.id?'active-course':''">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex-1 min-w-0 cursor-pointer" @click="openCourse(course)">
+                    <p class="text-[13px] font-[500] truncate" style="color:var(--text-1)" x-text="course.title"></p>
+                    <p class="text-[11px] mt-0.5" style="color:var(--text-3)">
+                      <span x-text="course.doc_count+' материалов'"></span>
+                      <span x-show="course.chunk_count>0"> · <span x-text="course.chunk_count+' чанков'"></span></span>
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-1 flex-shrink-0">
+                    <!-- Link to current chat -->
+                    <template x-if="currentChatId">
+                      <button
+                        class="cp-icon-btn"
+                        :style="currentChat?.course_id===course.id?'color:var(--accent);border-color:var(--accent)':''"
+                        :title="currentChat?.course_id===course.id?'Отвязать от чата':'Привязать к текущему чату'"
+                        @click="toggleChatCourse(course.id)">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                      </button>
+                    </template>
+                    <!-- Open docs -->
+                    <button class="cp-icon-btn" @click="openCourse(course)" title="Материалы">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </button>
+                    <!-- Delete -->
+                    <button class="cp-icon-btn" @click="deleteCourse(course.id)" title="Удалить курс" style="color:var(--red)">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <!-- Active course badge when linked to chat -->
+                <template x-if="currentChat?.course_id===course.id">
+                  <div class="flex items-center gap-1 mt-2 pt-2" style="border-top:1px solid var(--border)">
+                    <span style="background:rgba(200,145,58,.15);color:var(--accent);font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid rgba(200,145,58,.3)">
+                      🔗 Привязан к текущему чату
+                    </span>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+        <!-- ── DOCUMENTS TAB ────────────────────────────────────────────── -->
+        <template x-if="cpTab==='docs' && cpActiveCourse">
+          <div class="flex flex-col flex-1 overflow-hidden">
+
+            <!-- Course header -->
+            <div class="px-3 pt-3 pb-2 flex-shrink-0">
+              <div class="flex items-center gap-2 mb-2">
+                <button class="cp-icon-btn" @click="cpTab='list'" title="Назад">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                </button>
+                <p class="text-[13px] font-[500] truncate" style="color:var(--text-1)" x-text="cpActiveCourse.title"></p>
+              </div>
+
+              <!-- Upload zone -->
+              <div class="upload-zone mb-2"
+                   :class="cpDragging?'drag':''"
+                   @click="$refs.fileInput.click()"
+                   @dragover.prevent="cpDragging=true"
+                   @dragleave="cpDragging=false"
+                   @drop.prevent="onCourseFileDrop($event)">
+                <input type="file" class="hidden" x-ref="fileInput"
+                       accept=".pdf,.txt,.md,.docx"
+                       multiple
+                       @change="onCourseFileSelect($event)">
+                <svg class="mx-auto mb-1" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p class="text-[12px]" style="color:var(--text-2)">Перетащите файлы или нажмите</p>
+                <p class="text-[11px]" style="color:var(--text-3)">PDF, TXT, MD, DOCX · до 50 МБ</p>
+              </div>
+
+              <!-- YouTube URL -->
+              <div class="flex gap-1.5 mb-2">
+                <input class="auth-input flex-1 !py-2 !text-[12px]"
+                       type="url"
+                       placeholder="YouTube URL…"
+                       x-model="cpYoutubeUrl"
+                       @keydown.enter="ingestYoutube">
+                <button class="btn-icon !px-3" @click="ingestYoutube" :disabled="!cpYoutubeUrl.trim()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Documents list -->
+            <div class="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5">
+              <template x-if="cpDocs.length===0 && !cpDocsLoading">
+                <div class="text-center py-6" style="color:var(--text-3)">
+                  <p class="text-xs">Нет материалов — загрузите файлы или добавьте YouTube</p>
+                </div>
+              </template>
+
+              <template x-for="doc in cpDocs" :key="doc.id">
+                <div class="doc-item">
+                  <span class="doc-status" :class="doc.status"></span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[12px] font-[450] truncate" style="color:var(--text-1)" x-text="doc.filename"></p>
+                    <p class="text-[10.5px]" style="color:var(--text-3)">
+                      <template x-if="doc.status==='ready'">
+                        <span x-text="'✓ ' + (doc.chunk_count||0) + ' чанков'"></span>
+                      </template>
+                      <template x-if="doc.status==='indexing'">
+                        <span>⏳ Индексация…</span>
+                      </template>
+                      <template x-if="doc.status==='error'">
+                        <span style="color:var(--red)" x-text="'Ошибка: '+(doc.error_msg||'неизвестно')"></span>
+                      </template>
+                      <template x-if="doc.status==='pending'">
+                        <span>В очереди…</span>
+                      </template>
+                    </p>
+                  </div>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded" style="background:var(--surface-3);color:var(--text-3)" x-text="doc.source_type.toUpperCase()"></span>
+                  <button class="cp-icon-btn !w-6 !h-6" @click="deleteDoc(doc.id)" title="Удалить">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </template>
+
+              <!-- Poll for indexing updates -->
+              <template x-if="cpDocs.some(d=>d.status==='indexing'||d.status==='pending')">
+                <p class="text-center text-[10px] pt-1" style="color:var(--text-3)">Обновление статусов каждые 3 сек…</p>
+              </template>
+            </div>
+          </div>
+        </template>
+
+      </aside>
+
+      <!-- ═══ SETTINGS MODAL ═══════════════════════════════════════════════ -->
+      <template x-if="showSettings">
+        <div class="overlay" @click.self="showSettings=false">
+          <div class="modal modal-wide">
+            <div class="flex items-center justify-between mb-5">
+              <h3 class="logo text-[22px]" style="color:var(--text-1)">Настройки</h3>
+              <button @click="showSettings=false" class="hover:opacity-70" style="color:var(--text-3)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="flex gap-1 mb-5 p-1 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
+              <button class="settings-tab flex-1" :class="settingsTab==='model'?'active':''" @click="settingsTab='model'">🤖 Модель</button>
+              <button class="settings-tab flex-1" :class="settingsTab==='template'?'active':''" @click="settingsTab='template'">📋 Шаблон</button>
+              <button class="settings-tab flex-1" :class="settingsTab==='export'?'active':''" @click="settingsTab='export'">📄 PDF</button>
+            </div>
+
+            <!-- Model tab -->
+            <template x-if="settingsTab==='model'">
+              <div class="space-y-2">
+                <p class="text-[12px] mb-3" style="color:var(--text-2)">Выберите модель. Цена за один ответ — фиксированная, длина ответа на неё не влияет.</p>
+                <template x-for="(info,key) in modelCatalog" :key="key">
+                  <button class="model-card" :class="currentChat&&currentChat.model===key?'selected':''" @click="switchModel(key)">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-0.5">
+                        <p class="text-[13px] font-[500]" style="color:var(--text-1)" x-text="info.name"></p>
+                        <template x-if="info.recommended"><span class="badge-rec">Рекомендуется</span></template>
+                      </div>
+                      <p class="text-[12px]" style="color:var(--text-2)" x-text="info.desc"></p>
+                      <div class="flex items-center gap-3 mt-1">
+                        <span class="text-[11px]" style="color:var(--text-3)" x-text="info.speed"></span>
+                        <span class="text-[11px]" style="color:var(--text-3)" x-text="'Контекст: '+info.ctx"></span>
+                      </div>
+                    </div>
+                    <div class="text-right flex-shrink-0 ml-3">
+                      <p class="text-[13px] font-[500] font-mono" style="color:var(--accent)" x-text="fmtTokens(info.tokens_per_request)"></p>
+                      <p class="text-[10px]" style="color:var(--text-3)">за&nbsp;ответ</p>
+                    </div>
+                  </button>
+                </template>
+              </div>
+            </template>
+
+            <!-- Template tab -->
+            <template x-if="settingsTab==='template'">
+              <div class="space-y-2">
+                <p class="text-[12px] mb-3" style="color:var(--text-2)">Шаблон определяет структуру ответа. Можно менять кнопками над полем ввода.</p>
+                <template x-for="(meta,key) in templateMeta" :key="key">
+                  <button class="plan-card" :class="currentChat&&currentChat.template===key?'selected':''" @click="switchTemplate(key);showSettings=false">
+                    <div class="flex items-center gap-2">
+                      <span x-text="meta.icon"></span>
+                      <div>
+                        <p class="text-[13px] font-[500]" style="color:var(--text-1)" x-text="meta.name"></p>
+                        <p class="text-[12px]" style="color:var(--text-2)" x-text="meta.desc"></p>
+                      </div>
+                    </div>
+                    <template x-if="currentChat&&currentChat.template===key">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--accent)"><polyline points="20 6 9 17 4 12"/></svg>
+                    </template>
+                  </button>
+                </template>
+              </div>
+            </template>
+
+            <!-- Export/PDF tab -->
+            <template x-if="settingsTab==='export'">
+              <div class="space-y-4">
+                <p class="text-[12px]" style="color:var(--text-2)">Настройки применяются при экспорте PDF.</p>
+                <div><label class="form-label">Шрифт</label>
+                  <select class="form-select" x-model="pdfS.font">
+                    <option value="'Inter',sans-serif">Inter (современный)</option>
+                    <option value="'Georgia',serif">Georgia (академический)</option>
+                    <option value="'Times New Roman',serif">Times New Roman (классический)</option>
+                    <option value="'DM Sans',sans-serif">DM Sans (оригинальный)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Размер шрифта: <span x-text="pdfS.fontSize+'px'" style="color:var(--accent)"></span></label>
+                  <input type="range" min="11" max="18" step="1" x-model="pdfS.fontSize" class="w-full accent-amber-500">
+                </div>
+                <div><label class="form-label">Фон</label>
+                  <div class="flex gap-2 flex-wrap">
+                    <template x-for="c in pdfColors.bg" :key="c.v">
+                      <div class="text-center"><button class="color-swatch" :class="pdfS.bg===c.v?'active':''" :style="`background:${c.v};border-color:${pdfS.bg===c.v?'var(--accent)':'var(--border)'}`" @click="pdfS.bg=c.v" :title="c.n"></button><p class="text-[9px] mt-0.5" style="color:var(--text-3)" x-text="c.n"></p></div>
+                    </template>
+                  </div>
+                </div>
+                <div><label class="form-label">Акцент заголовков</label>
+                  <div class="flex gap-2 flex-wrap">
+                    <template x-for="c in pdfColors.accent" :key="c.v">
+                      <div class="text-center"><button class="color-swatch" :class="pdfS.accent===c.v?'active':''" :style="`background:${c.v};border-color:${pdfS.accent===c.v?'var(--accent)':'var(--border)'}`" @click="pdfS.accent=c.v" :title="c.n"></button><p class="text-[9px] mt-0.5" style="color:var(--text-3)" x-text="c.n"></p></div>
+                    </template>
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" x-model="pdfS.includeQ" class="accent-amber-500">
+                  <span class="text-[13px]" style="color:var(--text-1)">Включить вопросы пользователя</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" x-model="pdfS.timestamps" class="accent-amber-500">
+                  <span class="text-[13px]" style="color:var(--text-1)">Добавить временны́е метки</span>
+                </label>
+                <!-- preview -->
+                <div class="rounded-xl p-4" :style="`background:${pdfS.bg};font-family:${pdfS.font};font-size:${pdfS.fontSize}px;border:1px solid var(--border)`">
+                  <p :style="`font-size:${parseInt(pdfS.fontSize)+2}px;font-weight:600;color:${pdfS.accent};margin-bottom:5px`">## Пример заголовка</p>
+                  <p :style="`color:#1a1a1a`">Текст с формулой $E = mc^2$ и <strong>выделением</strong>.</p>
+                </div>
+                <div class="flex gap-2">
+                  <button class="flex-1 py-2.5 rounded-xl text-[13px] font-[500]" style="background:var(--surface-2);color:var(--text-1);border:1px solid var(--border)" @click="exportMD">📄 Скачать .md</button>
+                  <button class="flex-1 py-2.5 rounded-xl text-[13px] font-[500]" style="background:var(--accent);color:#0c0b09" @click="exportPDF">🖨 Экспорт PDF</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- ═══ BUY MODAL ════════════════════════════════════════════════════ -->
+      <template x-if="showBuyModal">
+        <div class="overlay" @click.self="showBuyModal=false">
+          <div class="modal">
+            <div class="flex items-center justify-between mb-5">
+              <h3 class="logo text-[22px]" style="color:var(--text-1)">Пополнить токены</h3>
+              <button @click="showBuyModal=false" class="hover:opacity-70" style="color:var(--text-3)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="flex items-center justify-between mb-4 px-4 py-3 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
+              <span class="text-[13px]" style="color:var(--text-2)">Текущий баланс</span>
+              <span class="font-mono text-[14px]" style="color:var(--accent)" x-text="fmtTokens(user.tokens_remaining)+' токенов'"></span>
+            </div>
+            <div class="space-y-2.5 mb-3">
+              <template x-for="plan in plans" :key="plan.id">
+                <button class="plan-card" :class="selPlan===plan.id?'selected':''" @click="selPlan=plan.id">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <p class="text-[14px] font-[500]" style="color:var(--text-1)" x-text="plan.name"></p>
+                      <template x-if="plan.badge"><span class="badge" x-text="plan.badge"></span></template>
+                    </div>
+                    <p class="text-[12px]" style="color:var(--text-3)">
+                      <span x-text="fmtTokens(plan.tokens)"></span> токенов ·
+                      <span x-text="Math.floor(plan.tokens/500)"></span> Lite /
+                      <span x-text="Math.floor(plan.tokens/2000)"></span> Flash /
+                      <span x-text="Math.floor(plan.tokens/8000)"></span> Pro
+                    </p>
+                  </div>
+                  <div class="flex flex-col items-end gap-1 ml-3 flex-shrink-0">
+                    <p class="text-[16px] font-[500]" style="color:var(--accent)" x-text="plan.price"></p>
+                  </div>
+                </button>
+              </template>
+            </div>
+            <p class="text-center text-[11px] mb-4" style="color:var(--text-3)">
+              Токены не сгорают.
+              <a href="/pricing" target="_blank" style="color:var(--accent)">Подробнее о ценах →</a>
+            </p>
+            <button class="w-full py-3 rounded-xl text-[14px] font-[500]" style="background:var(--accent);color:#0c0b09" :disabled="!selPlan" :style="selPlan?'':'opacity:.4;cursor:not-allowed'" @click="pay">
+              Оплатить <span x-text="plans.find(p=>p.id===selPlan)?.price||''"></span>
+            </button>
+            <p class="text-center text-[11px] mt-3" style="color:var(--text-3)">Безопасная оплата · Мгновенное зачисление</p>
+          </div>
+        </div>
+      </template>
+
+    </div>
+  </template>
+
+  <!-- Lightbox for RAG images -->
+  <template x-if="cpLightboxOpen">
+    <div class="overlay" @click="cpLightboxOpen=false" style="z-index:60">
+      <img :src="cpLightboxImg" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.7)" @click.stop>
+    </div>
+  </template>
+
+</div>
+
+<script>
+marked.use(markedKatex({ throwOnError: false, output: 'html' }));
+marked.setOptions({ breaks: true, gfm: true });
+
+function app() {
+  return {
+    // Auth
+    token: localStorage.getItem('orion_token') || '',
+    authTab: (new URLSearchParams(location.search).get('auth') === 'register') ? 'register' : 'login',
+    authErr: '', authLoading: false,
+    loginEmail: '', loginPass: '',
+    regName: '', regEmail: '', regPass: '', regAgree: false,
+
+    // App state
+    user: { username:'', email:'', tokens_remaining:0, is_trial:true },
+    chats: [], messages: [], currentChatId: null,
+    loading: false, inputText: '', pendingFiles: [], globalDrag: false,
+
+    // UI state
+    showSettings: false, showBuyModal: false, settingsTab: 'model', selPlan: null,
+
+    // Courses panel state
+    showCourses: false,
+    sidebarCollapsed: (localStorage.getItem('sb_collapsed') === 'true'),
+    courses: [],
+    cpTab: 'list',
+    cpActiveCourse: null,
+    cpDocs: [],
+    cpLoading: false,
+    cpDocsLoading: false,
+    cpCreating: false,
+    cpNewTitle: '',
+    cpNewDesc: '',
+    cpYoutubeUrl: '',
+    cpDragging: false,
+    cpPollTimer: null,
+    cpLightboxOpen: false,
+    cpLightboxImg: '',
+    modelCatalog: {}, templateMeta: {},
+
+    // Mindmap state
+    showMindmap: false, mmFullscreen: false, mmMd: '', mmLoading: false,
+    mmUpdatedAt: null, mmInstance: null, mmRefreshTimer: null,
+
+    // PDF settings
+    pdfS: { font:"'Inter',sans-serif", fontSize:14, bg:'#ffffff', accent:'#c8913a', includeQ:true, timestamps:true },
+    pdfColors: {
+      bg: [{v:'#ffffff',n:'Белый'},{v:'#fafaf8',n:'Крем'},{v:'#f5f0e8',n:'Тёплый'},{v:'#1a1a1a',n:'Тёмный'}],
+      accent: [{v:'#c8913a',n:'Золото'},{v:'#2563eb',n:'Синий'},{v:'#16a34a',n:'Зелёный'},{v:'#9333ea',n:'Пурпур'},{v:'#dc2626',n:'Красный'}],
+    },
+    plans: [
+      {id:1,name:'Старт',    tokens:100_000,  price:'₽199', badge:null},
+      {id:2,name:'Стандарт', tokens:500_000,  price:'₽799', badge:'Популярный'},
+      {id:3,name:'Профи',    tokens:2_000_000,price:'₽2 499',badge:'Выгодно'},
+    ],
+
+    get currentChat() {
+      return Array.isArray(this.chats)
+        ? (this.chats.find(c=>c.id===this.currentChatId) || null)
+        : null;
+    },
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────
+    async init() {
+      const [models, templates] = await Promise.all([
+        fetch('/api/models').then(r=>r.json()).catch(()=>({})),
+        fetch('/api/templates').then(r=>r.json()).catch(()=>({})),
+      ]);
+      this.modelCatalog = models;
+      this.templateMeta = templates;
+      if (this.token) await this.loadUser();
+    },
+
+    // ── Auth ───────────────────────────────────────────────────────────────
+    async login() {
+      this.authErr = ''; this.authLoading = true;
+      try {
+        const r = await fetch('/api/auth/login', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({email: this.loginEmail, password: this.loginPass}),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'Ошибка входа');
+        this.token = d.access_token;
+        localStorage.setItem('orion_token', this.token);
+        this.user = d.user;
+        await this.loadChats();
+      } catch(e) { this.authErr = e.message; }
+      finally { this.authLoading = false; }
+    },
+
+    async register() {
+      if (!this.regAgree) {
+        this.authErr = 'Для регистрации примите условия оферты и политики конфиденциальности';
+        return;
+      }
+
+      this.authErr = ''; 
+      this.authLoading = true;
+
+      try {
+        const r = await fetch('/api/auth/register', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            username:  this.regName,
+            email:     this.regEmail,
+            password:  this.regPass,
+            agreement: this.regAgree,
+          }),
+        });
+
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'Ошибка регистрации');
+
+        this.token = d.access_token;
+        localStorage.setItem('orion_token', this.token);
+        this.user = d.user;
+        await this.loadChats();
+
+      } catch(e) {
+        this.authErr = e.message;
+      } finally {
+        this.authLoading = false;
+      }
+    },
+
+    logout() {
+      this.token = ''; localStorage.removeItem('orion_token');
+      this.chats = []; this.messages = []; this.currentChatId = null;
+    },
+
+    // ── API helpers ────────────────────────────────────────────────────────
+    api(path, opts={}) {
+      return fetch(path, {
+        ...opts,
+        headers: { 'Authorization': `Bearer ${this.token}`, ...(opts.headers||{}) },
+      });
+    },
+
+    // Fire-and-forget client-side analytics. Server validates against an allowlist.
+    track(event, props={}) {
+      try {
+        fetch('/api/track', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {}),
+          },
+          body: JSON.stringify({ event, props }),
+        }).catch(()=>{});
+      } catch {}
+    },
+
+    async loadUser() {
+      try {
+        const r = await this.api('/api/user');
+        if (r.status === 401) {
+          // Stale/invalid token — force fresh login. Don't try to load anything else.
+          this.logout();
+          return;
+        }
+        if (!r.ok) return;
+        this.user = await r.json();
+        await this.loadChats();
+      } catch(e) { console.error('loadUser:', e); }
+    },
+
+    async loadChats() {
+      try {
+        const r = await this.api('/api/chats');
+        if (r.status === 401) { this.logout(); return; }
+        if (!r.ok) { this.chats = []; return; }
+        const data = await r.json();
+        this.chats = Array.isArray(data) ? data : [];
+      } catch(e) {
+        console.error('loadChats:', e);
+        this.chats = [];
+      }
+    },
+
+    // ── Chat ops ───────────────────────────────────────────────────────────
+    async selectChat(id) {
+      this.currentChatId = id; this.messages = []; this.pendingFiles = [];
+      this.mmMd = ''; this.mmUpdatedAt = null;
+      try {
+        const r = await this.api(`/api/chats/${id}/messages`);
+        if (r.status === 401) { this.logout(); return; }
+        if (!r.ok) { this.messages = []; return; }
+        const data = await r.json();
+        this.messages = Array.isArray(data) ? data : [];
+        this.$nextTick(()=>this.scrollDown());
+        if (this.showMindmap) await this.loadMindmap();
+      } catch(e) { console.error('selectChat:', e); }
+    },
+
+    async createChat() {
+      try {
+        const fd = new FormData(); fd.append('template','deep'); fd.append('model','gemini-2.0-flash');
+        const r = await this.api('/api/chats', { method:'POST', body:fd });
+        if (r.status === 401) { this.logout(); return; }
+        if (!r.ok) {
+          console.error('createChat failed:', r.status);
+          return;
+        }
+        const chat = await r.json();
+        if (!chat || !chat.id) {
+          console.error('createChat: server returned no chat id', chat);
+          return;
+        }
+        this.chats.unshift(chat);
+        await this.selectChat(chat.id);
+      } catch(e) { console.error('createChat:', e); }
+    },
+
+    async deleteChat(id) {
+      try {
+        const r = await this.api(`/api/chats/${id}`, { method:'DELETE' });
+        if (r.status === 401) { this.logout(); return; }
+        this.chats = this.chats.filter(c => c.id !== id);
+        if (this.currentChatId === id) { this.currentChatId = null; this.messages = []; }
+      } catch(e) { console.error('deleteChat:', e); }
+    },
+
+    async switchTemplate(key) {
+      const c = this.chats.find(c=>c.id===this.currentChatId); if(c) c.template=key;
+      try { const fd=new FormData(); fd.append('template',key); await this.api(`/api/chats/${this.currentChatId}/settings`,{method:'PATCH',body:fd}); } catch {}
+    },
+    async switchModel(key) {
+      const c = this.chats.find(c=>c.id===this.currentChatId); if(c) c.model=key;
+      try { const fd=new FormData(); fd.append('model',key); await this.api(`/api/chats/${this.currentChatId}/settings`,{method:'PATCH',body:fd}); } catch {}
+    },
+
+    // ── Drag & Drop ────────────────────────────────────────────────────────
+    handleDragLeave(e) { if (!e.relatedTarget||e.relatedTarget===document.body) this.globalDrag=false; },
+    async handleDrop(e) {
+      this.globalDrag=false;
+      if (!this.currentChatId) return;
+      await this.processFiles(Array.from(e.dataTransfer.files));
+    },
+    async onFileSelect(e) { await this.processFiles(Array.from(e.target.files)); e.target.value=''; },
+    async processFiles(files) {
+      for (const f of files) {
+        const fd = new FormData(); fd.append('file',f);
+        try {
+          const info = await this.api('/api/upload',{method:'POST',body:fd}).then(r=>r.json());
+          this.pendingFiles.push(info);
+        } catch(e) { console.error('Upload error:',e); }
+      }
+    },
+
+    // ── Send ───────────────────────────────────────────────────────────────
+    async send() {
+      const text = this.inputText.trim(); const files = [...this.pendingFiles];
+      if (!text && !files.length) return;
+      if (this.loading) return;
+
+      this.messages.push({id:'tmp-'+Date.now(),role:'user',content:text,files,created_at:new Date().toISOString()});
+      this.inputText=''; this.pendingFiles=[]; this.loading=true;
+      this.$nextTick(()=>this.scrollDown());
+
+      try {
+        const fd = new FormData();
+        fd.append('content', text);
+        fd.append('files_json', JSON.stringify(files.map(f=>({sha256:f.sha256,original_filename:f.original_filename,mime_type:f.mime_type,compressed:f.compressed}))));
+        const r = await this.api(`/api/chats/${this.currentChatId}/messages`,{method:'POST',body:fd});
+        if (!r.ok) {
+          const e = await r.json().catch(()=>({detail:r.statusText}));
+          throw new Error(e.detail||'Ошибка сервера');
+        }
+        const reply = await r.json();
+        this.messages.push(reply);
+        const c = this.chats.find(c=>c.id===this.currentChatId);
+        if (c&&(c.title==='Новый чат')&&text) c.title=text.slice(0,55)+(text.length>55?'…':'');
+        const u = await this.api('/api/user').then(r=>r.json());
+        this.user = u;
+        // Refresh mindmap (server is generating it in background)
+        this.scheduleMindmapRefresh();
+      } catch(ex) {
+        this.messages.push({id:'err-'+Date.now(),role:'assistant',content:`⚠️ ${ex.message}`,files:[],tokens_used:0,cost_usd:0,created_at:new Date().toISOString()});
+      } finally { this.loading=false; this.$nextTick(()=>this.scrollDown()); }
+    },
+
+    // ── Export ─────────────────────────────────────────────────────────────
+    buildMd() {
+      const chat = this.currentChat; let md = `# ${chat?.title||'ConspectAI Chat'}\n\n`;
+      md += `> Шаблон: ${this.templateMeta[chat?.template]?.name||''} · Модель: ${this.modelCatalog[chat?.model]?.name||''}\n\n---\n\n`;
+      for (const m of this.messages) {
+        if (m.role==='user'&&!this.pdfS.includeQ) continue;
+        if (this.pdfS.timestamps) { const d=new Date((m.created_at||'')+'Z'); md+=`*${d.toLocaleString('ru-RU')}*\n\n`; }
+        md += m.role==='user' ? `**Вопрос:** ${m.content}\n\n---\n\n` : `${m.content}\n\n---\n\n`;
+      }
+      return md;
+    },
+    exportMD() {
+      this.track('export_md', { chat_id: this.currentChatId, msgs: this.messages.length });
+      const md=this.buildMd(), blob=new Blob([md],{type:'text/markdown;charset=utf-8'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download=(this.currentChat?.title||'chat').replace(/[^\w\-]/g,'_').slice(0,50)+'.md';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    },
+    exportPDF() {
+      this.track('export_pdf', { chat_id: this.currentChatId, msgs: this.messages.length });
+      const s=this.pdfS; const html=marked.parse(this.buildMd());
+      const win=window.open('','_blank');
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${this.currentChat?.title||'ConspectAI'}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+  body{font-family:${s.font};font-size:${s.fontSize}px;line-height:1.75;background:${s.bg};color:#1a1a1a;max-width:800px;margin:0 auto;padding:52px}
+  h1{font-size:1.6em;font-weight:600;color:${s.accent};margin:0 0 10px}
+  h2{font-size:1.15em;font-weight:600;color:${s.accent};margin:22px 0 8px;border-bottom:1.5px solid ${s.accent}33;padding-bottom:4px}
+  h3{font-size:1em;font-weight:600;margin:14px 0 6px}
+  p{margin-bottom:.5em}ul,ol{margin-left:1.4em;margin-bottom:.6em}li{margin-bottom:.25em}
+  code{font-family:'DM Mono',monospace;font-size:.82em;background:#0000000d;padding:2px 5px;border-radius:4px}
+  pre{background:#0000000d;border-radius:8px;padding:14px;overflow-x:auto;margin:10px 0}
+  pre code{background:none;padding:0}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.9em}
+  th,td{border:1px solid #00000022;padding:7px 12px;text-align:left}
+  th{font-weight:600;background:#00000009}
+  blockquote{border-left:3px solid ${s.accent};padding-left:14px;color:#666;margin:10px 0}
+  hr{border:none;border-top:1px solid #00000022;margin:16px 0}
+  .katex-display{margin:.8em 0;overflow-x:auto}
+  @media print{body{padding:32px}}
+</style></head><body>${html}
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"><\/script>
+<script>
+  document.querySelectorAll('.math.math-display').forEach(el=>{try{katex.render(el.textContent,el,{displayMode:true,throwOnError:false})}catch{}});
+  document.querySelectorAll('.math.math-inline').forEach(el=>{try{katex.render(el.textContent,el,{displayMode:false,throwOnError:false})}catch{}});
+  setTimeout(()=>window.print(),600);
+<\/script></body></html>`);
+      win.document.close();
+    },
+
+    // ── Mindmap ────────────────────────────────────────────────────────────
+    get mmStatusText() {
+      if (this.mmLoading) return 'Обновление карты…';
+      if (this.mmUpdatedAt) {
+        const d = new Date(this.mmUpdatedAt.endsWith('Z')?this.mmUpdatedAt:this.mmUpdatedAt+'Z');
+        return `Обновлено ${this.relTime(this.mmUpdatedAt)}`;
+      }
+      return 'Карта обновится после первого ответа';
+    },
+
+    async toggleMindmap() {
+      this.showMindmap = !this.showMindmap;
+      if (this.showMindmap) {
+        await this.loadMindmap();
+      }
+    },
+
+    async loadMindmap() {
+      if (!this.currentChatId) return;
+      try {
+        const resp = await this.api(`/api/chats/${this.currentChatId}/mindmap`);
+        if (!resp.ok) return;
+        const r = await resp.json();
+        this.mmMd = r.markdown || '';
+        this.mmUpdatedAt = r.updated_at;
+        if (this.mmMd) this.$nextTick(() => this.renderMindmap());
+      } catch(e) { console.error('mindmap load:',e); }
+    },
+
+    renderMindmap() {
+      const svg = document.getElementById('mm-svg');
+      if (!svg || !this.mmMd) return;
+      // Wait for esm.sh module to finish loading
+      if (!window.MarkmapAPI) {
+        window.addEventListener('markmap-ready', () => this.renderMindmap(), { once: true });
+        return;
+      }
+      try {
+        if (this.mmInstance && typeof this.mmInstance.destroy === 'function') {
+          this.mmInstance.destroy();
+        }
+        svg.innerHTML = '';
+        const { Transformer, Markmap } = window.MarkmapAPI;
+        const transformer = new Transformer();
+        const { root } = transformer.transform(this.mmMd);
+        this.mmInstance = Markmap.create(svg, {
+          duration: 350,
+          spacingHorizontal: 70,
+          spacingVertical: 6,
+          paddingX: 10,
+          color: () => '#c8913a',
+        }, root);
+      } catch (e) { console.error('mindmap render:', e); }
+    },
+
+    async regenerateMindmap() {
+      if (!this.currentChatId || this.mmLoading) return;
+      this.mmLoading = true;
+      try {
+        await this.api(`/api/chats/${this.currentChatId}/mindmap/regenerate`, {method:'POST'});
+        // Server runs it in the background — poll for changes
+        const beforeUpdate = this.mmUpdatedAt;
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 1500));
+          await this.loadMindmap();
+          if (this.mmUpdatedAt && this.mmUpdatedAt !== beforeUpdate) break;
+        }
+      } catch(e) { console.error(e); }
+      finally { this.mmLoading = false; }
+    },
+
+    scheduleMindmapRefresh() {
+      // Called after sending a message — server is generating in the background.
+      if (this.mmRefreshTimer) clearTimeout(this.mmRefreshTimer);
+      const beforeUpdate = this.mmUpdatedAt;
+      this.mmLoading = true;
+      let attempts = 0;
+      const poll = async () => {
+        attempts++;
+        await this.loadMindmap();
+        if (this.mmUpdatedAt && this.mmUpdatedAt !== beforeUpdate) {
+          this.mmLoading = false;
+          return;
+        }
+        if (attempts < 8) {
+          this.mmRefreshTimer = setTimeout(poll, 1800);
+        } else {
+          this.mmLoading = false;
+        }
+      };
+      this.mmRefreshTimer = setTimeout(poll, 2200);
+    },
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    scrollDown() { const el=document.getElementById('msg-scroll'); if(el) el.scrollTop=el.scrollHeight; },
+    fmtTokens(n) { if(n==null)return'—'; if(n>=1_000_000)return(n/1_000_000).toFixed(1)+'M'; if(n>=1_000)return Math.round(n/1_000)+'K'; return String(n); },
+    relTime(str) {
+      if(!str)return''; const d=new Date(str.endsWith('Z')?str:str+'Z'); const s=(Date.now()-d)/1000;
+      if(s<60)return'только что'; if(s<3600)return Math.floor(s/60)+' мин'; if(s<86400)return Math.floor(s/3600)+' ч';
+      return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+    },
+    modelShort(key) { if(!key)return''; const m=this.modelCatalog[key]; return m?m.name.replace('Gemini ',''):key.replace('gemini-',''); },
+    renderMd(text) { if(!text)return''; try{return marked.parse(text)}catch{return text} },
+    async copyText(t) { try{ await navigator.clipboard.writeText(t) } catch {} },
+
+    // ── Courses ────────────────────────────────────────────────────────────
+    async toggleCourses() {
+      this.showCourses = !this.showCourses;
+      if (this.showCourses && this.courses.length === 0) {
+        await this.loadCourses();
+      }
+    },
+
+    async loadCourses() {
+      this.cpLoading = true;
+      try {
+        const r = await this.api('/api/courses');
+        if (r.ok) this.courses = await r.json();
+      } catch(e) { console.error('loadCourses:', e); }
+      finally { this.cpLoading = false; }
+    },
+
+    async createCourse() {
+      if (!this.cpNewTitle.trim()) return;
+      try {
+        const r = await this.api('/api/courses', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ title: this.cpNewTitle.trim(), description: this.cpNewDesc.trim() }),
+        });
+        if (r.ok) {
+          const course = await r.json();
+          this.courses.unshift(course);
+          this.cpNewTitle = ''; this.cpNewDesc = ''; this.cpCreating = false;
+          this.openCourse(course);
+        }
+      } catch(e) { console.error('createCourse:', e); }
+    },
+
+    async deleteCourse(id) {
+      if (!confirm('Удалить курс и все материалы?')) return;
+      try {
+        await this.api(`/api/courses/${id}`, { method: 'DELETE' });
+        this.courses = this.courses.filter(c => c.id !== id);
+        if (this.cpActiveCourse?.id === id) {
+          this.cpActiveCourse = null; this.cpTab = 'list'; this.cpDocs = [];
+        }
+      } catch(e) { console.error('deleteCourse:', e); }
+    },
+
+    async openCourse(course) {
+      this.cpActiveCourse = course;
+      this.cpTab = 'docs';
+      await this.loadDocs();
+    },
+
+    async loadDocs() {
+      if (!this.cpActiveCourse) return;
+      this.cpDocsLoading = true;
+      try {
+        const r = await this.api(`/api/courses/${this.cpActiveCourse.id}/documents`);
+        if (r.ok) {
+          this.cpDocs = await r.json();
+          // Start polling if any are still indexing
+          this.maybeStartDocPoll();
+        }
+      } catch(e) { console.error('loadDocs:', e); }
+      finally { this.cpDocsLoading = false; }
+    },
+
+    maybeStartDocPoll() {
+      const needsPoll = this.cpDocs.some(d => d.status === 'indexing' || d.status === 'pending');
+      if (needsPoll && !this.cpPollTimer) {
+        this.cpPollTimer = setInterval(async () => {
+          await this.loadDocs();
+          if (!this.cpDocs.some(d => d.status === 'indexing' || d.status === 'pending')) {
+            clearInterval(this.cpPollTimer); this.cpPollTimer = null;
+            // Refresh courses list to update chunk counts
+            await this.loadCourses();
+          }
+        }, 3000);
+      }
+    },
+
+    async onCourseFileSelect(e) {
+      const files = Array.from(e.target.files);
+      e.target.value = '';
+      for (const f of files) await this.uploadCourseFile(f);
+    },
+
+    async onCourseFileDrop(e) {
+      this.cpDragging = false;
+      const files = Array.from(e.dataTransfer.files);
+      for (const f of files) await this.uploadCourseFile(f);
+    },
+
+    async uploadCourseFile(file) {
+      if (!this.cpActiveCourse) return;
+      const fd = new FormData(); fd.append('file', file);
+      // Optimistic UI — show pending immediately
+      const tmpId = 'tmp-' + Date.now();
+      this.cpDocs.unshift({ id: tmpId, filename: file.name, status: 'pending', source_type: file.name.split('.').pop() || 'file', chunk_count: 0 });
+      try {
+        const r = await this.api(`/api/courses/${this.cpActiveCourse.id}/ingest`, { method: 'POST', body: fd });
+        if (r.ok) {
+          const data = await r.json();
+          // Replace tmp with real doc
+          const idx = this.cpDocs.findIndex(d => d.id === tmpId);
+          if (idx !== -1) this.cpDocs[idx] = { ...this.cpDocs[idx], id: data.document_id, status: data.status };
+          this.maybeStartDocPoll();
+        } else {
+          this.cpDocs = this.cpDocs.filter(d => d.id !== tmpId);
+        }
+      } catch(e) {
+        this.cpDocs = this.cpDocs.filter(d => d.id !== tmpId);
+        console.error('upload file:', e);
+      }
+    },
+
+    async ingestYoutube() {
+      if (!this.cpActiveCourse || !this.cpYoutubeUrl.trim()) return;
+      const url = this.cpYoutubeUrl.trim();
+      this.cpYoutubeUrl = '';
+      const tmpId = 'yt-' + Date.now();
+      this.cpDocs.unshift({ id: tmpId, filename: url, status: 'pending', source_type: 'youtube', chunk_count: 0 });
+      try {
+        const r = await this.api(`/api/courses/${this.cpActiveCourse.id}/ingest-url`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ url }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const idx = this.cpDocs.findIndex(d => d.id === tmpId);
+          if (idx !== -1) this.cpDocs[idx] = { ...this.cpDocs[idx], id: data.document_id, status: data.status };
+          this.maybeStartDocPoll();
+        } else {
+          this.cpDocs = this.cpDocs.filter(d => d.id !== tmpId);
+        }
+      } catch(e) {
+        this.cpDocs = this.cpDocs.filter(d => d.id !== tmpId);
+        console.error('ingest youtube:', e);
+      }
+    },
+
+    async deleteDoc(docId) {
+      if (!this.cpActiveCourse) return;
+      try {
+        await this.api(`/api/courses/${this.cpActiveCourse.id}/documents/${docId}`, { method: 'DELETE' });
+        this.cpDocs = this.cpDocs.filter(d => d.id !== docId);
+      } catch(e) { console.error('deleteDoc:', e); }
+    },
+
+    async toggleChatCourse(courseId) {
+      if (!this.currentChatId) return;
+      const currentLinked = this.currentChat?.course_id;
+      const newCourseId = currentLinked === courseId ? null : courseId;
+      try {
+        const r = await this.api(`/api/chats/${this.currentChatId}/course`, {
+          method: 'PATCH',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ course_id: newCourseId }),
+        });
+        if (r.ok) {
+          // Update the chat object in memory
+          const c = this.chats.find(c => c.id === this.currentChatId);
+          if (c) c.course_id = newCourseId;
+        }
+      } catch(e) { console.error('toggleChatCourse:', e); }
+    },
+
+    pay() {
+      if(!this.selPlan)return;
+      const p=this.plans.find(p=>p.id===this.selPlan);
+      alert(`Переход к оплате: ${p.price}\nТокены зачислятся автоматически.`);
+      this.showBuyModal=false; this.selPlan=null;
+    },
+  };
+}
+</script>
+</body>
+</html>

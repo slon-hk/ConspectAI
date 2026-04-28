@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConspectAI — STEM Knowledge Architect</title>
+<meta name="description" content="ИИ-ассистент для студентов инженерных и научных специальностей. Структурированные ответы с LaTeX-формулами, автоматическая карта изученных тем, 5 шаблонов вывода.">
+
+<!-- Canonical / favicon -->
+<link rel="canonical" href="https://conspectai.tech/">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+<!-- Open Graph (Telegram / Facebook / iMessage / Slack) -->
+<meta property="og:type"        content="website">
+<meta property="og:url"         content="https://conspectai.tech/">
+<meta property="og:title"       content="ConspectAI — STEM Knowledge Architect">
+<meta property="og:description" content="ИИ-ассистент для студентов инженерных и научных специальностей. Структурированные ответы, LaTeX и карта тем.">
+<meta property="og:image"       content="https://conspectai.tech/static/og-image.svg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale"      content="ru_RU">
+
+<!-- Twitter Card -->
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="ConspectAI — STEM Knowledge Architect">
+<meta name="twitter:description" content="ИИ-ассистент для студентов инженерных и научных специальностей.">
+<meta name="twitter:image"       content="https://conspectai.tech/static/og-image.svg"><script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;450;500;600&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0b09;--surface:#171512;--surface-2:#1e1b17;--surface-3:#252118;
+  --border:#272420;--border-2:#322e28;
+  --accent:#c8913a;--accent-hi:#dda74d;--accent-dim:rgba(200,145,58,.13);--accent-glow:rgba(200,145,58,.28);
+  --text-1:#e6e1d5;--text-2:#8a8274;--text-3:#4a4640;
+  --green:#4ade80;--blue:#60a5fa;--purple:#a78bfa;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent-dim)}
+
+.logo{font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.04em}
+.font-display{font-family:'Cormorant Garamond',serif}
+.font-mono{font-family:'DM Mono',monospace}
+
+/* ── Background gradients ── */
+.bg-hero{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(200,145,58,.12) 0%,transparent 70%),radial-gradient(ellipse 60% 40% at 50% 100%,rgba(96,165,250,.04) 0%,transparent 70%)}
+.bg-section{position:relative}
+.bg-section::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(200,145,58,.04) 0%,transparent 60%);pointer-events:none}
+
+/* ── Nav ── */
+.nav{position:sticky;top:0;z-index:30;backdrop-filter:blur(16px);background:rgba(12,11,9,.72);border-bottom:1px solid var(--border)}
+.nav-link{color:var(--text-2);font-size:13.5px;font-weight:450;transition:color .15s;cursor:pointer}
+.nav-link:hover{color:var(--text-1)}
+
+/* ── Buttons ── */
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:500;background:var(--accent);color:#0c0b09;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
+.btn-primary:hover{background:var(--accent-hi);box-shadow:0 0 24px var(--accent-glow);transform:translateY(-1px)}
+.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:500;background:transparent;color:var(--text-1);border:1px solid var(--border-2);cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-secondary:hover{background:var(--surface-2);border-color:var(--accent)}
+.btn-ghost{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;background:transparent;color:var(--text-2);cursor:pointer;border:1px solid transparent;transition:all .15s;text-decoration:none}
+.btn-ghost:hover{color:var(--text-1);border-color:var(--border)}
+
+/* ── Cards ── */
+.card{background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);border:1px solid var(--border);border-radius:16px;padding:24px;transition:transform .25s,border-color .2s,box-shadow .25s}
+.card:hover{transform:translateY(-3px);border-color:var(--border-2);box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.card-glow{position:relative;overflow:hidden}
+.card-glow::before{content:'';position:absolute;top:-50%;right:-30%;width:60%;height:60%;background:radial-gradient(circle,var(--accent-dim) 0%,transparent 70%);pointer-events:none;opacity:0;transition:opacity .35s}
+.card-glow:hover::before{opacity:1}
+
+/* ── Badges ── */
+.badge-trial{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.badge-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:500;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(200,145,58,.22)}
+
+/* ── Mock chat preview ── */
+.preview-window{background:linear-gradient(180deg,var(--surface) 0%,#13110e 100%);border:1px solid var(--border-2);border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 0 1px rgba(200,145,58,.05)}
+.preview-bar{display:flex;align-items:center;gap:6px;padding:11px 16px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+.preview-dot{width:11px;height:11px;border-radius:50%}
+.preview-content{padding:24px 26px;font-size:14px;line-height:1.7}
+.preview-content h2{font-size:1.05em;font-weight:600;margin:14px 0 6px;color:var(--text-1);border-bottom:1px solid var(--border);padding-bottom:4px}
+.preview-content h2:first-child{margin-top:0}
+.preview-content strong{color:var(--text-1);font-weight:600}
+.preview-content p{margin-bottom:.5em;color:var(--text-1)}
+.preview-content .katex{font-size:1.05em;color:var(--text-1)}
+.preview-content .katex-display{margin:.7em 0}
+.preview-content .anchor-tip{color:var(--accent)}
+
+/* ── Animated gradient border ── */
+.shine-card{position:relative;border-radius:16px;padding:1px;background:linear-gradient(135deg,rgba(200,145,58,.4) 0%,rgba(200,145,58,.05) 30%,rgba(200,145,58,.05) 70%,rgba(200,145,58,.3) 100%)}
+.shine-card-inner{background:var(--surface);border-radius:15px;padding:23px;height:100%}
+
+/* ── Animations ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 var(--accent-glow)}70%{box-shadow:0 0 0 14px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.animate-up{animation:fadeUp .8s cubic-bezier(.2,.8,.2,1) both}
+.animate-in{animation:fadeIn 1.2s ease both}
+.delay-1{animation-delay:.1s}
+.delay-2{animation-delay:.2s}
+.delay-3{animation-delay:.3s}
+.delay-4{animation-delay:.4s}
+.logo-pulse{animation:pulse-ring 2.5s ease-out infinite}
+
+/* ── Floating orbs (decorative) ── */
+.orb{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;opacity:.5}
+@keyframes float-1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,-20px)}}
+@keyframes float-2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,30px)}}
+.orb-1{width:300px;height:300px;background:rgba(200,145,58,.18);top:-80px;left:10%;animation:float-1 18s ease-in-out infinite}
+.orb-2{width:250px;height:250px;background:rgba(96,165,250,.06);top:30%;right:5%;animation:float-2 22s ease-in-out infinite}
+
+/* ── Stats ── */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-radius:14px;overflow:hidden;border:1px solid var(--border)}
+.stat-cell{background:var(--surface);padding:24px;text-align:center}
+
+/* ── Code block in mock ── */
+.mock-code{font-family:'DM Mono',monospace;font-size:.84em;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text-2);margin:6px 0;overflow-x:auto}
+
+@media (max-width:768px){
+  .hero-title{font-size:42px!important}
+  .stat-row{grid-template-columns:1fr;gap:1px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══════════════════════════════════════════════════════════════ -->
+<nav class="nav">
+  <div class="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5 no-underline">
+      <div class="logo-pulse w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--accent)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="logo text-[22px]" style="color:var(--text-1)">ConspectAI</span>
+    </a>
+    <div class="flex items-center gap-1">
+      <a href="#features" class="nav-link px-3 py-2 hidden sm:inline">Возможности</a>
+      <a href="#templates" class="nav-link px-3 py-2 hidden sm:inline">Шаблоны</a>
+      <a href="/pricing" class="nav-link px-3 py-2 hidden md:inline">Тарифы</a>
+      <a href="/app?auth=login" class="btn-ghost ml-2">Войти</a>
+      <a href="/app?auth=register" class="btn-primary !py-2 !px-4 !text-[13px]">Начать бесплатно</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════════════════ -->
+<section class="bg-hero relative overflow-hidden">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="max-w-5xl mx-auto px-6 pt-20 pb-24 md:pt-28 md:pb-32 text-center relative">
+    <div class="badge-trial mb-6 animate-up">
+      🎁 10 000 пробных токенов · без карты · без подписки
+    </div>
+
+    <h1 class="hero-title font-display text-[60px] md:text-[78px] leading-[1.05] mb-6 animate-up delay-1" style="color:var(--text-1)">
+      <span style="color:var(--text-1)">STEM Knowledge</span><br>
+      <span style="background:linear-gradient(135deg,var(--accent) 0%,var(--accent-hi) 100%);-webkit-background-clip:text;background-clip:text;color:transparent">Architect</span>
+    </h1>
+
+    <p class="text-[16px] md:text-[18px] max-w-2xl mx-auto mb-10 animate-up delay-2" style="color:var(--text-2)">
+      ИИ-ассистент для студентов инженерных и научных специальностей. Структурированные ответы с LaTeX-формулами, автоматическая карта изученных тем и память чатов.
+    </p>
+
+    <div class="flex items-center justify-center gap-3 flex-wrap animate-up delay-3">
+      <a href="/app?auth=register" class="btn-primary">
+        Попробовать бесплатно
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+      <a href="#preview" class="btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Посмотреть пример
+      </a>
+    </div>
+
+    <p class="text-[12px] mt-6 animate-up delay-4" style="color:var(--text-3)">
+      Powered by Google Gemini 2.0 · Open source
+    </p>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ══════════════════════════════════════════════════════════ -->
+<section id="features" class="bg-section py-20 md:py-28">
+  <div class="max-w-6xl mx-auto px-6 relative">
+
+    <div class="text-center mb-14">
+      <span class="badge-tag mb-4">Возможности</span>
+      <h2 class="font-display text-[40px] md:text-[52px] mb-3" style="color:var(--text-1)">Сделано для серьёзной учёбы</h2>
+      <p class="text-[15px] max-w-2xl mx-auto" style="color:var(--text-2)">
+        Не очередной ChatGPT-клон. Каждая деталь продумана для математики, физики и инженерных дисциплин.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+      <div class="card card-glow">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="1.7" style="stroke:var(--accent)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </div>
+        <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Настоящий LaTeX</h3>
+        <p class="text-[13.5px]" style="color:var(--text-2)">
+          Формулы рендерятся через KaTeX — как в учебнике. $\nabla \cdot \mathbf{E} = \rho/\varepsilon_0$ выглядит правильно, не ASCII-каша.
+        </p>
+      </div>
+
+      <div class="card card-glow">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="1.7" style="stroke:var(--accent)"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">5 шаблонов вывода</h3>
+        <p class="text-[13.5px]" style="color:var(--text-2)">
+          Deep Engineering, Exam Cram, Quick Summary, Problem Solver, Concept Map — каждый структурирует ответ под свою задачу.
+        </p>
+      </div>
+
+      <div class="card card-glow">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="1.7" style="stroke:var(--accent)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Память контекста</h3>
+        <p class="text-[13.5px]" style="color:var(--text-2)">
+          Ассистент помнит весь диалог. Можно уточнять, дополнять, развивать тему — без бесконечных «как я уже говорил…».
+        </p>
+      </div>
+
+      <div class="card card-glow">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="1.7" style="stroke:var(--accent)"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </div>
+        <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Drag &amp; drop файлов</h3>
+        <p class="text-[13.5px]" style="color:var(--text-2)">
+          Картинки, PDF, код, .tex — перетащите в окно. Дедупликация по SHA-256: один файл не занимает место дважды.
+        </p>
+      </div>
+
+      <div class="card card-glow">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="1.7" style="stroke:var(--accent)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Экспорт в PDF и MD</h3>
+        <p class="text-[13.5px]" style="color:var(--text-2)">
+          Сохраните конспект в Markdown для Obsidian или в PDF с настраиваемыми шрифтом, цветами и фоном — для печати.
+        </p>
+      </div>
+
+      <div class="card card-glow">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.22)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="1.7" style="stroke:var(--accent)"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="7" y1="6" x2="9.5" y2="11"/><line x1="17" y1="6" x2="14.5" y2="11"/><line x1="7" y1="18" x2="9.5" y2="13"/><line x1="17" y1="18" x2="14.5" y2="13"/></svg>
+        </div>
+        <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Карта тем — автоматически</h3>
+        <p class="text-[13.5px]" style="color:var(--text-2)">
+          ИИ-картограф строит интерактивный mind-map изученных тем прямо во время диалога. Идеальная карта повторения перед экзаменом — без ручной работы.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MOCK PREVIEW ══════════════════════════════════════════════════════ -->
+<section id="preview" class="py-20 md:py-28 relative overflow-hidden">
+  <div class="orb orb-1" style="top:auto;bottom:-100px;left:auto;right:5%"></div>
+
+  <div class="max-w-5xl mx-auto px-6 relative">
+    <div class="text-center mb-12">
+      <span class="badge-tag mb-4">Пример ответа</span>
+      <h2 class="font-display text-[40px] md:text-[52px] mb-3" style="color:var(--text-1)">Так выглядит ответ</h2>
+      <p class="text-[15px] max-w-2xl mx-auto" style="color:var(--text-2)">
+        Шаблон <span class="badge-tag !mb-0 align-middle">⚙️ Deep Engineering</span>&nbsp;— на запрос «объясни линейную независимость»
+      </p>
+    </div>
+
+    <div class="preview-window animate-up">
+      <div class="preview-bar">
+        <div class="preview-dot" style="background:#ff5f57"></div>
+        <div class="preview-dot" style="background:#febc2e"></div>
+        <div class="preview-dot" style="background:#28c840"></div>
+        <span class="ml-3 text-[12px] font-mono" style="color:var(--text-3)">orion.ai · линейная зависимость</span>
+      </div>
+      <div class="preview-content">
+        <h2>🧭 Overview</h2>
+        <p>Линейная независимость — фундаментальное понятие, определяющее, можно ли составить вектор пространства как комбинацию других, или каждый из них «вносит» что-то новое.</p>
+
+        <h2>📐 Formal Definition</h2>
+        <p>Система векторов $\{v_1, v_2, \dots, v_k\}$ называется <strong>линейно независимой</strong>, если равенство</p>
+        <p>$$\alpha_1 v_1 + \alpha_2 v_2 + \cdots + \alpha_k v_k = \mathbf{0}$$</p>
+        <p>выполняется только при $\alpha_1 = \alpha_2 = \cdots = \alpha_k = 0$. Если найдётся хотя бы один набор коэффициентов, где не все $\alpha_i = 0$ при сумме, равной нулю, система называется <strong>линейно зависимой</strong>.</p>
+
+        <h2>🔗 Intuition</h2>
+        <p><span class="anchor-tip">💡</span> Простыми словами: в наборе нет «лишних» векторов. Ни один нельзя собрать из остальных, как из конструктора. Если векторы зависимы&nbsp;— значит, кто-то «бесполезен», его направление уже покрыто комбинацией других.</p>
+
+        <h2>⚠️ Common Pitfalls</h2>
+        <p>— Нулевой вектор всегда делает систему зависимой: $1 \cdot \mathbf{0} = \mathbf{0}$ при $\alpha_1 \neq 0$.<br>
+        — В $\mathbb{R}^n$ любые $n+1$ векторов автоматически зависимы.</p>
+      </div>
+    </div>
+
+    <p class="text-center text-[12px] mt-6" style="color:var(--text-3)">
+      Реальный вывод модели · LaTeX рендерится в браузере через KaTeX
+    </p>
+  </div>
+</section>
+
+<!-- ═══ MINDMAP SHOWCASE ══════════════════════════════════════════════════ -->
+<section class="bg-section py-20 md:py-28">
+  <div class="max-w-5xl mx-auto px-6 relative">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+      <div>
+        <span class="badge-tag mb-4">Карта тем</span>
+        <h2 class="font-display text-[36px] md:text-[48px] mb-4 leading-tight" style="color:var(--text-1)">
+          Видеть весь предмет<br>сразу
+        </h2>
+        <p class="text-[15px] mb-5" style="color:var(--text-2)">
+          После каждого ответа второй ИИ-агент&nbsp;— картограф&nbsp;— тихо обновляет mind-map изученных тем. Вы получаете живую структуру предмета, готовую к повторению.
+        </p>
+        <ul class="space-y-2.5 text-[14px]" style="color:var(--text-2)">
+          <li class="flex items-start gap-2">
+            <span style="color:var(--accent)" class="mt-0.5">✓</span>
+            <span>Обновляется автоматически в фоне после каждого вопроса</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span style="color:var(--accent)" class="mt-0.5">✓</span>
+            <span>Интерактивная: можно сворачивать ветки, увеличивать, открывать на полный экран</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span style="color:var(--accent)" class="mt-0.5">✓</span>
+            <span>Бесплатно: не списывается из ваших токенов</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span style="color:var(--accent)" class="mt-0.5">✓</span>
+            <span>Ручная перестройка одной кнопкой&nbsp;— если нужно</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Static SVG mindmap preview -->
+      <div class="preview-window" style="aspect-ratio:1/1;display:flex;flex-direction:column">
+        <div class="preview-bar">
+          <div class="preview-dot" style="background:#ff5f57"></div>
+          <div class="preview-dot" style="background:#febc2e"></div>
+          <div class="preview-dot" style="background:#28c840"></div>
+          <span class="ml-3 text-[12px] font-mono" style="color:var(--text-3)">Карта тем · линейная алгебра</span>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px;background:radial-gradient(ellipse at center,rgba(200,145,58,.04) 0%,transparent 70%)">
+          <svg viewBox="0 0 480 380" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;font-family:'DM Sans',sans-serif">
+            <!-- Curves -->
+            <g fill="none" stroke="#c8913a" stroke-opacity=".55" stroke-width="1.6">
+              <path d="M 100 190 Q 145 110, 215 110"/>
+              <path d="M 100 190 Q 145 190, 215 190"/>
+              <path d="M 100 190 Q 145 270, 215 270"/>
+              <path d="M 215 110 Q 270 80, 340 80"/>
+              <path d="M 215 110 Q 270 130, 340 130"/>
+              <path d="M 215 190 Q 270 165, 340 165"/>
+              <path d="M 215 190 Q 270 195, 340 195"/>
+              <path d="M 215 190 Q 270 225, 340 225"/>
+              <path d="M 215 270 Q 270 270, 340 270"/>
+              <path d="M 215 270 Q 270 305, 340 305"/>
+            </g>
+            <!-- Nodes -->
+            <g>
+              <!-- Root -->
+              <circle cx="100" cy="190" r="6" fill="#c8913a"/>
+              <text x="80" y="183" fill="#e6e1d5" font-size="14" font-weight="500" text-anchor="end">Линейная</text>
+              <text x="80" y="200" fill="#e6e1d5" font-size="14" font-weight="500" text-anchor="end">алгебра</text>
+              <!-- Level 1 -->
+              <circle cx="215" cy="110" r="4.5" fill="#c8913a"/>
+              <text x="225" y="114" fill="#e6e1d5" font-size="13">Векторы</text>
+              <circle cx="215" cy="190" r="4.5" fill="#c8913a"/>
+              <text x="225" y="194" fill="#e6e1d5" font-size="13">Матрицы</text>
+              <circle cx="215" cy="270" r="4.5" fill="#c8913a"/>
+              <text x="225" y="274" fill="#e6e1d5" font-size="13">Системы</text>
+              <!-- Level 2 -->
+              <circle cx="340" cy="80" r="3.5" fill="#c8913a" fill-opacity=".7"/>
+              <text x="348" y="84" fill="#8a8274" font-size="12">Лин. независимость</text>
+              <circle cx="340" cy="130" r="3.5" fill="#c8913a" fill-opacity=".7"/>
+              <text x="348" y="134" fill="#8a8274" font-size="12">Базис, размерность</text>
+              <circle cx="340" cy="165" r="3.5" fill="#c8913a" fill-opacity=".7"/>
+              <text x="348" y="169" fill="#8a8274" font-size="12">Определитель</text>
+              <circle cx="340" cy="195" r="3.5" fill="#c8913a" fill-opacity=".7"/>
+              <text x="348" y="199" fill="#8a8274" font-size="12">Ранг</text>
+              <circle cx="340" cy="225" r="3.5" fill="#c8913a" fill-opacity=".7"/>
+              <text x="348" y="229" fill="#8a8274" font-size="12">Собств. значения</text>
+              <circle cx="340" cy="270" r="3.5" fill="#c8913a" fill-opacity=".7"/>
+              <text x="348" y="274" fill="#8a8274" font-size="12">Метод Гаусса</text>
+              <circle cx="340" cy="305" r="3.5" fill="#c8913a" fill-opacity=".7"/>
+              <text x="348" y="309" fill="#8a8274" font-size="12">Правило Крамера</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ TEMPLATES ═════════════════════════════════════════════════════════ -->
+<section id="templates" class="bg-section py-20 md:py-28">
+  <div class="max-w-6xl mx-auto px-6 relative">
+
+    <div class="text-center mb-14">
+      <span class="badge-tag mb-4">Шаблоны</span>
+      <h2 class="font-display text-[40px] md:text-[52px] mb-3" style="color:var(--text-1)">Один вопрос&nbsp;— разные ответы</h2>
+      <p class="text-[15px] max-w-2xl mx-auto" style="color:var(--text-2)">
+        Переключайте шаблон в один клик — и ответ перестроится под цель: разобраться, повторить к экзамену, решить задачу.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+      <div class="shine-card">
+        <div class="shine-card-inner">
+          <div class="text-[28px] mb-3">⚙️</div>
+          <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Deep Engineering</h3>
+          <p class="text-[13px] mb-4" style="color:var(--text-2)">Полный разбор: определение → вывод → пример → интуиция → подводные камни.</p>
+          <div class="text-[11.5px] font-mono" style="color:var(--text-3)">
+            ## Overview · ## Formal Definition · ## Mechanism · ## Worked Example · ## Intuition · ## Pitfalls
+          </div>
+        </div>
+      </div>
+
+      <div class="shine-card">
+        <div class="shine-card-inner">
+          <div class="text-[28px] mb-3">⚡</div>
+          <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Exam Cram</h3>
+          <p class="text-[13px] mb-4" style="color:var(--text-2)">К экзамену за ночь: формулы, флэш-карточки, типичные ошибки, мнемоника.</p>
+          <div class="text-[11.5px] font-mono" style="color:var(--text-3)">
+            ## High-Yield · ## Formula Sheet · ## Flashcards · ## Pitfalls · ## Mnemonics
+          </div>
+        </div>
+      </div>
+
+      <div class="shine-card">
+        <div class="shine-card-inner">
+          <div class="text-[28px] mb-3">📌</div>
+          <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Quick Summary</h3>
+          <p class="text-[13px] mb-4" style="color:var(--text-2)">Аннотация статьи или главы за минуту: суть, методология, выводы, ограничения.</p>
+          <div class="text-[11.5px] font-mono" style="color:var(--text-3)">
+            ## Abstract · ## Core Result · ## Methodology · ## Significance
+          </div>
+        </div>
+      </div>
+
+      <div class="shine-card">
+        <div class="shine-card-inner">
+          <div class="text-[28px] mb-3">✏️</div>
+          <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Problem Solver</h3>
+          <p class="text-[13px] mb-4" style="color:var(--text-2)">Пошаговое решение задачи с проверкой ответа и альтернативным методом.</p>
+          <div class="text-[11.5px] font-mono" style="color:var(--text-3)">
+            ## Analysis · ## Strategy · ## Solution · ## Verification · ## Alternative
+          </div>
+        </div>
+      </div>
+
+      <div class="shine-card">
+        <div class="shine-card-inner">
+          <div class="text-[28px] mb-3">🌐</div>
+          <h3 class="text-[17px] font-[500] mb-2" style="color:var(--text-1)">Concept Map</h3>
+          <p class="text-[13px] mb-4" style="color:var(--text-2)">Глубокое понимание: контекст, аналогии, связи с другими темами, применения.</p>
+          <div class="text-[11.5px] font-mono" style="color:var(--text-3)">
+            ## Big Picture · ## Definition Layers · ## Analogies · ## Applications
+          </div>
+        </div>
+      </div>
+
+      <div class="card flex items-center justify-center text-center" style="background:transparent;border-style:dashed">
+        <div>
+          <div class="text-[24px] mb-2" style="color:var(--text-3)">+</div>
+          <p class="text-[13px]" style="color:var(--text-2)">Кастомные шаблоны<br><span class="text-[11px]" style="color:var(--text-3)">скоро</span></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MODELS ════════════════════════════════════════════════════════════ -->
+<section id="models" class="py-20 md:py-28">
+  <div class="max-w-5xl mx-auto px-6">
+
+    <div class="text-center mb-14">
+      <span class="badge-tag mb-4">Модели</span>
+      <h2 class="font-display text-[40px] md:text-[52px] mb-3" style="color:var(--text-1)">Выбирайте под задачу</h2>
+      <p class="text-[15px] max-w-2xl mx-auto" style="color:var(--text-2)">
+        Дешёвый Flash Lite для рутины, Pro для сложных доказательств. Цена&nbsp;— перед каждым запросом.
+      </p>
+    </div>
+
+    <div class="space-y-3">
+
+      <div class="card flex flex-col md:flex-row md:items-center gap-4">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-[16px] font-[500]" style="color:var(--text-1)">Gemini 2.0 Flash</h3>
+            <span class="badge-trial !py-0.5 !px-2 !text-[10px]">Рекомендуется</span>
+          </div>
+          <p class="text-[13px]" style="color:var(--text-2)">Быстрый, современный, мультимодальный. Оптимальный баланс скорости и качества.</p>
+          <p class="text-[11px] mt-1" style="color:var(--text-3)">⚡ Очень быстрый · Контекст 1M токенов</p>
+        </div>
+        <div class="flex md:flex-col gap-3 md:gap-1 md:text-right">
+          <div><span class="text-[10px]" style="color:var(--text-3)">Вход:&nbsp;</span><span class="font-mono text-[13px]" style="color:var(--accent)">$0.075</span><span class="text-[10px]" style="color:var(--text-3)">&nbsp;/1M</span></div>
+          <div><span class="text-[10px]" style="color:var(--text-3)">Выход:&nbsp;</span><span class="font-mono text-[13px]" style="color:var(--text-2)">$0.30</span><span class="text-[10px]" style="color:var(--text-3)">&nbsp;/1M</span></div>
+        </div>
+      </div>
+
+      <div class="card flex flex-col md:flex-row md:items-center gap-4">
+        <div class="flex-1">
+          <h3 class="text-[16px] font-[500] mb-1" style="color:var(--text-1)">Gemini 2.0 Flash Lite</h3>
+          <p class="text-[13px]" style="color:var(--text-2)">Самый дешёвый и быстрый — для коротких справок и рутинных задач.</p>
+          <p class="text-[11px] mt-1" style="color:var(--text-3)">⚡⚡ Мгновенный · Контекст 1M токенов</p>
+        </div>
+        <div class="flex md:flex-col gap-3 md:gap-1 md:text-right">
+          <div><span class="text-[10px]" style="color:var(--text-3)">Вход:&nbsp;</span><span class="font-mono text-[13px]" style="color:var(--accent)">$0.0375</span><span class="text-[10px]" style="color:var(--text-3)">&nbsp;/1M</span></div>
+          <div><span class="text-[10px]" style="color:var(--text-3)">Выход:&nbsp;</span><span class="font-mono text-[13px]" style="color:var(--text-2)">$0.15</span><span class="text-[10px]" style="color:var(--text-3)">&nbsp;/1M</span></div>
+        </div>
+      </div>
+
+      <div class="card flex flex-col md:flex-row md:items-center gap-4">
+        <div class="flex-1">
+          <h3 class="text-[16px] font-[500] mb-1" style="color:var(--text-1)">Gemini 1.5 Pro</h3>
+          <p class="text-[13px]" style="color:var(--text-2)">Максимальное качество и рассуждения. Для сложных доказательств и анализа больших документов.</p>
+          <p class="text-[11px] mt-1" style="color:var(--text-3)">🧠 Умный · Контекст 2M токенов</p>
+        </div>
+        <div class="flex md:flex-col gap-3 md:gap-1 md:text-right">
+          <div><span class="text-[10px]" style="color:var(--text-3)">Вход:&nbsp;</span><span class="font-mono text-[13px]" style="color:var(--accent)">$1.25</span><span class="text-[10px]" style="color:var(--text-3)">&nbsp;/1M</span></div>
+          <div><span class="text-[10px]" style="color:var(--text-3)">Выход:&nbsp;</span><span class="font-mono text-[13px]" style="color:var(--text-2)">$5.00</span><span class="text-[10px]" style="color:var(--text-3)">&nbsp;/1M</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ STATS ═════════════════════════════════════════════════════════════ -->
+<section class="py-12 md:py-16">
+  <div class="max-w-4xl mx-auto px-6">
+    <div class="stat-row">
+      <div class="stat-cell">
+        <p class="font-display text-[36px] mb-1" style="color:var(--accent)">10 000</p>
+        <p class="text-[12px]" style="color:var(--text-2)">Пробных токенов · бесплатно</p>
+      </div>
+      <div class="stat-cell">
+        <p class="font-display text-[36px] mb-1" style="color:var(--accent)">∞</p>
+        <p class="text-[12px]" style="color:var(--text-2)">Карта тем · автообновление в фоне</p>
+      </div>
+      <div class="stat-cell">
+        <p class="font-display text-[36px] mb-1" style="color:var(--accent)">2M</p>
+        <p class="text-[12px]" style="color:var(--text-2)">Токенов контекста · Gemini 1.5 Pro</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FINAL CTA ═════════════════════════════════════════════════════════ -->
+<section class="bg-hero py-24 md:py-32 relative overflow-hidden">
+  <div class="orb" style="width:400px;height:400px;background:rgba(200,145,58,.12);top:50%;left:50%;transform:translate(-50%,-50%);filter:blur(100px)"></div>
+
+  <div class="max-w-3xl mx-auto px-6 text-center relative">
+    <h2 class="font-display text-[44px] md:text-[60px] mb-5" style="color:var(--text-1)">
+      Готовы попробовать?
+    </h2>
+    <p class="text-[15px] mb-10" style="color:var(--text-2)">
+      Регистрация занимает 30 секунд. Никаких карт. 10 000 токенов&nbsp;— чтобы убедиться, что это работает.
+    </p>
+    <div class="flex items-center justify-center gap-3 flex-wrap">
+      <a href="/app?auth=register" class="btn-primary !text-[15px] !py-3 !px-7">
+        Создать аккаунт
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+      <a href="/app?auth=login" class="btn-secondary !text-[15px] !py-3 !px-7">У меня уже есть аккаунт</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════════════════ -->
+<footer class="border-t" style="border-color:var(--border)">
+  <div class="max-w-6xl mx-auto px-6 py-12">
+
+    <!-- Top row: logo + nav columns -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+      <!-- Brand column -->
+      <div class="col-span-2 md:col-span-1">
+        <div class="flex items-center gap-2.5 mb-3">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:var(--accent)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <span class="logo text-[18px]" style="color:var(--text-1)">ConspectAI</span>
+        </div>
+        <p class="text-[12px]" style="color:var(--text-3);line-height:1.6">
+          ИИ-ассистент для студентов&nbsp;инженерных и научных&nbsp;специальностей.
+        </p>
+      </div>
+
+      <!-- Product -->
+      <div>
+        <p class="text-[11px] mb-3 font-semibold" style="color:var(--text-2);letter-spacing:.05em;text-transform:uppercase">Продукт</p>
+        <ul class="space-y-2 text-[12.5px]">
+          <li><a href="#features"   class="nav-link">Возможности</a></li>
+          <li><a href="#templates"  class="nav-link">Шаблоны</a></li>
+          <li><a href="/pricing"    class="nav-link">Тарифы</a></li>
+          <li><a href="/app?auth=register" class="nav-link">Регистрация</a></li>
+        </ul>
+      </div>
+
+      <!-- Legal -->
+      <div>
+        <p class="text-[11px] mb-3 font-semibold" style="color:var(--text-2);letter-spacing:.05em;text-transform:uppercase">Документы</p>
+        <ul class="space-y-2 text-[12.5px]">
+          <li><a href="/offer"    class="nav-link">Публичная оферта</a></li>
+          <li><a href="/privacy"  class="nav-link">Политика конфиденциальности</a></li>
+          <li><a href="/contacts" class="nav-link">Контакты</a></li>
+        </ul>
+      </div>
+
+      <!-- Contact -->
+      <div>
+        <p class="text-[11px] mb-3 font-semibold" style="color:var(--text-2);letter-spacing:.05em;text-transform:uppercase">Связаться</p>
+        <ul class="space-y-2 text-[12.5px]">
+          <li><a href="mailto:support@conspectai.tech" class="nav-link" style="font-family:'DM Mono',monospace;font-size:11.5px">support@conspectai.tech</a></li>
+          <li><a href="https://t.me/slon_hk" target="_blank" rel="noopener" class="nav-link">Telegram @slon_hk</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Legal info: required by Russian law for self-employed -->
+    <div class="pt-6 border-t" style="border-color:var(--border)">
+      <p class="text-[11px] leading-relaxed" style="color:var(--text-3)">
+        Самозанятый Степанов Леонид Артемович · ИНН <span class="font-mono">673110788119</span> · г. Санкт-Петербург, Россия
+      </p>
+      <p class="text-[11px] mt-2" style="color:var(--text-3)">
+        © 2026 ConspectAI · Powered by Google Gemini
+      </p>
+    </div>
+  </div>
+</footer>
+
+<!-- Lightweight landing analytics: track which CTA users actually click -->
+<script>
+(function() {
+  function track(props) {
+    try {
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'landing_cta_click', props: props }),
+        keepalive: true,  // ensures the request goes out even if the page is unloading
+      }).catch(()=>{});
+    } catch {}
+  }
+
+  // Identify CTAs by their href + nearest section, so we know what users prefer
+  document.addEventListener('click', function(e) {
+    const a = e.target.closest('a[href*="/app"]');
+    if (!a) return;
+    const isRegister = a.href.includes('auth=register');
+    const section = (a.closest('section, header, footer, nav') || {}).id
+                 || (a.closest('section, header, footer, nav') || {}).tagName?.toLowerCase()
+                 || 'unknown';
+    track({
+      destination: isRegister ? 'register' : 'login',
+      section: String(section).slice(0, 40),
+      label: a.textContent.trim().slice(0, 40),
+    });
+  }, true);
+})();
+</script>
+
+</body>
+</html>

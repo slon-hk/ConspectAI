@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<title>ConspectAI · Админка</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=DM+Sans:wght@300;400;450;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0b09;--sidebar:#100f0d;--surface:#171512;--surface-2:#1e1b17;--surface-3:#252118;
+  --border:#272420;--border-2:#322e28;
+  --accent:#c8913a;--accent-hi:#dda74d;--accent-dim:rgba(200,145,58,.13);--accent-glow:rgba(200,145,58,.28);
+  --text-1:#e6e1d5;--text-2:#8a8274;--text-3:#4a4640;
+  --green:#4ade80;--red:#f87171;--blue:#60a5fa;--purple:#a78bfa;--orange:#fb923c;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
+
+.logo{font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.04em}
+.font-mono{font-family:'DM Mono',monospace}
+[x-cloak]{display:none!important}
+
+/* ── Layout ── */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(12,11,9,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.tab{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-3);border:1px solid transparent;transition:all .15s;background:transparent}
+.tab.active{background:var(--surface-2);color:var(--text-1);border-color:var(--border-2)}
+.tab:hover:not(.active){color:var(--text-2)}
+
+/* ── Cards ── */
+.kpi{background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+.kpi-label{font-size:11px;color:var(--text-3);font-weight:500;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px}
+.kpi-value{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:32px;color:var(--text-1);line-height:1}
+.kpi-sub{font-size:11px;color:var(--text-3);margin-top:5px}
+.kpi-accent{color:var(--accent)}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.panel-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.panel-title{font-size:13px;font-weight:500;color:var(--text-1)}
+
+/* ── Tables ── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--surface-2);padding:9px 14px;text-align:left;color:var(--text-3);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border)}
+td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--text-1);vertical-align:middle}
+tr:hover td{background:var(--surface-2)}
+tr:last-child td{border-bottom:none}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);transition:all .15s}
+.btn:hover{border-color:var(--border-2);color:var(--text-1);background:var(--surface-3)}
+.btn-primary{background:var(--accent);color:#0c0b09;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-hi);border-color:var(--accent-hi);color:#0c0b09}
+.btn-danger{color:var(--red);border-color:rgba(248,113,113,.3)}
+.btn-danger:hover{background:rgba(248,113,113,.1);border-color:var(--red);color:var(--red)}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--text-3)}
+.btn-ghost:hover{color:var(--text-1);background:var(--surface-2)}
+
+/* ── Badges ── */
+.b-trial{background:rgba(96,165,250,.13);color:var(--blue);border:1px solid rgba(96,165,250,.3)}
+.b-blocked{background:rgba(248,113,113,.13);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.b-admin{background:rgba(200,145,58,.13);color:var(--accent);border:1px solid rgba(200,145,58,.3)}
+.b-active{background:rgba(74,222,128,.13);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.b{font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;display:inline-flex;align-items:center;gap:4px}
+
+/* ── Inputs ── */
+.input{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 11px;color:var(--text-1);font-size:13px;outline:none;transition:border-color .15s;font-family:inherit}
+.input:focus{border-color:var(--accent)}
+.input::placeholder{color:var(--text-3)}
+
+/* ── Modal ── */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--border-2);border-radius:18px;padding:22px;width:380px;max-width:100%;max-height:90vh;overflow-y:auto}
+
+/* ── Auth gate ── */
+.auth-card{background:var(--surface);border:1px solid var(--border-2);border-radius:18px;padding:32px;width:380px;max-width:calc(100vw - 32px);text-align:center}
+
+/* ── Animations ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.animate-up{animation:fadeUp .25s ease}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.spin svg{animation:spin 1s linear infinite}
+
+/* ── Misc ── */
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(74,222,128,.6);animation:pdot 2s ease-in-out infinite}
+@keyframes pdot{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.6)}50%{box-shadow:0 0 0 6px rgba(74,222,128,0)}}
+
+.bar{height:4px;background:var(--border-2);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-hi));border-radius:2px}
+
+/* ── Chart panels ── */
+.chart-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+.chart-panel-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.chart-panel-title{font-size:13px;font-weight:500;color:var(--text-1)}
+.chart-canvas-wrap{position:relative;height:240px}
+.range-pills{display:inline-flex;gap:2px;background:var(--surface-2);padding:2px;border-radius:8px;border:1px solid var(--border)}
+.range-pill{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;color:var(--text-3);border:none;background:transparent;transition:all .15s}
+.range-pill.active{background:var(--surface-3);color:var(--text-1)}
+
+/* ── Funnel ── */
+.funnel-row{display:grid;grid-template-columns:140px 1fr 80px;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.funnel-row:last-child{border-bottom:none}
+.funnel-bar{height:24px;background:var(--accent-dim);border-radius:5px;display:flex;align-items:center;padding:0 10px;font-size:11px;color:var(--text-1);font-weight:500;font-family:'DM Mono',monospace}
+</style>
+</head>
+<body>
+
+<div x-data="adminApp()" x-cloak class="min-h-full">
+
+  <!-- ═══ NOT LOGGED IN / NOT ADMIN ═══════════════════════════════════════ -->
+  <template x-if="state==='gate'">
+    <div class="min-h-screen flex items-center justify-center" style="background:radial-gradient(ellipse at 50% 0%,rgba(200,145,58,.07) 0%,transparent 60%)">
+      <div class="auth-card">
+        <div class="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center" style="background:var(--accent)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 1l3 6 6 .9-4.5 4.4 1 6.7L12 16l-5.5 3 1-6.7L3 7.9 9 7z"/></svg>
+        </div>
+        <h1 class="logo text-[26px] mb-1.5">Админ-панель</h1>
+        <p class="text-[13px] mb-5" style="color:var(--text-2)" x-text="gateMsg"></p>
+        <a href="/app?auth=login" class="btn btn-primary !text-[13px] !py-2 !px-5">Войти как администратор</a>
+      </div>
+    </div>
+  </template>
+
+  <!-- ═══ ADMIN UI ═════════════════════════════════════════════════════════ -->
+  <template x-if="state==='ready'">
+    <div>
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="max-w-7xl mx-auto px-5 py-3 flex items-center gap-4">
+          <a href="/app" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <div class="w-8 h-8 rounded-xl flex items-center justify-center" style="background:var(--accent)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div>
+              <span class="logo text-[18px]" style="color:var(--text-1)">ConspectAI</span>
+              <span class="text-[10px] ml-1.5 px-1.5 py-0.5 rounded font-semibold" style="background:var(--accent);color:#0c0b09">ADMIN</span>
+            </div>
+          </a>
+
+          <div class="flex items-center gap-1 ml-4">
+            <button class="tab" :class="tab==='dash'?'active':''"  @click="tab='dash'">Обзор</button>
+            <button class="tab" :class="tab==='analytics'?'active':''" @click="tab='analytics';loadAnalytics()">Аналитика</button>
+            <button class="tab" :class="tab==='users'?'active':''" @click="tab='users';loadUsers()">Пользователи</button>
+            <button class="tab" :class="tab==='activity'?'active':''" @click="tab='activity';loadActivity()">Активность</button>
+            <button class="tab" :class="tab==='models'?'active':''" @click="tab='models';loadModels()">Модели</button>
+            <button class="tab" :class="tab==='system'?'active':''" @click="tab='system';loadSystem()">⚡ Система</button>
+          </div>
+
+          <div class="ml-auto flex items-center gap-3">
+            <div class="flex items-center gap-2"><span class="pulse-dot"></span><span class="text-[11px]" style="color:var(--text-3)">Онлайн</span></div>
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full" style="background:var(--surface-2);border:1px solid var(--border)">
+              <div class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold" style="background:var(--accent-dim);color:var(--accent)" x-text="user.username[0].toUpperCase()"></div>
+              <span class="text-[12px]" style="color:var(--text-1)" x-text="user.username"></span>
+            </div>
+            <a href="/app" class="btn btn-ghost">К приложению →</a>
+          </div>
+        </div>
+      </header>
+
+      <main class="max-w-7xl mx-auto px-5 py-6">
+
+        <!-- ── DASHBOARD ── -->
+        <template x-if="tab==='dash'">
+          <div class="space-y-5 animate-up">
+
+            <!-- KPI grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="kpi">
+                <p class="kpi-label">Пользователей</p>
+                <p class="kpi-value" x-text="stats.user_count||0"></p>
+                <p class="kpi-sub">+<span x-text="stats.new_users_24h||0"></span> за 24 часа</p>
+              </div>
+              <div class="kpi">
+                <p class="kpi-label">Сообщений</p>
+                <p class="kpi-value" x-text="fmtNum(stats.message_count||0)"></p>
+                <p class="kpi-sub">+<span x-text="fmtNum(stats.messages_24h||0)"></span> за 24 часа</p>
+              </div>
+              <div class="kpi">
+                <p class="kpi-label">Токенов израсходовано</p>
+                <p class="kpi-value kpi-accent" x-text="fmtNum(stats.total_tokens||0)"></p>
+                <p class="kpi-sub" x-text="`по ${stats.reply_count||0} ответам`"></p>
+              </div>
+              <div class="kpi">
+                <p class="kpi-label">Расход (всего)</p>
+                <p class="kpi-value kpi-accent" x-text="'$'+(stats.total_cost||0).toFixed(2)"></p>
+                <p class="kpi-sub" x-text="`файлы: ${stats.storage_size||'—'}`"></p>
+              </div>
+            </div>
+
+            <!-- Secondary -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="kpi">
+                <p class="kpi-label">Чатов</p>
+                <p class="kpi-value" style="font-size:24px" x-text="fmtNum(stats.chat_count||0)"></p>
+              </div>
+              <div class="kpi">
+                <p class="kpi-label">Пробные</p>
+                <p class="kpi-value" style="font-size:24px" x-text="stats.trial_count||0"></p>
+                <div class="bar mt-2"><div class="bar-fill" :style="`width:${Math.min(100,((stats.trial_count||0)/(stats.user_count||1))*100)}%`"></div></div>
+              </div>
+              <div class="kpi">
+                <p class="kpi-label">Заблокированы</p>
+                <p class="kpi-value" style="font-size:24px;color:var(--red)" x-text="stats.blocked_count||0"></p>
+              </div>
+              <div class="kpi">
+                <p class="kpi-label">Файлов в хранилище</p>
+                <p class="kpi-value" style="font-size:24px" x-text="fmtNum(stats.file_count||0)"></p>
+                <p class="kpi-sub">с дедупликацией</p>
+              </div>
+            </div>
+
+            <!-- Quick links -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <button class="kpi text-left hover:border-opacity-50" style="border-color:var(--border-2);cursor:pointer" @click="tab='users';loadUsers()">
+                <div class="flex items-center gap-2 mb-1">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" style="stroke:var(--accent)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span class="text-[12px]" style="color:var(--text-2)">Управление</span>
+                </div>
+                <p class="text-[14px] font-[500]">Пользователи</p>
+                <p class="text-[11px] mt-0.5" style="color:var(--text-3)">блокировка, выдача токенов, права админа</p>
+              </button>
+              <button class="kpi text-left hover:border-opacity-50" style="border-color:var(--border-2);cursor:pointer" @click="tab='activity';loadActivity()">
+                <div class="flex items-center gap-2 mb-1">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" style="stroke:var(--accent)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  <span class="text-[12px]" style="color:var(--text-2)">Мониторинг</span>
+                </div>
+                <p class="text-[14px] font-[500]">Активность</p>
+                <p class="text-[11px] mt-0.5" style="color:var(--text-3)">последние сообщения и расходы</p>
+              </button>
+              <button class="kpi text-left hover:border-opacity-50" style="border-color:var(--border-2);cursor:pointer" @click="tab='models';loadModels()">
+                <div class="flex items-center gap-2 mb-1">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" style="stroke:var(--accent)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                  <span class="text-[12px]" style="color:var(--text-2)">Аналитика</span>
+                </div>
+                <p class="text-[14px] font-[500]">Использование моделей</p>
+                <p class="text-[11px] mt-0.5" style="color:var(--text-3)">расход по моделям Gemini</p>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── ANALYTICS ── -->
+        <template x-if="tab==='analytics'">
+          <div class="space-y-5 animate-up">
+
+            <!-- Header / range -->
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-[14px] font-[500]" style="color:var(--text-1)">Аналитика продукта</h2>
+                <p class="text-[11px]" style="color:var(--text-3)">Поведение пользователей, события, расходы и здоровье системы</p>
+              </div>
+              <div class="range-pills">
+                <template x-for="r in [7, 14, 30, 90]" :key="r">
+                  <button class="range-pill" :class="anRange===r?'active':''" @click="anRange=r;loadAnalytics()" x-text="r+'д'"></button>
+                </template>
+              </div>
+            </div>
+
+            <!-- ROW 1: 4 charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <!-- DAU -->
+              <div class="chart-panel">
+                <div class="chart-panel-h">
+                  <div>
+                    <p class="chart-panel-title">Активные пользователи (DAU)</p>
+                    <p class="text-[11px]" style="color:var(--text-3)" x-text="`Уникальных за день · последние ${anRange} дн`"></p>
+                  </div>
+                  <p class="text-[14px] font-[500] font-mono" style="color:var(--accent)" x-text="anDauTotal"></p>
+                </div>
+                <div class="chart-canvas-wrap"><canvas id="chartDau"></canvas></div>
+              </div>
+
+              <!-- Signups -->
+              <div class="chart-panel">
+                <div class="chart-panel-h">
+                  <div>
+                    <p class="chart-panel-title">Регистрации</p>
+                    <p class="text-[11px]" style="color:var(--text-3)" x-text="`Новых пользователей · последние ${anRange} дн`"></p>
+                  </div>
+                  <p class="text-[14px] font-[500] font-mono" style="color:var(--accent)" x-text="anSignupsTotal"></p>
+                </div>
+                <div class="chart-canvas-wrap"><canvas id="chartSignups"></canvas></div>
+              </div>
+
+              <!-- Messages per day -->
+              <div class="chart-panel">
+                <div class="chart-panel-h">
+                  <div>
+                    <p class="chart-panel-title">Сообщения и токены</p>
+                    <p class="text-[11px]" style="color:var(--text-3)" x-text="`${anMsgsTotal} сообщ · ${fmtNum(anTokensTotal)} токенов`"></p>
+                  </div>
+                </div>
+                <div class="chart-canvas-wrap"><canvas id="chartMsgs"></canvas></div>
+              </div>
+
+              <!-- Cost per day -->
+              <div class="chart-panel">
+                <div class="chart-panel-h">
+                  <div>
+                    <p class="chart-panel-title">Расходы на Gemini API</p>
+                    <p class="text-[11px]" style="color:var(--text-3)" x-text="`Долларов в день · последние ${anRange} дн`"></p>
+                  </div>
+                  <p class="text-[14px] font-[500] font-mono" style="color:var(--accent)" x-text="'$'+anCostTotal.toFixed(4)"></p>
+                </div>
+                <div class="chart-canvas-wrap"><canvas id="chartCost"></canvas></div>
+              </div>
+            </div>
+
+            <!-- ROW 2: funnel + top events + features -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <!-- Funnel -->
+              <div class="chart-panel">
+                <div class="chart-panel-h">
+                  <p class="chart-panel-title">Воронка регистрации</p>
+                </div>
+                <div>
+                  <template x-for="(step, i) in anFunnelSteps" :key="i">
+                    <div class="funnel-row">
+                      <p class="text-[12px]" style="color:var(--text-2)" x-text="step.label"></p>
+                      <div class="funnel-bar" :style="`width:${Math.max(8,(step.count/Math.max(1,anFunnelSteps[0].count))*100)}%`" x-text="step.count"></div>
+                      <p class="text-[11px] text-right font-mono" style="color:var(--text-3)" x-text="anFunnelSteps[0].count?Math.round((step.count/anFunnelSteps[0].count)*100)+'%':'—'"></p>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Top events -->
+              <div class="chart-panel">
+                <div class="chart-panel-h">
+                  <p class="chart-panel-title">Популярные события</p>
+                  <p class="text-[11px]" style="color:var(--text-3)">за период</p>
+                </div>
+                <div class="space-y-1.5">
+                  <template x-if="anTopEvents.length===0">
+                    <p class="text-center py-8 text-[12px]" style="color:var(--text-3)">Нет данных</p>
+                  </template>
+                  <template x-for="ev in anTopEvents" :key="ev.event">
+                    <div class="flex items-center gap-3">
+                      <p class="text-[12px] font-mono w-32 truncate" style="color:var(--text-1)" x-text="ev.event"></p>
+                      <div class="flex-1 h-5 rounded relative overflow-hidden" style="background:var(--surface-2)">
+                        <div class="absolute inset-y-0 left-0 rounded" style="background:var(--accent-dim)" :style="`width:${(ev.count/Math.max(1,anTopEvents[0].count))*100}%`"></div>
+                        <span class="absolute inset-0 flex items-center px-2 text-[10.5px] font-mono" style="color:var(--text-1)" x-text="ev.count"></span>
+                      </div>
+                      <p class="text-[10px] w-12 text-right font-mono" style="color:var(--text-3)" x-text="ev.unique_users+' u'"></p>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Feature adoption -->
+              <div class="chart-panel">
+                <div class="chart-panel-h">
+                  <p class="chart-panel-title">Использование фич</p>
+                  <p class="text-[11px]" style="color:var(--text-3)">уник. польз.</p>
+                </div>
+                <div class="space-y-2.5">
+                  <template x-for="f in anFeatureList" :key="f.key">
+                    <div>
+                      <div class="flex items-center justify-between mb-1">
+                        <p class="text-[12px]" style="color:var(--text-1)" x-text="f.label"></p>
+                        <p class="text-[12px] font-mono" style="color:var(--accent)" x-text="f.value"></p>
+                      </div>
+                      <div class="bar"><div class="bar-fill" :style="`width:${stats.user_count?Math.min(100,(f.value/stats.user_count)*100):0}%`"></div></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- ROW 3: System metrics -->
+            <div>
+              <div class="flex items-center gap-3 mb-3">
+                <h2 class="text-[13px] font-[500]" style="color:var(--text-1)">Системные метрики</h2>
+                <span class="text-[10.5px]" style="color:var(--text-3)" x-text="'uptime: '+fmtUptime(anSys.uptime_seconds||0)"></span>
+                <button class="btn btn-ghost ml-auto !text-[11px]" @click="loadSystem">↻ Обновить</button>
+              </div>
+
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div class="kpi">
+                  <p class="kpi-label">HTTP запросов</p>
+                  <p class="kpi-value" style="font-size:24px" x-text="fmtNum(anSys.http_total||0)"></p>
+                  <p class="kpi-sub" :style="anSys.http_errors>0?'color:var(--red)':''" x-text="(anSys.http_errors||0)+' ошибок 5xx'"></p>
+                </div>
+                <div class="kpi">
+                  <p class="kpi-label">HTTP latency</p>
+                  <p class="kpi-value" style="font-size:24px" x-text="(anSys.http_p50_ms||0)+' мс'"></p>
+                  <p class="kpi-sub" x-text="`p95: ${anSys.http_p95_ms||0} · p99: ${anSys.http_p99_ms||0}`"></p>
+                </div>
+                <div class="kpi">
+                  <p class="kpi-label">Gemini latency</p>
+                  <p class="kpi-value" style="font-size:24px" x-text="((anSys.gemini_p50_ms||0)/1000).toFixed(1)+' с'"></p>
+                  <p class="kpi-sub" x-text="`p95: ${((anSys.gemini_p95_ms||0)/1000).toFixed(1)}с`"></p>
+                </div>
+                <div class="kpi">
+                  <p class="kpi-label">Майндмепы</p>
+                  <p class="kpi-value" style="font-size:24px;color:var(--green)" x-text="anSys.bg_mindmap_runs||0"></p>
+                  <p class="kpi-sub" :style="anSys.bg_mindmap_failed>0?'color:var(--red)':''" x-text="(anSys.bg_mindmap_failed||0)+' ошибок'"></p>
+                </div>
+              </div>
+
+              <!-- Top routes table -->
+              <div class="panel">
+                <div class="panel-h"><span class="panel-title">Самые частые роуты</span></div>
+                <table>
+                  <thead>
+                    <tr><th>Путь</th><th>Статус</th><th class="text-right">Запросов</th></tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="r in (anSys.top_routes||[])" :key="r.path+r.status">
+                      <tr>
+                        <td class="font-mono text-[12px]" x-text="r.path"></td>
+                        <td>
+                          <span class="b" :class="r.status.startsWith('2')?'b-active':r.status.startsWith('4')?'b-trial':'b-blocked'" x-text="r.status"></span>
+                        </td>
+                        <td class="text-right font-mono text-[12px]" x-text="fmtNum(r.count)"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── USERS ── -->
+        <template x-if="tab==='users'">
+          <div class="animate-up">
+            <div class="flex items-center gap-3 mb-4">
+              <input class="input flex-1 max-w-xs" placeholder="Поиск по имени или email…" x-model="usersSearch" @input.debounce.400ms="loadUsers()">
+              <button class="btn" @click="loadUsers" :class="usersLoading?'spin':''" title="Обновить">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Обновить
+              </button>
+              <p class="ml-auto text-[12px]" style="color:var(--text-3)">Всего: <span class="font-mono" x-text="usersTotal"></span></p>
+            </div>
+
+            <div class="panel overflow-x-auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Пользователь</th>
+                    <th class="text-right">Токены</th>
+                    <th class="text-right">Расход</th>
+                    <th class="text-right">Чаты</th>
+                    <th class="text-right">Сообщения</th>
+                    <th>Статус</th>
+                    <th>Регистрация</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-if="usersLoading && users.length===0">
+                    <tr><td colspan="8" class="text-center py-12" style="color:var(--text-3)">Загрузка…</td></tr>
+                  </template>
+                  <template x-if="!usersLoading && users.length===0">
+                    <tr><td colspan="8" class="text-center py-12" style="color:var(--text-3)">Пользователи не найдены</td></tr>
+                  </template>
+                  <template x-for="u in users" :key="u.id">
+                    <tr>
+                      <td>
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style="background:var(--surface-2);color:var(--accent);border:1px solid var(--border-2)" x-text="u.username[0].toUpperCase()"></div>
+                          <div class="min-w-0">
+                            <p class="text-[13px] font-[450]" style="color:var(--text-1)" x-text="u.username"></p>
+                            <p class="text-[11px]" style="color:var(--text-3)" x-text="u.email"></p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="text-right font-mono text-[12px]" style="color:var(--accent)" x-text="fmtNum(u.tokens_remaining)"></td>
+                      <td class="text-right font-mono text-[12px]" x-text="'$'+(u.total_spent_usd||0).toFixed(4)"></td>
+                      <td class="text-right font-mono text-[12px]" x-text="u.chat_count"></td>
+                      <td class="text-right font-mono text-[12px]" x-text="u.message_count"></td>
+                      <td>
+                        <div class="flex flex-wrap gap-1">
+                          <template x-if="u.is_admin"><span class="b b-admin">★ admin</span></template>
+                          <template x-if="u.is_blocked"><span class="b b-blocked">⛔ блок</span></template>
+                          <template x-if="u.is_trial && !u.is_blocked"><span class="b b-trial">trial</span></template>
+                          <template x-if="!u.is_admin && !u.is_blocked && !u.is_trial"><span class="b b-active">активен</span></template>
+                        </div>
+                      </td>
+                      <td class="text-[11px]" style="color:var(--text-3)" x-text="formatDate(u.created_at)"></td>
+                      <td class="text-right">
+                        <button class="btn btn-ghost" @click="openUser(u)" title="Действия">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── ACTIVITY ── -->
+        <template x-if="tab==='activity'">
+          <div class="animate-up">
+            <div class="flex items-center gap-3 mb-4">
+              <h2 class="text-[14px] font-[500]" style="color:var(--text-1)">Последние сообщения</h2>
+              <button class="btn ml-auto" @click="loadActivity" :class="activityLoading?'spin':''">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Обновить
+              </button>
+            </div>
+            <div class="panel overflow-x-auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Время</th><th>Пользователь</th><th>Чат</th><th>Роль</th>
+                    <th>Модель</th><th class="text-right">Токены</th><th class="text-right">Цена</th><th>Контент</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-if="activityLoading && activity.length===0">
+                    <tr><td colspan="8" class="text-center py-12" style="color:var(--text-3)">Загрузка…</td></tr>
+                  </template>
+                  <template x-for="m in activity" :key="m.id">
+                    <tr>
+                      <td class="text-[11px] font-mono" style="color:var(--text-3)" x-text="relTime(m.created_at)"></td>
+                      <td>
+                        <p class="text-[12.5px]" x-text="m.username"></p>
+                        <p class="text-[10.5px]" style="color:var(--text-3)" x-text="m.email"></p>
+                      </td>
+                      <td class="text-[12px] max-w-[180px] truncate" x-text="m.chat_title"></td>
+                      <td>
+                        <span class="b" :class="m.role==='user'?'b-trial':'b-admin'" x-text="m.role==='user'?'Q':'A'"></span>
+                      </td>
+                      <td class="text-[10.5px] font-mono" style="color:var(--text-3)" x-text="m.model||'—'"></td>
+                      <td class="text-right font-mono text-[11px]" style="color:var(--accent)" x-text="m.tokens_used?fmtNum(m.tokens_used):'—'"></td>
+                      <td class="text-right font-mono text-[11px]" x-text="m.cost_usd?'$'+(+m.cost_usd).toFixed(5):'—'"></td>
+                      <td class="text-[12px] max-w-[280px] truncate" style="color:var(--text-2)" x-text="m.content"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── MODELS ── -->
+        <template x-if="tab==='models'">
+          <div class="animate-up">
+            <h2 class="text-[14px] font-[500] mb-4" style="color:var(--text-1)">Использование моделей</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <template x-for="m in modelUsage" :key="m.model">
+                <div class="kpi">
+                  <div class="flex items-center justify-between mb-3">
+                    <p class="text-[14px] font-[500]" style="color:var(--text-1)" x-text="m.model"></p>
+                    <p class="font-mono text-[14px]" style="color:var(--accent)" x-text="'$'+(+m.cost).toFixed(4)"></p>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <p style="color:var(--text-3)">Запросов</p>
+                      <p class="font-mono text-[14px] mt-0.5" style="color:var(--text-1)" x-text="fmtNum(m.calls)"></p>
+                    </div>
+                    <div>
+                      <p style="color:var(--text-3)">Токенов</p>
+                      <p class="font-mono text-[14px] mt-0.5" style="color:var(--text-1)" x-text="fmtNum(m.tokens)"></p>
+                    </div>
+                  </div>
+                  <div class="bar mt-3"><div class="bar-fill" :style="`width:${Math.min(100,(+m.cost/Math.max(0.01,maxCost))*100)}%`"></div></div>
+                </div>
+              </template>
+              <template x-if="!modelUsage.length && !modelsLoading">
+                <p class="col-span-2 text-center py-12" style="color:var(--text-3)">Данных ещё нет</p>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- ══ SYSTEM TAB ════════════════════════════════════════════════════ -->
+        <template x-if="tab==='system'">
+          <div class="animate-up space-y-6">
+            <div class="flex items-center justify-between">
+              <h2 class="text-[14px] font-[500]" style="color:var(--text-1)">Системные метрики</h2>
+              <button class="btn-sm" @click="loadSystem">⟳ Обновить</button>
+            </div>
+
+            <!-- Uptime + HTTP summary -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="kpi">
+                <p class="text-[11px]" style="color:var(--text-3)">Uptime</p>
+                <p class="font-mono text-[18px] mt-1" style="color:var(--accent)" x-text="fmtUptime(sysMetrics.uptime_seconds)"></p>
+              </div>
+              <div class="kpi">
+                <p class="text-[11px]" style="color:var(--text-3)">HTTP запросов</p>
+                <p class="font-mono text-[18px] mt-1" style="color:var(--text-1)" x-text="fmtNum(sysMetrics.http_total||0)"></p>
+              </div>
+              <div class="kpi">
+                <p class="text-[11px]" style="color:var(--text-3)">HTTP ошибок 5xx</p>
+                <p class="font-mono text-[18px] mt-1" :style="(sysMetrics.http_errors||0)>0?'color:var(--red)':'color:var(--green)'" x-text="fmtNum(sysMetrics.http_errors||0)"></p>
+              </div>
+              <div class="kpi">
+                <p class="text-[11px]" style="color:var(--text-3)">Mindmap фоновых</p>
+                <p class="font-mono text-[18px] mt-1" style="color:var(--text-1)" x-text="(sysMetrics.bg_mindmap_runs||0)+' / '+(sysMetrics.bg_mindmap_failed||0)+' fail'"></p>
+              </div>
+            </div>
+
+            <!-- Latency -->
+            <div>
+              <p class="text-[12px] font-[500] mb-2" style="color:var(--text-2)">HTTP латентность</p>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="kpi text-center">
+                  <p class="text-[10px] mb-1" style="color:var(--text-3)">p50</p>
+                  <p class="font-mono text-[20px]" :style="(sysMetrics.http_p50_ms||0)<500?'color:var(--green)':'color:var(--accent)'" x-text="(sysMetrics.http_p50_ms||0)+'ms'"></p>
+                </div>
+                <div class="kpi text-center">
+                  <p class="text-[10px] mb-1" style="color:var(--text-3)">p95</p>
+                  <p class="font-mono text-[20px]" :style="(sysMetrics.http_p95_ms||0)<2000?'color:var(--accent)':'color:var(--red)'" x-text="(sysMetrics.http_p95_ms||0)+'ms'"></p>
+                </div>
+                <div class="kpi text-center">
+                  <p class="text-[10px] mb-1" style="color:var(--text-3)">p99</p>
+                  <p class="font-mono text-[20px]" :style="(sysMetrics.http_p99_ms||0)<5000?'color:var(--accent)':'color:var(--red)'" x-text="(sysMetrics.http_p99_ms||0)+'ms'"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gemini calls -->
+            <div>
+              <p class="text-[12px] font-[500] mb-2" style="color:var(--text-2)">Gemini API</p>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="kpi text-center">
+                  <p class="text-[10px] mb-1" style="color:var(--text-3)">Gemini p50</p>
+                  <p class="font-mono text-[20px]" style="color:var(--accent)" x-text="(sysMetrics.gemini_p50_ms||0)+'ms'"></p>
+                </div>
+                <div class="kpi text-center">
+                  <p class="text-[10px] mb-1" style="color:var(--text-3)">Gemini p95</p>
+                  <p class="font-mono text-[20px]" style="color:var(--accent)" x-text="(sysMetrics.gemini_p95_ms||0)+'ms'"></p>
+                </div>
+                <div class="kpi">
+                  <p class="text-[10px] mb-1" style="color:var(--text-3)">Вызовы по моделям</p>
+                  <template x-for="[model, count] in Object.entries(sysMetrics.gemini_calls||{})" :key="model">
+                    <div class="flex justify-between text-[11px] mt-1">
+                      <span style="color:var(--text-2)" x-text="model.replace('gemini-','')"></span>
+                      <span class="font-mono" style="color:var(--text-1)" x-text="count"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- Top routes table -->
+            <div>
+              <p class="text-[12px] font-[500] mb-2" style="color:var(--text-2)">Топ маршруты</p>
+              <div class="overflow-x-auto rounded-xl" style="border:1px solid var(--border)">
+                <table class="w-full text-[12px]">
+                  <thead>
+                    <tr style="background:var(--surface-2);border-bottom:1px solid var(--border)">
+                      <th class="text-left p-3" style="color:var(--text-3)">Маршрут</th>
+                      <th class="text-left p-3" style="color:var(--text-3)">Статус</th>
+                      <th class="text-right p-3" style="color:var(--text-3)">Запросов</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(r,i) in (sysMetrics.top_routes||[])" :key="i">
+                      <tr style="border-top:1px solid var(--border)">
+                        <td class="p-3 font-mono" style="color:var(--text-1)" x-text="r.path"></td>
+                        <td class="p-3">
+                          <span class="px-2 py-0.5 rounded text-[10px] font-mono"
+                            :style="r.status==='2xx'?'background:rgba(74,222,128,.12);color:var(--green)':r.status==='5xx'?'background:rgba(248,113,113,.12);color:var(--red)':'background:var(--surface-2);color:var(--text-2)'"
+                            x-text="r.status"></span>
+                        </td>
+                        <td class="p-3 text-right font-mono" style="color:var(--accent)" x-text="fmtNum(r.count)"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </template>
+
+      </main>
+    </div>
+  </template>
+
+  <!-- ═══ USER ACTIONS MODAL ════════════════════════════════════════════════ -->
+  <template x-if="userModal">
+    <div class="overlay" @click.self="userModal=null">
+      <div class="modal">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-semibold" style="background:var(--surface-2);color:var(--accent);border:1px solid var(--border-2)" x-text="userModal.username[0].toUpperCase()"></div>
+            <div>
+              <p class="text-[14px] font-[500]" style="color:var(--text-1)" x-text="userModal.username"></p>
+              <p class="text-[11px]" style="color:var(--text-3)" x-text="userModal.email"></p>
+            </div>
+          </div>
+          <button class="btn-ghost btn" @click="userModal=null">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <div class="rounded-lg p-3" style="background:var(--surface-2);border:1px solid var(--border)">
+            <p class="text-[10.5px]" style="color:var(--text-3)">ТОКЕНЫ</p>
+            <p class="text-[16px] font-mono mt-0.5" style="color:var(--accent)" x-text="fmtNum(userModal.tokens_remaining)"></p>
+          </div>
+          <div class="rounded-lg p-3" style="background:var(--surface-2);border:1px solid var(--border)">
+            <p class="text-[10.5px]" style="color:var(--text-3)">РАСХОД</p>
+            <p class="text-[16px] font-mono mt-0.5" x-text="'$'+(userModal.total_spent_usd||0).toFixed(4)"></p>
+          </div>
+        </div>
+
+        <!-- Grant tokens -->
+        <div class="mb-4">
+          <p class="text-[11px] mb-1.5 font-[500]" style="color:var(--text-3);letter-spacing:.05em;text-transform:uppercase">Выдать токены</p>
+          <div class="flex gap-2">
+            <input class="input flex-1" type="number" min="1" placeholder="100000" x-model="grantAmount">
+            <button class="btn btn-primary" @click="grantTokens(userModal.id)" :disabled="!grantAmount||+grantAmount<=0">
+              + Выдать
+            </button>
+          </div>
+          <div class="flex gap-1 mt-2">
+            <template x-for="amt in [10000,100000,500000,1000000]" :key="amt">
+              <button class="btn !text-[11px] !py-1" @click="grantAmount=amt" x-text="'+'+fmtNum(amt)"></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Toggles -->
+        <div class="space-y-2 mb-4">
+          <button class="w-full flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors" :style="`background:${userModal.is_blocked?'rgba(248,113,113,.08)':'var(--surface-2)'};border:1px solid ${userModal.is_blocked?'rgba(248,113,113,.25)':'var(--border)'}`" @click="toggleBlock(userModal)">
+            <div class="text-left">
+              <p class="text-[13px] font-[500]" :style="userModal.is_blocked?'color:var(--red)':'color:var(--text-1)'">⛔ Блокировка</p>
+              <p class="text-[11px]" style="color:var(--text-3)" x-text="userModal.is_blocked?'Доступ запрещён':'Имеет доступ к приложению'"></p>
+            </div>
+            <span class="b" :class="userModal.is_blocked?'b-blocked':'b-active'" x-text="userModal.is_blocked?'ВКЛ':'ВЫКЛ'"></span>
+          </button>
+          <button class="w-full flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors" :style="`background:${userModal.is_admin?'rgba(200,145,58,.08)':'var(--surface-2)'};border:1px solid ${userModal.is_admin?'rgba(200,145,58,.25)':'var(--border)'}`" @click="toggleAdmin(userModal)">
+            <div class="text-left">
+              <p class="text-[13px] font-[500]" :style="userModal.is_admin?'color:var(--accent)':'color:var(--text-1)'">★ Администратор</p>
+              <p class="text-[11px]" style="color:var(--text-3)" x-text="userModal.is_admin?'Доступ к админ-панели':'Обычный пользователь'"></p>
+            </div>
+            <span class="b" :class="userModal.is_admin?'b-admin':'b-active'" x-text="userModal.is_admin?'ВКЛ':'ВЫКЛ'"></span>
+          </button>
+        </div>
+
+        <!-- Danger zone -->
+        <button class="btn btn-danger w-full justify-center" @click="confirmDelete(userModal)" x-show="userModal.id !== user.id">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          Удалить аккаунт
+        </button>
+      </div>
+    </div>
+  </template>
+
+</div>
+
+<script>
+function adminApp() {
+  return {
+    state:    'loading',  // loading | gate | ready
+    gateMsg:  '',
+    token:    localStorage.getItem('orion_token') || '',
+    user:     null,
+
+    tab:      'dash',
+
+    // Stats
+    stats:    {},
+
+    // Users
+    users:    [],
+    usersTotal: 0,
+    usersLoading: false,
+    usersSearch: '',
+    userModal: null,
+    grantAmount: '',
+
+    // Activity
+    activity: [],
+    activityLoading: false,
+
+    // Models
+    modelUsage: [],
+    modelsLoading: false,
+    sysMetrics: {},
+    get maxCost() { return Math.max(...this.modelUsage.map(m => +m.cost || 0), 0.01); },
+
+    // Analytics
+    anRange: 30,
+    anDau: [], anSignups: [], anMsgs: [],
+    anTopEvents: [], anFunnel: {}, anFeatures: {}, anSys: {},
+    chartInstances: {},
+    get anDauTotal()    { return this.anDau.reduce((s,d)=>s+d.users,0); },
+    get anSignupsTotal(){ return this.anSignups.reduce((s,d)=>s+d.signups,0); },
+    get anMsgsTotal()   { return this.anMsgs.reduce((s,d)=>s+d.messages,0); },
+    get anTokensTotal() { return this.anMsgs.reduce((s,d)=>s+d.tokens,0); },
+    get anCostTotal()   { return this.anMsgs.reduce((s,d)=>s+d.cost_usd,0); },
+    get anFunnelSteps() {
+      const f = this.anFunnel;
+      return [
+        {label:'Регистрации',     count: f.signups || 0},
+        {label:'Создали чат',      count: f.created_chat || 0},
+        {label:'Отправили сообщ.', count: f.sent_message || 0},
+        {label:'Активны (5+ сообщ.)', count: f.engaged || 0},
+      ];
+    },
+    get anFeatureList() {
+      const f = this.anFeatures;
+      return [
+        {key:'file_upload', label:'Загрузка файлов',  value: f.file_upload || 0},
+        {key:'mindmap',     label:'Карта тем',         value: f.mindmap || 0},
+        {key:'export',      label:'Экспорт MD/PDF',    value: f.export || 0},
+        {key:'templates',   label:'Смена шаблонов',    value: f.templates || 0},
+        {key:'buy_modal',   label:'Открыли покупку',   value: f.buy_modal || 0},
+        {key:'tokens_out',  label:'Кончились токены', value: f.tokens_out || 0},
+      ];
+    },
+
+    async init() {
+      if (!this.token) {
+        this.state = 'gate';
+        this.gateMsg = 'Требуется вход в аккаунт администратора';
+        return;
+      }
+      try {
+        const r = await this.api('/api/user');
+        if (!r.ok) {
+          this.state = 'gate';
+          this.gateMsg = 'Сессия истекла. Войдите заново.';
+          localStorage.removeItem('orion_token');
+          return;
+        }
+        const me = await r.json();
+        if (!me.is_admin) {
+          this.state = 'gate';
+          this.gateMsg = 'У вашего аккаунта нет прав администратора';
+          return;
+        }
+        this.user = me;
+        this.state = 'ready';
+        await this.loadStats();
+      } catch(e) {
+        this.state = 'gate';
+        this.gateMsg = 'Ошибка соединения с сервером';
+        console.error(e);
+      }
+    },
+
+    api(path, opts={}) {
+      return fetch(path, {
+        ...opts,
+        headers: { 'Authorization': `Bearer ${this.token}`, ...(opts.headers||{}) },
+      });
+    },
+
+    async loadStats() {
+      try {
+        const r = await this.api('/api/admin/stats');
+        if (r.ok) this.stats = await r.json();
+      } catch {}
+    },
+
+    // ── Users ────────────────────────────────────────────────────────────────
+    async loadUsers() {
+      this.usersLoading = true;
+      try {
+        const url = `/api/admin/users?search=${encodeURIComponent(this.usersSearch)}&limit=200`;
+        const r = await this.api(url);
+        if (r.ok) {
+          const data = await r.json();
+          this.users = data.items || [];
+          this.usersTotal = data.total || 0;
+        }
+      } catch(e) { console.error(e); }
+      finally { this.usersLoading = false; }
+    },
+
+    openUser(u) {
+      this.userModal = { ...u };
+      this.grantAmount = '';
+    },
+
+    async grantTokens(uid) {
+      const amount = parseInt(this.grantAmount, 10);
+      if (!amount || amount <= 0) return;
+      try {
+        const r = await this.api(`/api/admin/users/${uid}/grant-tokens`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount }),
+        });
+        if (r.ok) {
+          this.userModal.tokens_remaining = (this.userModal.tokens_remaining || 0) + amount;
+          this.userModal.is_trial = false;
+          this.grantAmount = '';
+          await this.loadUsers();
+        }
+      } catch(e) { console.error(e); }
+    },
+
+    async toggleBlock(u) {
+      const newVal = !u.is_blocked;
+      try {
+        const r = await this.api(`/api/admin/users/${u.id}/block`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: newVal }),
+        });
+        if (r.ok) { this.userModal.is_blocked = newVal; await this.loadUsers(); }
+      } catch(e) { console.error(e); }
+    },
+
+    async toggleAdmin(u) {
+      const newVal = !u.is_admin;
+      if (u.id === this.user.id && !newVal) {
+        alert('Нельзя забрать права администратора у себя');
+        return;
+      }
+      try {
+        const r = await this.api(`/api/admin/users/${u.id}/admin`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: newVal }),
+        });
+        if (r.ok) { this.userModal.is_admin = newVal; await this.loadUsers(); }
+        else { const e = await r.json(); alert(e.detail || 'Ошибка'); }
+      } catch(e) { console.error(e); }
+    },
+
+    confirmDelete(u) {
+      if (!confirm(`Удалить аккаунт ${u.username} (${u.email}) безвозвратно?\nВсе чаты и сообщения будут удалены.`)) return;
+      this.deleteUser(u.id);
+    },
+
+    async deleteUser(uid) {
+      try {
+        const r = await this.api(`/api/admin/users/${uid}`, { method: 'DELETE' });
+        if (r.ok) {
+          this.userModal = null;
+          await this.loadUsers();
+          await this.loadStats();
+        }
+      } catch(e) { console.error(e); }
+    },
+
+    // ── Activity ─────────────────────────────────────────────────────────────
+    async loadActivity() {
+      this.activityLoading = true;
+      try {
+        const r = await this.api('/api/admin/activity?limit=80');
+        if (r.ok) this.activity = await r.json();
+      } catch(e) { console.error(e); }
+      finally { this.activityLoading = false; }
+    },
+
+    // ── Models ───────────────────────────────────────────────────────────────
+    async loadModels() {
+      this.modelsLoading = true;
+      try {
+        const r = await this.api('/api/admin/models');
+        if (r.ok) this.modelUsage = await r.json();
+      } catch(e) { console.error(e); }
+      finally { this.modelsLoading = false; }
+    },
+
+    async loadSystem() {
+      try {
+        const r = await this.api('/api/admin/analytics/system');
+        if (r.ok) this.sysMetrics = await r.json();
+      } catch(e) { console.error('loadSystem:', e); }
+    },
+
+    // ── Analytics ────────────────────────────────────────────────────────────
+    async loadAnalytics() {
+      const days = this.anRange;
+      try {
+        const [dau, signups, msgs, evs, funnel, feat, sys] = await Promise.all([
+          this.api(`/api/admin/analytics/dau?days=${days}`).then(r=>r.json()),
+          this.api(`/api/admin/analytics/signups?days=${days}`).then(r=>r.json()),
+          this.api(`/api/admin/analytics/messages?days=${days}`).then(r=>r.json()),
+          this.api(`/api/admin/analytics/events?days=${days}`).then(r=>r.json()),
+          this.api(`/api/admin/analytics/funnel?days=${days}`).then(r=>r.json()),
+          this.api(`/api/admin/analytics/features?days=${days}`).then(r=>r.json()),
+          this.api(`/api/admin/analytics/system`).then(r=>r.json()),
+        ]);
+        this.anDau      = dau || [];
+        this.anSignups  = signups || [];
+        this.anMsgs     = msgs || [];
+        this.anTopEvents= evs || [];
+        this.anFunnel   = funnel || {};
+        this.anFeatures = feat || {};
+        this.anSys      = sys || {};
+        this.$nextTick(() => this.renderAllCharts());
+      } catch(e) { console.error('analytics load:', e); }
+    },
+
+    async loadSystem() {
+      try {
+        const r = await this.api('/api/admin/analytics/system');
+        if (r.ok) this.anSys = await r.json();
+      } catch {}
+    },
+
+    renderAllCharts() {
+      if (!window.Chart) return;
+      // Common axis/tooltip styling
+      const grid  = '#272420';
+      const text  = '#8a8274';
+      const accent = '#c8913a';
+      const accent2 = '#60a5fa';
+
+      const baseOpts = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor:'#171512', borderColor:'#322e28', borderWidth:1, titleColor:'#e6e1d5', bodyColor:'#e6e1d5' } },
+        scales: {
+          x: { grid: { color: grid, drawBorder:false }, ticks: { color: text, font:{size:10} } },
+          y: { grid: { color: grid, drawBorder:false }, ticks: { color: text, font:{size:10}, precision:0 }, beginAtZero:true },
+        },
+      };
+
+      // DAU — line
+      this._renderChart('chartDau', {
+        type: 'line',
+        data: {
+          labels: this.anDau.map(d => d.day.slice(5)),
+          datasets: [{
+            data: this.anDau.map(d => d.users),
+            borderColor: accent, backgroundColor: 'rgba(200,145,58,.1)',
+            tension: 0.3, fill: true, pointRadius: 2, pointBackgroundColor: accent,
+            borderWidth: 2,
+          }],
+        },
+        options: baseOpts,
+      });
+
+      // Signups — bar
+      this._renderChart('chartSignups', {
+        type: 'bar',
+        data: {
+          labels: this.anSignups.map(d => d.day.slice(5)),
+          datasets: [{
+            data: this.anSignups.map(d => d.signups),
+            backgroundColor: accent, borderRadius: 3,
+          }],
+        },
+        options: baseOpts,
+      });
+
+      // Messages — bar (messages) + line (tokens)
+      const msgOpts = JSON.parse(JSON.stringify(baseOpts));
+      msgOpts.plugins.legend = { display: true, position:'top', align:'end', labels:{color:text, font:{size:10}, boxWidth:10}};
+      msgOpts.scales.y1 = { position:'right', grid:{display:false}, ticks:{color:text, font:{size:10}}, beginAtZero:true };
+      this._renderChart('chartMsgs', {
+        type: 'bar',
+        data: {
+          labels: this.anMsgs.map(d => d.day.slice(5)),
+          datasets: [
+            { type:'bar',  label:'Сообщения', data: this.anMsgs.map(d=>d.messages), backgroundColor: accent, borderRadius:3, yAxisID:'y' },
+            { type:'line', label:'Токены',    data: this.anMsgs.map(d=>d.tokens),   borderColor: accent2, backgroundColor:'rgba(96,165,250,.1)', tension:0.3, pointRadius:1, borderWidth:2, yAxisID:'y1' },
+          ],
+        },
+        options: msgOpts,
+      });
+
+      // Cost — area
+      this._renderChart('chartCost', {
+        type: 'line',
+        data: {
+          labels: this.anMsgs.map(d => d.day.slice(5)),
+          datasets: [{
+            data: this.anMsgs.map(d => +d.cost_usd.toFixed(5)),
+            borderColor: accent, backgroundColor: 'rgba(200,145,58,.18)',
+            tension: 0.3, fill: true, pointRadius: 2, borderWidth: 2,
+          }],
+        },
+        options: {
+          ...baseOpts,
+          plugins: {
+            ...baseOpts.plugins,
+            tooltip: { ...baseOpts.plugins.tooltip,
+              callbacks: { label: ctx => '$' + ctx.parsed.y.toFixed(5) }
+            }
+          },
+          scales: {
+            ...baseOpts.scales,
+            y: { ...baseOpts.scales.y, ticks: {...baseOpts.scales.y.ticks, callback: v => '$' + (+v).toFixed(3) } },
+          },
+        },
+      });
+    },
+
+    _renderChart(canvasId, config) {
+      const el = document.getElementById(canvasId);
+      if (!el) return;
+      // Destroy previous instance to avoid memory leaks on re-render
+      if (this.chartInstances[canvasId]) {
+        this.chartInstances[canvasId].destroy();
+      }
+      this.chartInstances[canvasId] = new Chart(el, config);
+    },
+
+    fmtUptime(sec) {
+      if (sec < 60)    return `${sec} с`;
+      if (sec < 3600)  return `${Math.floor(sec/60)} мин`;
+      if (sec < 86400) return `${Math.floor(sec/3600)} ч ${Math.floor((sec%3600)/60)} мин`;
+      const d = Math.floor(sec/86400), h = Math.floor((sec%86400)/3600);
+      return `${d} дн ${h} ч`;
+    },
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    fmtNum(n) {
+      if (n == null) return '0';
+      n = +n;
+      if (n >= 1_000_000) return (n/1_000_000).toFixed(1).replace('.0','')+'M';
+      if (n >= 1_000)     return (n/1_000).toFixed(1).replace('.0','')+'K';
+      return n.toString();
+    },
+
+    fmtUptime(sec) {
+      if (!sec) return '—';
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      if (d > 0) return `${d}д ${h}ч`;
+      if (h > 0) return `${h}ч ${m}м`;
+      return `${m}м`;
+    },
+
+    formatDate(s) {
+      if (!s) return '';
+      const d = new Date(s.endsWith('Z')?s:s+'Z');
+      return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'});
+    },
+
+    relTime(s) {
+      if (!s) return '';
+      const d = new Date(s.endsWith('Z')?s:s+'Z');
+      const sec = (Date.now()-d)/1000;
+      if (sec<60)    return 'сейчас';
+      if (sec<3600)  return Math.floor(sec/60)+' мин';
+      if (sec<86400) return Math.floor(sec/3600)+' ч';
+      return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+    },
+  };
+}
+</script>
+</body>
+</html>

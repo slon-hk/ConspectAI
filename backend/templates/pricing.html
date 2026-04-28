@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тарифы · ConspectAI</title>
+<meta name="description" content="Прозрачные цены ConspectAI: фиксированная стоимость каждого ответа, токены не сгорают.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="canonical" href="https://conspectai.tech/pricing">
+<meta property="og:type"  content="website">
+<meta property="og:url"   content="https://conspectai.tech/pricing">
+<meta property="og:title" content="Тарифы · ConspectAI">
+<meta property="og:description" content="Фиксированная стоимость каждого ответа. Токены не сгорают. Покупаете один раз — пользуетесь сколько хотите.">
+<meta property="og:image" content="https://conspectai.tech/static/og-image.svg">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;450;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{
+  --bg:#0c0b09;--surface:#171512;--surface-2:#1e1b17;--border:#272420;--border-2:#322e28;
+  --accent:#c8913a;--accent-hi:#dda74d;--accent-dim:rgba(200,145,58,.13);--accent-glow:rgba(200,145,58,.28);
+  --text-1:#e6e1d5;--text-2:#a39e91;--text-3:#6e6a60;
+  --green:#4ade80;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;line-height:1.65;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
+
+.logo{font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.04em}
+.font-display{font-family:'Cormorant Garamond',serif}
+.font-mono{font-family:'DM Mono',monospace}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hi)}
+
+.topbar{position:sticky;top:0;z-index:20;background:rgba(12,11,9,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.topbar-inner{max-width:1100px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:14px}
+.logo-link{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-icon{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:500;background:var(--accent);color:#0c0b09;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
+.btn-primary:hover{background:var(--accent-hi);box-shadow:0 0 24px var(--accent-glow);transform:translateY(-1px);color:#0c0b09}
+.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text-2);border:1px solid var(--border);transition:all .15s;text-decoration:none}
+.btn-secondary:hover{color:var(--text-1);border-color:var(--accent-hi)}
+
+main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
+
+.hero{text-align:center;padding:32px 0 56px}
+.hero h1{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:56px;line-height:1.05;margin-bottom:12px}
+.hero h1 .gold{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-hi) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:17px;color:var(--text-2);max-width:600px;margin:0 auto 6px}
+
+.section-h{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.section-h h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:32px;color:var(--text-1)}
+.section-h .line{flex:1;height:1px;background:var(--border)}
+
+/* Packs grid */
+.packs{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:64px}
+@media(min-width:780px){.packs{grid-template-columns:repeat(3,1fr)}}
+
+.pack{background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);border:1px solid var(--border);border-radius:18px;padding:28px;position:relative;display:flex;flex-direction:column;transition:transform .25s,border-color .25s,box-shadow .25s}
+.pack:hover{transform:translateY(-3px);border-color:var(--border-2);box-shadow:0 12px 36px rgba(0,0,0,.4)}
+.pack.featured{border-color:var(--accent);box-shadow:0 0 0 1px rgba(200,145,58,.4),0 12px 36px rgba(0,0,0,.4)}
+.pack.featured::before{content:'Популярный';position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0c0b09;font-size:11px;font-weight:600;padding:3px 11px;border-radius:99px;letter-spacing:.04em;text-transform:uppercase}
+.pack-name{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:24px;margin-bottom:4px}
+.pack-tokens{font-size:13px;color:var(--text-3);margin-bottom:18px}
+.pack-tokens .num{color:var(--accent);font-family:'DM Mono',monospace;font-size:14px}
+.pack-price{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:48px;line-height:1;margin-bottom:4px}
+.pack-price-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
+.pack ul{list-style:none;margin-bottom:24px;flex:1}
+.pack li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;padding:5px 0;color:var(--text-2)}
+.pack li::before{content:'';width:14px;height:14px;border-radius:50%;background:rgba(200,145,58,.15);flex-shrink:0;margin-top:4px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23c8913a' stroke-width='3'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");background-position:center;background-repeat:no-repeat}
+.pack-cta{display:block;text-align:center;padding:11px;border-radius:10px;font-size:14px;font-weight:500;text-decoration:none;transition:all .2s}
+.pack-cta.primary{background:var(--accent);color:#0c0b09}
+.pack-cta.primary:hover{background:var(--accent-hi);color:#0c0b09;box-shadow:0 0 20px var(--accent-glow)}
+.pack-cta.secondary{background:transparent;color:var(--text-1);border:1px solid var(--border-2)}
+.pack-cta.secondary:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Models table */
+.models-table{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:48px}
+.models-table table{width:100%;border-collapse:collapse;font-size:14px}
+.models-table th{background:var(--surface-2);padding:14px 18px;text-align:left;color:var(--text-3);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.models-table td{padding:16px 18px;border-bottom:1px solid var(--border)}
+.models-table tr:last-child td{border-bottom:none}
+.models-table .model-name{font-weight:500;color:var(--text-1)}
+.models-table .model-sub{font-size:12px;color:var(--text-3);margin-top:2px}
+.models-table .price{font-family:'DM Mono',monospace;color:var(--accent);font-size:15px;font-weight:500}
+.models-table .examples{font-size:12px;color:var(--text-2)}
+
+/* How it works */
+.how{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:48px}
+@media(min-width:780px){.how{grid-template-columns:repeat(3,1fr)}}
+.how-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px}
+.how-num{font-family:'Cormorant Garamond',serif;font-size:32px;color:var(--accent);line-height:1;margin-bottom:10px}
+.how-title{font-size:15px;font-weight:500;margin-bottom:6px}
+.how-desc{font-size:13px;color:var(--text-2);line-height:1.6}
+
+/* FAQ */
+.faq{display:flex;flex-direction:column;gap:10px;margin-bottom:48px}
+.faq details{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .15s}
+.faq details[open]{border-color:var(--border-2)}
+.faq summary{padding:16px 20px;cursor:pointer;font-size:14px;font-weight:500;display:flex;justify-content:space-between;align-items:center;list-style:none}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';color:var(--text-3);font-size:20px;transition:transform .2s;line-height:1}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq .a{padding:0 20px 16px;font-size:13.5px;color:var(--text-2);line-height:1.7}
+
+/* CTA bottom */
+.cta{text-align:center;padding:48px 24px;background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.4) 100%);border:1px solid var(--border);border-radius:18px}
+.cta h3{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:36px;margin-bottom:10px}
+.cta p{color:var(--text-2);margin-bottom:24px}
+
+.footer{border-top:1px solid var(--border);padding:24px;text-align:center;font-size:12px;color:var(--text-3);margin-top:64px}
+.footer a{margin:0 10px}
+
+.badge-trial{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a href="/" class="logo-link">
+      <div class="logo-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="logo text-[18px]" style="color:var(--text-1)">ConspectAI</span>
+    </a>
+    <div class="ml-auto flex items-center gap-2">
+      <a href="/" class="btn-secondary hidden sm:inline-flex">На главную</a>
+      <a href="/app?auth=register" class="btn-primary !py-2 !px-4 !text-[13px]">Начать бесплатно</a>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ── HERO ────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="badge-trial mb-5">🎁 10 000 токенов при регистрации · без карты</div>
+    <h1>Прозрачные цены.<br><span class="gold">Без сюрпризов.</span></h1>
+    <p>Фиксированная стоимость каждого ответа. Токены не сгорают и не имеют срока. Покупаете один раз — пользуетесь сколько хотите.</p>
+  </section>
+
+  <!-- ── PACKS ───────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-h">
+      <h2>Пакеты токенов</h2>
+      <span class="line"></span>
+    </div>
+
+    <div class="packs">
+
+      <div class="pack">
+        <div class="pack-name">Старт</div>
+        <p class="pack-tokens"><span class="num">100 000</span> токенов</p>
+        <div class="pack-price">₽ 199</div>
+        <p class="pack-price-sub">≈ ₽2.00 за тысячу токенов</p>
+        <ul>
+          <li><strong>200</strong>&nbsp;ответов Flash Lite</li>
+          <li><strong>50</strong>&nbsp;ответов Flash</li>
+          <li><strong>12</strong>&nbsp;ответов Pro</li>
+          <li>Все шаблоны и карта тем</li>
+          <li>Экспорт в Markdown и PDF</li>
+        </ul>
+        <a href="/app?auth=register" class="pack-cta secondary">Начать с пакета</a>
+      </div>
+
+      <div class="pack featured">
+        <div class="pack-name">Стандарт</div>
+        <p class="pack-tokens"><span class="num">500 000</span> токенов</p>
+        <div class="pack-price">₽799</div>
+        <p class="pack-price-sub">≈ ₽1.60 за тысячу — экономия 20%</p>
+        <ul>
+          <li><strong>1 000</strong>&nbsp;ответов Flash Lite</li>
+          <li><strong>250</strong>&nbsp;ответов Flash</li>
+          <li><strong>62</strong>&nbsp;ответа Pro</li>
+          <li>Все шаблоны и карта тем</li>
+          <li>Экспорт в Markdown и PDF</li>
+        </ul>
+        <a href="/app?auth=register" class="pack-cta primary">Выбрать Стандарт</a>
+      </div>
+
+      <div class="pack">
+        <div class="pack-name">Профи</div>
+        <p class="pack-tokens"><span class="num">2 000 000</span> токенов</p>
+        <div class="pack-price">₽2 499</div>
+        <p class="pack-price-sub">≈ ₽1.25 за тысячу — экономия 38%</p>
+        <ul>
+          <li><strong>4 000</strong>&nbsp;ответов Flash Lite</li>
+          <li><strong>1 000</strong>&nbsp;ответов Flash</li>
+          <li><strong>250</strong>&nbsp;ответов Pro</li>
+          <li>Все шаблоны и карта тем</li>
+          <li>Экспорт в Markdown и PDF</li>
+        </ul>
+        <a href="/app?auth=register" class="pack-cta secondary">Выбрать Профи</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── MODELS / RATES ──────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-h">
+      <h2>Сколько токенов стоит ответ</h2>
+      <span class="line"></span>
+    </div>
+
+    <p style="color:var(--text-2);margin-bottom:20px;font-size:15px">
+      У каждой модели — фиксированная цена за один ответ. Длина ответа на цену не влияет: получите 100 строк или 1000 — спишется одинаково.
+    </p>
+
+    <div class="models-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Модель</th>
+            <th>Стоимость ответа</th>
+            <th>Сколько ответов хватит</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="model-name">⚡⚡ Gemini 2.0 Flash Lite</div>
+              <div class="model-sub">Самый быстрый и экономичный</div>
+            </td>
+            <td><span class="price">500 токенов</span></td>
+            <td class="examples">20 ответов из триала · 200 из Старта · 4 000 из Профи</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="model-name">⚡ Gemini 2.0 Flash</div>
+              <div class="model-sub">Лучший баланс качества и скорости · рекомендуется</div>
+            </td>
+            <td><span class="price">2 000 токенов</span></td>
+            <td class="examples">5 ответов из триала · 50 из Старта · 1 000 из Профи</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="model-name">🧠 Gemini 1.5 Pro</div>
+              <div class="model-sub">Максимальное качество для сложных задач</div>
+            </td>
+            <td><span class="price">8 000 токенов</span></td>
+            <td class="examples">1 ответ из триала · 12 из Старта · 250 из Профи</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ─────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-h">
+      <h2>Как это работает</h2>
+      <span class="line"></span>
+    </div>
+
+    <div class="how">
+      <div class="how-card">
+        <div class="how-num">01</div>
+        <div class="how-title">Зарегистрируйтесь</div>
+        <p class="how-desc">Получите 10 000 пробных токенов сразу — без карты, без подписки. Хватит чтобы попробовать все шаблоны и карту тем.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num">02</div>
+        <div class="how-title">Выбирайте модель</div>
+        <p class="how-desc">Перед каждым запросом видите цену в токенах. Простой вопрос — Flash Lite. Сложное доказательство — Pro.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num">03</div>
+        <div class="how-title">Покупайте при необходимости</div>
+        <p class="how-desc">Когда токены кончатся, докупаете пакет. Купленные токены не сгорают и не имеют срока действия.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FAQ ─────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-h">
+      <h2>Частые вопросы</h2>
+      <span class="line"></span>
+    </div>
+
+    <div class="faq">
+
+      <details open>
+        <summary>Что такое токен и почему фиксированная цена?</summary>
+        <div class="a">Токен — это единица расчёта в нашем сервисе. Чтобы вы могли заранее точно знать, сколько потратите, мы установили <strong>фиксированную ставку за один ответ</strong> для каждой модели. Это удобнее, чем считать токены по факту: вы видите цену перед запросом и точно знаете, сколько ответов получите из пакета.</div>
+      </details>
+
+      <details>
+        <summary>Что если ответ получится очень длинным?</summary>
+        <div class="a">Длина ответа на цену не влияет — спишется ровно ставка модели (500 / 2 000 / 8 000 токенов). Исключение — очень большие контексты с прикреплёнными файлами на много страниц: в таких случаях может списаться 2× от ставки, и в карточке ответа появится отметка. Это редкое исключение, обычные диалоги и длинные ответы укладываются в стандартную ставку.</div>
+      </details>
+
+      <details>
+        <summary>Сгорают ли купленные токены?</summary>
+        <div class="a">Нет. Токены не имеют срока действия и не сгорают. Купили пакет «Профи» с 2 000 000 токенов в январе — можете растянуть на год или израсходовать за день. Без обязательств.</div>
+      </details>
+
+      <details>
+        <summary>Когда списываются токены?</summary>
+        <div class="a">Токены списываются <strong>только за ответ ИИ</strong>. Если вы отправили вопрос, но ИИ вернул ошибку, токены не спишутся. Также бесплатны: автоматическая карта тем (мы сами оплачиваем эту фичу), экспорт в PDF/Markdown, переключение шаблонов, переименование чатов.</div>
+      </details>
+
+      <details>
+        <summary>Можно ли вернуть деньги за неиспользованные токены?</summary>
+        <div class="a">Да, в течение 14 дней с момента оплаты по основаниям, предусмотренным законодательством РФ. Напишите на <a href="mailto:support@conspectai.tech">support@conspectai.tech</a> — рассмотрим запрос индивидуально. Подробнее — в <a href="/offer">публичной оферте</a>.</div>
+      </details>
+
+      <details>
+        <summary>Какие способы оплаты?</summary>
+        <div class="a">Банковские карты Visa, Mastercard, МИР через систему Robokassa. Платёж проходит мгновенно, токены зачисляются автоматически. Реквизиты карты у нас не хранятся.</div>
+      </details>
+
+      <details>
+        <summary>Можно ли получить чек для возврата налога?</summary>
+        <div class="a">Да. После оплаты на ваш email автоматически отправляется фискальный чек самозанятого. Чек можно использовать для налогового вычета или для отчёта работодателю.</div>
+      </details>
+
+    </div>
+  </section>
+
+  <!-- ── CTA ─────────────────────────────────────────────────────────────── -->
+  <section class="cta">
+    <h3>Готовы попробовать?</h3>
+    <p>Регистрация занимает 30 секунд · 10 000 токенов в подарок</p>
+    <a href="/app?auth=register" class="btn-primary !text-[15px]">
+      Создать аккаунт
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </a>
+  </section>
+
+</main>
+
+<footer class="footer">
+  © 2026 ConspectAI ·
+  <a href="/pricing">Тарифы</a> ·
+  <a href="/offer">Публичная оферта</a> ·
+  <a href="/privacy">Политика конфиденциальности</a> ·
+  <a href="/contacts">Контакты</a>
+</footer>
+
+</body>
+</html>

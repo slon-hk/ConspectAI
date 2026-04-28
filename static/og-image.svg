@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%"   stop-color="#1e1b17"/>
+      <stop offset="100%" stop-color="#0c0b09"/>
+    </radialGradient>
+    <radialGradient id="goldHalo" cx="60%" cy="50%" r="32%">
+      <stop offset="0%"   stop-color="#c8913a" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#c8913a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldText" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"  stop-color="#c8913a"/>
+      <stop offset="50%" stop-color="#dda74d"/>
+      <stop offset="100%" stop-color="#c8913a"/>
+    </linearGradient>
+    <pattern id="grid" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#c8913a" stroke-width="0.5" opacity="0.10"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGlow)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect width="1200" height="630" fill="url(#goldHalo)"/>
+
+  <!-- Decorative LaTeX-like equation, faded into background -->
+  <g font-family="'Cormorant Garamond', Georgia, serif" font-size="36" fill="#c8913a" opacity="0.10" font-style="italic">
+    <text x="80"  y="110">∇·E = ρ/ε₀</text>
+    <text x="980" y="170">∫f(x)dx</text>
+    <text x="100" y="540">e^(iπ) + 1 = 0</text>
+    <text x="900" y="540">∂u/∂t = α∇²u</text>
+  </g>
+
+  <!-- Logo: curly braces + equation lines -->
+  <g transform="translate(96 270)">
+    <!-- Left brace, gold -->
+    <path d="M58 0 Q22 0, 22 36 L22 60 Q22 78, 0 78 Q22 78, 22 96 L22 120 Q22 156, 58 156"
+          stroke="#c8913a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Right brace, light -->
+    <path d="M150 0 Q186 0, 186 36 L186 60 Q186 78, 208 78 Q186 78, 186 96 L186 120 Q186 156, 150 156"
+          stroke="#e6e1d5" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Equation lines (light) -->
+    <rect x="60" y="34" width="88" height="9" rx="4.5" fill="#e6e1d5"/>
+    <rect x="60" y="73" width="88" height="9" rx="4.5" fill="#e6e1d5"/>
+    <rect x="60" y="112" width="88" height="9" rx="4.5" fill="#e6e1d5"/>
+  </g>
+
+  <!-- Brand name + tagline -->
+  <g font-family="'DM Sans', 'Inter', sans-serif">
+    <text x="370" y="295" fill="#e6e1d5" font-size="78" font-weight="500" letter-spacing="-1">ConspectAI</text>
+    <text x="370" y="345" fill="#8a8274" font-size="22" font-weight="400" letter-spacing="0.5">STEM Knowledge Architect</text>
+  </g>
+
+  <!-- Body text — value proposition -->
+  <g font-family="'DM Sans', sans-serif" font-size="20" fill="#8a8274">
+    <text x="370" y="430">ИИ-ассистент для студентов инженерных и научных специальностей.</text>
+    <text x="370" y="460">Структурированные ответы с LaTeX, карта тем, экспорт в PDF.</text>
+  </g>
+
+  <!-- Footer line -->
+  <g font-family="'DM Mono', monospace" font-size="16">
+    <text x="370" y="540" fill="#c8913a">conspectai.tech</text>
+    <text x="540" y="540" fill="#4a4640">·</text>
+    <text x="560" y="540" fill="#8a8274">3 000 пробных токенов · бесплатно</text>
+  </g>
+
+  <!-- Subtle corner accents -->
+  <circle cx="0" cy="630" r="200" fill="#c8913a" opacity="0.05"/>
+  <circle cx="1200" cy="0" r="180" fill="#c8913a" opacity="0.04"/>
+</svg>

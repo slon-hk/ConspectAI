@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Политика конфиденциальности · ConspectAI</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="canonical" href="https://conspectai.tech/privacy">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=DM+Sans:wght@300;400;450;500;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0b09;--surface:#171512;--surface-2:#1e1b17;--border:#272420;--border-2:#322e28;
+    --accent:#c8913a;--accent-hi:#dda74d;--accent-dim:rgba(200,145,58,.13);
+    --text-1:#e6e1d5;--text-2:#a39e91;--text-3:#6e6a60;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased}
+  ::-webkit-scrollbar{width:8px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
+
+  .logo{font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.04em}
+  .font-mono{font-family:'DM Mono',monospace}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{color:var(--accent-hi);text-decoration:underline}
+
+  /* Topbar */
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(12,11,9,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+  .topbar-inner{max-width:880px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:14px}
+  .logo-link{display:flex;align-items:center;gap:10px;text-decoration:none}
+  .logo-icon{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+  .logo-text{font-size:18px;color:var(--text-1)}
+  .back{margin-left:auto;font-size:13px;color:var(--text-2);display:inline-flex;align-items:center;gap:6px}
+  .back:hover{color:var(--text-1);text-decoration:none}
+
+  /* Article */
+  article{max-width:760px;margin:0 auto;padding:48px 24px 96px}
+  .doc-meta{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:36px;padding-bottom:24px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-3)}
+  .doc-meta .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:99px;font-size:11px;font-weight:500;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(200,145,58,.22)}
+
+  h1{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:46px;line-height:1.1;letter-spacing:-.01em;margin-bottom:14px}
+  .lede{font-size:16px;color:var(--text-2);margin-bottom:32px}
+
+  h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:28px;margin:40px 0 16px;color:var(--text-1)}
+  h3{font-size:15px;font-weight:600;margin:24px 0 8px;color:var(--text-1);text-transform:uppercase;letter-spacing:.04em}
+  p{font-size:15px;color:var(--text-1);margin-bottom:14px}
+  ul,ol{margin:14px 0 18px 20px}
+  li{font-size:15px;color:var(--text-1);margin-bottom:6px}
+  strong{color:var(--text-1);font-weight:600}
+  code{font-family:'DM Mono',monospace;font-size:.92em;background:var(--surface-2);padding:1px 6px;border-radius:4px;color:var(--accent)}
+
+  .info-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:16px 20px;margin:24px 0}
+  .info-box p:last-child{margin-bottom:0}
+
+  /* Footer */
+  .footer{border-top:1px solid var(--border);padding:24px;text-align:center;font-size:12px;color:var(--text-3)}
+  .footer a{margin:0 10px}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="/" class="logo-link">
+      <div class="logo-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="logo logo-text">ConspectAI</span>
+    </a>
+    <a href="/" class="back">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      На главную
+    </a>
+  </div>
+</header>
+
+<article>
+  <div class="doc-meta">
+    <span class="badge">Юридический документ</span>
+    <span>Действует с 26 апреля 2026 г.</span>
+  </div>
+
+  <h1>Политика обработки персональных данных</h1>
+  <p class="lede">
+    Настоящая Политика описывает, какие персональные данные собирает сервис ConspectAI, как они используются и какие у вас права в отношении этих данных.
+  </p>
+
+  <h2>1. Общие положения</h2>
+  <p>
+    Настоящий документ разработан в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных» и определяет порядок обработки персональных данных пользователей сайта <a href="https://conspectai.tech">https://conspectai.tech</a> и сервиса ConspectAI (далее — «Сервис»).
+  </p>
+  <p>
+    <strong>Оператор персональных данных:</strong> Самозанятый Степанов Леонид Артемович, ИНН 673110788119, г. Санкт-Петербург.
+  </p>
+  <p>
+    Используя Сервис, вы подтверждаете своё согласие с условиями этой Политики. Если вы не согласны с условиями — пожалуйста, не используйте Сервис.
+  </p>
+
+  <h2>2. Какие данные мы собираем</h2>
+
+  <h3>2.1. При регистрации</h3>
+  <ul>
+    <li><strong>Email-адрес</strong> — для входа и связи по техническим вопросам</li>
+    <li><strong>Имя пользователя</strong> — отображается в личном кабинете</li>
+    <li><strong>Пароль</strong> — хранится только в виде криптографического хеша (bcrypt), исходный пароль не сохраняется и нам недоступен</li>
+  </ul>
+
+  <h3>2.2. При использовании сервиса</h3>
+  <ul>
+    <li><strong>Тексты ваших запросов и ответов ИИ</strong> — для обеспечения работы чата, истории диалогов и автоматической генерации карты тем</li>
+    <li><strong>Загружаемые вами файлы</strong> (изображения, документы) — для обработки в рамках оказания услуги</li>
+    <li><strong>Метаданные использования</strong> — количество отправленных сообщений, использованные модели и шаблоны, потраченные токены — для биллинга и контроля квот</li>
+  </ul>
+
+  <h3>2.3. Технические данные</h3>
+  <ul>
+    <li>IP-адрес — фиксируется в логах веб-сервера для безопасности</li>
+    <li>Тип и версия браузера, операционная система — для совместимости</li>
+    <li>События взаимодействия с интерфейсом (нажатия кнопок, открытие разделов) — для аналитики продукта в обезличенном виде</li>
+  </ul>
+
+  <h3>2.4. При оплате</h3>
+  <p>
+    Платежи обрабатываются сторонней системой ЮKassa (ООО НКО «ЮMoney»). Реквизиты вашей банковской карты в Сервис <strong>не передаются и нами не хранятся</strong>. Мы получаем только факт успешной/неуспешной оплаты и сумму.
+  </p>
+
+  <h2>3. Как мы используем данные</h2>
+  <ul>
+    <li>Для предоставления услуг Сервиса (обработка запросов, хранение истории чатов, экспорт)</li>
+    <li>Для авторизации и обеспечения безопасности учётной записи</li>
+    <li>Для биллинга и учёта израсходованных токенов</li>
+    <li>Для связи с вами по техническим вопросам и важным изменениям сервиса</li>
+    <li>Для улучшения качества сервиса (анонимизированный анализ поведения)</li>
+    <li>Для соблюдения требований законодательства РФ</li>
+  </ul>
+
+  <h2>4. Передача данных третьим лицам</h2>
+  <p>Ваши данные могут передаваться следующим обработчикам:</p>
+  <ul>
+    <li><strong>Google LLC (Google AI / Gemini API)</strong> — тексты ваших запросов и приложенные файлы передаются для генерации ответов ИИ. Google обрабатывает данные согласно своей политике конфиденциальности.</li>
+    <li><strong>ООО "РОБОКАССА"</strong> — данные платёжных операций для обработки оплаты.</li>
+    <li><strong>Российские государственные органы</strong> — в случаях, прямо предусмотренных законодательством РФ.</li>
+  </ul>
+  <p>
+    Мы <strong>не продаём</strong> ваши данные и не передаём их в маркетинговых целях третьим лицам.
+  </p>
+
+  <h2>5. Хранение данных</h2>
+  <ul>
+    <li>Данные хранятся на серверах в <strong>Российской Федерации</strong>, что соответствует требованию ст. 18 152-ФЗ о локализации</li>
+    <li>Доступ к данным имеет только администратор сервиса</li>
+    <li>Пароли хранятся в виде необратимого хеша, восстановление исходного пароля невозможно</li>
+    <li>Срок хранения — пока существует ваша учётная запись. После удаления аккаунта данные удаляются в течение 30 дней</li>
+    <li>Аналитические события хранятся в обезличенном виде не более 90 дней</li>
+  </ul>
+
+  <h2>6. Cookies и localStorage</h2>
+  <p>
+    Сервис использует localStorage браузера для хранения токена авторизации (чтобы вы оставались залогинены). Cookies в традиционном виде сервис не использует, рекламные/трекинговые системы третьих лиц не подключены.
+  </p>
+
+  <h2>7. Ваши права</h2>
+  <p>В соответствии с законодательством РФ вы имеете право:</p>
+  <ul>
+    <li>Получить информацию о составе ваших персональных данных, которые мы храним</li>
+    <li>Потребовать изменения или дополнения данных, если они неточны</li>
+    <li>Запросить удаление вашей учётной записи и связанных с ней данных</li>
+    <li>Отозвать согласие на обработку персональных данных</li>
+    <li>Обжаловать действия Оператора в Роскомнадзор</li>
+  </ul>
+  <p>
+    Для реализации любого из этих прав отправьте запрос на <a href="mailto:support@conspectai.tech">support@conspectai.tech</a>. Запрос будет рассмотрен в течение 30 дней.
+  </p>
+
+  <h2>8. Безопасность</h2>
+  <p>Мы применяем разумные технические и организационные меры для защиты ваших данных:</p>
+  <ul>
+    <li>Передача данных только по HTTPS (TLS 1.3)</li>
+    <li>Изоляция базы данных от внешней сети</li>
+    <li>Хранение паролей в виде bcrypt-хешей</li>
+    <li>Регулярные обновления зависимостей и безопасности</li>
+  </ul>
+  <p>
+    При этом ни одна система не может гарантировать абсолютной защиты — пожалуйста, используйте сложные уникальные пароли и никому не передавайте данные для входа.
+  </p>
+
+  <h2>9. Изменения Политики</h2>
+  <p>
+    Мы можем обновлять эту Политику. Актуальная версия всегда доступна на этой странице. Существенные изменения мы анонсируем по email или в интерфейсе сервиса.
+  </p>
+
+  <h2>10. Контакты</h2>
+  <div class="info-box">
+    <p><strong>По вопросам обработки персональных данных:</strong></p>
+    <p>Email: <a href="mailto:support@conspectai.tech">support@conspectai.tech</a></p>
+    <p>Telegram: <a href="https://t.me/slon_hk">@slon_hk</a></p>
+    <p>Самозанятый Степанов Леонид Артемович, ИНН 673110788119, г. Санкт-Петербург</p>
+  </div>
+</article>
+
+<div class="footer">
+  © 2026 ConspectAI ·
+  <a href="/pricing">Тарифы</a> ·
+  <a href="/offer">Публичная оферта</a> ·
+  <a href="/privacy">Политика конфиденциальности</a> ·
+  <a href="/contacts">Контакты</a>
+</div>
+
+</body>
+</html>

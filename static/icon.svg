@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Left brace (gold accent) -->
+  <path d="M22 12 Q14 12, 14 20 L14 28 Q14 32, 10 32 Q14 32, 14 36 L14 44 Q14 52, 22 52"
+        stroke="#c8913a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right brace (light) -->
+  <path d="M42 12 Q50 12, 50 20 L50 28 Q50 32, 54 32 Q50 32, 50 36 L50 44 Q50 52, 42 52"
+        stroke="#e6e1d5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Equation lines (3 stacked bars) -->
+  <rect x="22" y="22" width="20" height="3.6" rx="1.8" fill="#e6e1d5"/>
+  <rect x="22" y="30" width="20" height="3.6" rx="1.8" fill="#e6e1d5"/>
+  <rect x="22" y="38" width="20" height="3.6" rx="1.8" fill="#e6e1d5"/>
+</svg>

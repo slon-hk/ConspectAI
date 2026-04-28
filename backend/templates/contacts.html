@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Контакты · ConspectAI</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="canonical" href="https://conspectai.tech/contacts">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;450;500;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0b09;--surface:#171512;--surface-2:#1e1b17;--border:#272420;--border-2:#322e28;
+    --accent:#c8913a;--accent-hi:#dda74d;--accent-dim:rgba(200,145,58,.13);--accent-glow:rgba(200,145,58,.28);
+    --text-1:#e6e1d5;--text-2:#a39e91;--text-3:#6e6a60;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+
+  .logo{font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.04em}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{color:var(--accent-hi)}
+
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(12,11,9,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+  .topbar-inner{max-width:880px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:14px}
+  .logo-link{display:flex;align-items:center;gap:10px;text-decoration:none}
+  .logo-icon{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+  .logo-text{font-size:18px;color:var(--text-1)}
+  .back{margin-left:auto;font-size:13px;color:var(--text-2);display:inline-flex;align-items:center;gap:6px}
+  .back:hover{color:var(--text-1)}
+
+  main{flex:1;max-width:680px;margin:0 auto;padding:64px 24px;width:100%}
+  h1{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:48px;line-height:1.1;letter-spacing:-.01em;margin-bottom:14px;text-align:center}
+  .lede{font-size:16px;color:var(--text-2);text-align:center;margin-bottom:48px}
+
+  .channels{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:40px}
+  @media(min-width:600px){.channels{grid-template-columns:1fr 1fr}}
+
+  .channel{display:flex;align-items:center;gap:14px;padding:18px 20px;background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);border:1px solid var(--border);border-radius:14px;text-decoration:none;transition:all .2s;color:var(--text-1)}
+  .channel:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 12px 32px rgba(0,0,0,.35);text-decoration:none;color:var(--text-1)}
+  .channel-icon{width:42px;height:42px;border-radius:11px;background:var(--accent-dim);border:1px solid rgba(200,145,58,.22);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0}
+  .channel-meta{flex:1;min-width:0}
+  .channel-label{font-size:11px;color:var(--text-3);font-weight:500;letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px}
+  .channel-value{font-size:14px;color:var(--text-1);font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis}
+
+  .reqs{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px}
+  .reqs h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:24px;margin-bottom:14px}
+  .reqs .row{display:grid;grid-template-columns:140px 1fr;gap:12px;padding:7px 0;font-size:14px;border-bottom:1px dashed var(--border)}
+  .reqs .row:last-child{border-bottom:none}
+  .reqs .k{color:var(--text-3);font-size:12px}
+  .reqs .v{color:var(--text-1)}
+  .reqs .v.mono{font-family:'DM Mono',monospace}
+
+  .footer{border-top:1px solid var(--border);padding:24px;text-align:center;font-size:12px;color:var(--text-3)}
+  .footer a{margin:0 10px}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="/" class="logo-link">
+      <div class="logo-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="logo logo-text">ConspectAI</span>
+    </a>
+    <a href="/" class="back">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      На главную
+    </a>
+  </div>
+</header>
+
+<main>
+  <h1>Связаться с нами</h1>
+  <p class="lede">Любые вопросы по работе сервиса, оплате или личной информации — пишите. Отвечаем обычно в течение суток.</p>
+
+  <div class="channels">
+    <a href="mailto:support@conspectai.tech" class="channel">
+      <div class="channel-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      </div>
+      <div class="channel-meta">
+        <p class="channel-label">Email</p>
+        <p class="channel-value">support@conspectai.tech</p>
+      </div>
+    </a>
+
+    <a href="https://t.me/slon_hk" class="channel" target="_blank" rel="noopener">
+      <div class="channel-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+      </div>
+      <div class="channel-meta">
+        <p class="channel-label">Telegram</p>
+        <p class="channel-value">@slon_hk</p>
+      </div>
+    </a>
+  </div>
+
+  <div class="reqs">
+    <h2>Реквизиты</h2>
+    <div class="row"><div class="k">Кто</div><div class="v">Самозанятый Степанов Леонид Артемович</div></div>
+    <div class="row"><div class="k">ИНН</div><div class="v mono">673110788119</div></div>
+    <div class="row"><div class="k">Город</div><div class="v">Санкт-Петербург</div></div>
+    <div class="row"><div class="k">Сайт</div><div class="v"><a href="https://conspectai.tech">conspectai.tech</a></div></div>
+  </div>
+</main>
+
+<div class="footer">
+  © 2026 ConspectAI ·
+  <a href="/pricing">Тарифы</a> ·
+  <a href="/offer">Публичная оферта</a> ·
+  <a href="/privacy">Политика конфиденциальности</a> ·
+  <a href="/contacts">Контакты</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments — NEVER copy these into the image
+.venv/
+venv/
+env/
+**/venv/
+**/.venv/
+
+# Local config / secrets
+.env
+.env.*
+!.env.example
+
+# OS junk
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Build artifacts and caches
+*.log
+*.sqlite
+*.sqlite3
+chat_history.db
+chat_history.db-journal
+node_modules/
+
+# User data — should be in volumes, not in the image
+uploads/
+backend/uploads/
+
+# Docker / docs
+docker-compose*.yml
+.dockerignore
+Dockerfile
+conf/Dockerfile
+README.md
+Readme.md
+*.md
+!backend/templates/*.md

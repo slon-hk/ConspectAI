@@ -1,0 +1,25 @@
+# Local development Caddyfile — no HTTPS, no Let's Encrypt.
+# Used by docker-compose.dev.yml.
+
+:80 {
+    encode zstd gzip
+
+    handle /static/* {
+        root * /srv
+        file_server
+    }
+
+    handle {
+        reverse_proxy app:8000
+    }
+
+    handle_errors {
+        @api path /api/*
+        respond @api `{"detail":"Service unavailable"}` {err.status_code} {
+            close
+        }
+        rewrite * /static/503.html
+        root    * /srv
+        file_server
+    }
+}

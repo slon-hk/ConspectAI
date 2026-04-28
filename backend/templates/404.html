@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<title>404 · Страница не найдена</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;450;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0b09;--surface:#171512;--border:#272420;
+    --accent:#c8913a;--accent-hi:#dda74d;--accent-glow:rgba(200,145,58,.32);
+    --text-1:#e6e1d5;--text-2:#a39e91;--text-3:#6e6a60;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+
+  body{
+    font-family:'DM Sans',sans-serif;color:var(--text-1);
+    background-color:var(--bg);
+    background-size:cover;
+    background-position:center center;
+    background-repeat:no-repeat;
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+    transition:background-image .6s ease-in;
+  }
+
+  /* Dark gradient overlay so text stays readable on any background image */
+  body::before{
+    content:'';
+    position:fixed;inset:0;
+    background:
+      radial-gradient(ellipse at center, rgba(12,11,9,.55) 0%, rgba(12,11,9,.85) 80%),
+      linear-gradient(180deg, rgba(12,11,9,.6) 0%, rgba(12,11,9,.4) 50%, rgba(12,11,9,.85) 100%);
+    pointer-events:none;
+    z-index:1;
+  }
+
+  .wrap{
+    position:relative;z-index:2;
+    height:100%;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding:32px;
+    text-align:center;
+  }
+
+  .logo{
+    position:absolute;top:28px;left:32px;
+    display:flex;align-items:center;gap:10px;
+    text-decoration:none;
+    transition:opacity .15s;
+  }
+  .logo:hover{opacity:.8}
+  .logo-icon{
+    width:34px;height:34px;border-radius:10px;
+    background:var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 20px var(--accent-glow);
+  }
+  .logo-text{
+    font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.04em;
+    font-size:22px;color:var(--text-1);
+  }
+
+  .code{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:300;
+    font-size:clamp(120px, 22vw, 240px);
+    line-height:.9;
+    background:linear-gradient(135deg, var(--accent) 0%, var(--accent-hi) 50%, var(--accent) 100%);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;color:transparent;
+    margin-bottom:8px;
+    letter-spacing:-.02em;
+    filter:drop-shadow(0 4px 24px rgba(200,145,58,.18));
+  }
+
+  .title{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:400;font-style:italic;
+    font-size:clamp(24px, 3vw, 36px);
+    color:var(--text-1);
+    margin-bottom:14px;
+    letter-spacing:.01em;
+  }
+
+  .desc{
+    font-size:15px;line-height:1.65;
+    color:var(--text-2);
+    max-width:460px;
+    margin-bottom:36px;
+  }
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:11px 22px;border-radius:10px;
+    font-size:14px;font-weight:500;font-family:inherit;
+    cursor:pointer;text-decoration:none;border:1px solid transparent;
+    transition:all .2s;
+  }
+  .btn-primary{background:var(--accent);color:#0c0b09;border-color:var(--accent)}
+  .btn-primary:hover{background:var(--accent-hi);border-color:var(--accent-hi);box-shadow:0 0 24px var(--accent-glow);transform:translateY(-1px)}
+  .btn-secondary{background:rgba(23,21,18,.6);color:var(--text-1);border-color:var(--border);backdrop-filter:blur(6px)}
+  .btn-secondary:hover{background:var(--surface);border-color:var(--accent)}
+
+  .hint{
+    position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+    font-family:'DM Mono',monospace;font-size:11px;
+    color:var(--text-3);letter-spacing:.05em;
+  }
+
+  /* Soft fade-in on load */
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  .anim{animation:fadeUp .8s cubic-bezier(.2,.8,.2,1) both}
+  .anim-1{animation-delay:.05s}
+  .anim-2{animation-delay:.18s}
+  .anim-3{animation-delay:.30s}
+  .anim-4{animation-delay:.42s}
+
+  @media(max-width:600px){
+    .logo{top:18px;left:18px}
+    .actions{flex-direction:column;width:100%;max-width:280px}
+    .btn{justify-content:center}
+  }
+</style>
+</head>
+<body>
+
+<a href="/" class="logo">
+  <div class="logo-icon">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="#0c0b09"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+  </div>
+  <span class="logo-text">ConspectAI</span>
+</a>
+
+<div class="wrap">
+  <div class="code anim anim-1">404</div>
+  <h1 class="title anim anim-2">Эта страница затерялась в космосе</h1>
+  <p class="desc anim anim-3">
+    Возможно, ссылка устарела, или вы попали сюда по ошибке. Не переживайте — давайте вернёмся туда, где всё работает.
+  </p>
+  <div class="actions anim anim-4">
+    <a href="/" class="btn btn-primary">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      На главную
+    </a>
+    <a href="/app" class="btn btn-secondary">Открыть приложение</a>
+  </div>
+</div>
+
+<p class="hint">Error 404 · Resource not found</p>
+
+<script>
+  // Pick a random background from the manifest. Falls back to the dark
+  // gradient (already set on body) if the manifest is unreachable.
+  fetch('/static/error-bg/manifest.json', { cache: 'no-cache' })
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data || !Array.isArray(data.images) || !data.images.length) return;
+      const file = data.images[Math.floor(Math.random() * data.images.length)];
+      // Preload to avoid a flash of unstyled background
+      const img = new Image();
+      img.onload = () => {
+        document.body.style.backgroundImage = `url(/static/error-bg/${file})`;
+      };
+      img.src = `/static/error-bg/${file}`;
+    })
+    .catch(() => {});
+</script>
+
+</body>
+</html>

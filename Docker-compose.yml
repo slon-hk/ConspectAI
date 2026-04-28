@@ -1,0 +1,98 @@
+# ConspectAI — combined dev/prod stack.
+#
+# Project layout this file expects:
+#   ff/                          ← cwd when running docker compose
+#     ├── backend/               (Python source)
+#     ├── conf/
+#     │   ├── Dockerfile
+#     │   ├── requirements.txt
+#     │   └── Caddyfile          ← Caddyfile lives here
+#     ├── static/                (single source of truth for static assets)
+#     ├── docker-compose.yml     (this file)
+#     └── .env
+#
+# Required env vars in .env:
+#   GEMINI_API_KEY=...
+#   SECRET_KEY=...
+#   POSTGRES_PASSWORD=...
+#   DOMAIN=conspectai.tech
+#   ACME_EMAIL=admin@conspectai.tech
+
+name: conspectai
+
+services:
+
+  # ── PostgreSQL 16 ──────────────────────────────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       orion
+      POSTGRES_USER:     orion
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orion -d orion"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── FastAPI app ────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: conf/Dockerfile
+    image: conspectai:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL:    postgresql://orion:${POSTGRES_PASSWORD}@db:5432/orion
+      GEMINI_API_KEY:  ${GEMINI_API_KEY}
+      SECRET_KEY:      ${SECRET_KEY}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+    expose:
+      - "8000"
+    volumes:
+      - uploads_data:/app/uploads
+      - rag_images_data:/app/uploads/rag_images
+    networks:
+      - net
+
+  # ── Caddy reverse proxy + automatic HTTPS ──────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN:     ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./conf/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./static:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - net
+
+volumes:
+  postgres_data: { name: conspectai_postgres_data }
+  uploads_data:  { name: conspectai_uploads_data }
+  rag_images_data: { name: conspectai_rag_images }
+  caddy_data:    { name: conspectai_caddy_data }
+  caddy_config:  { name: conspectai_caddy_config }
+
+networks:
+  net:
+    name: conspectai-net

@@ -1,0 +1,58 @@
+# Production Caddy config — automatic HTTPS via Let's Encrypt.
+# DOMAIN and ACME_EMAIL come from .env via docker-compose.
+
+# ── Redirect www → apex (canonical: conspectai.tech) ──────────────────────────
+www.{$DOMAIN} {
+    tls {$ACME_EMAIL}
+    redir https://{$DOMAIN}{uri} permanent
+}
+
+# ── Main site ─────────────────────────────────────────────────────────────────
+{$DOMAIN} {
+    tls {$ACME_EMAIL}
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        X-Frame-Options           "DENY"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        Permissions-Policy        "geolocation=(), microphone=(), camera=()"
+        -Server
+    }
+
+    handle /static/* {
+        root * /srv
+        file_server
+        header Cache-Control "public, max-age=86400"
+    }
+
+    @uploads path /api/files/*
+    header  @uploads Cache-Control "private, max-age=86400"
+
+    @health path /api/models
+    header  @health Cache-Control "no-store"
+
+    handle {
+        reverse_proxy app:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            transport http {
+                read_timeout  120s
+                write_timeout 120s
+            }
+        }
+    }
+
+    handle_errors {
+        @api path /api/*
+        respond @api `{"detail":"Service unavailable"}` {err.status_code} {
+            close
+        }
+
+        rewrite * /static/503.html
+        root    * /srv
+        file_server
+    }
+}

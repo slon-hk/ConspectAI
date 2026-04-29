@@ -5,6 +5,7 @@ from .chats import ChatRepository
 from .files import FileRepository
 from .messages import MessageRepository
 from .mindmaps import MindmapRepository
+from .usage import UsageRepository
 from .users import UserRepository
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "FileRepository",
     "MessageRepository",
     "MindmapRepository",
+    "UsageRepository",
     "UserRepository",
 ]

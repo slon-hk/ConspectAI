@@ -85,6 +85,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   even though it still runs on the same Postgres database for now.
 - Analytics event SQL now lives behind `app.repositories.olap.AnalyticsEventRepository`;
   `analytics.py` remains the compatibility API for current callers.
+- Usage and quota SQL now lives behind `app.repositories.oltp.UsageRepository`;
+  `QuotaService` and `UsageService` preserve the current `db.py` wrapper API.
 
 ## Next Stages
 

@@ -105,6 +105,40 @@ async def admin_model_usage(_=Depends(require_admin)):
     return [_serialize(r) for r in rows]
 
 
+@router.get("/metrics")
+async def admin_metrics(_=Depends(require_admin)):
+    return _serialize(await db.get_admin_metrics())
+
+
+@router.get("/metrics/overview")
+async def admin_metrics_overview(_=Depends(require_admin)):
+    return _serialize(await db.admin_metrics_overview())
+
+
+@router.get("/metrics/rag")
+async def admin_metrics_rag(_=Depends(require_admin)):
+    out = await db.admin_metrics_rag()
+    out["slowest_queries"] = [_serialize(r) for r in out["slowest_queries"]]
+    return _serialize(out)
+
+
+@router.get("/metrics/usage")
+async def admin_metrics_usage(_=Depends(require_admin)):
+    out = await db.admin_metrics_usage()
+    out["requests_per_day"] = [_serialize(r) for r in out["requests_per_day"]]
+    out["top_users"] = [_serialize(r) for r in out["top_users"]]
+    out["top_models"] = [_serialize(r) for r in out["top_models"]]
+    return out
+
+
+@router.get("/metrics/marketing")
+async def admin_metrics_marketing(_=Depends(require_admin)):
+    out = await db.admin_metrics_marketing()
+    out["traffic_sources"] = [_serialize(r) for r in out["traffic_sources"]]
+    out["campaign_performance"] = [_serialize(r) for r in out["campaign_performance"]]
+    return _serialize(out)
+
+
 # ── Helper ────────────────────────────────────────────────────────────────────
 def _serialize(d) -> dict:
     if d is None:

@@ -714,7 +714,12 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                 <input type="file" multiple class="hidden" accept="image/*,.pdf,.txt,.doc,.docx,.csv,.json,.md,.py,.js,.ts,.tex" @change="onFileSelect($event)">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </label>
-              <textarea class="chat-input flex-1 py-0.5" x-model="inputText" placeholder="Напишите вопрос или перетащите файл…" rows="1" :disabled="loading" @keydown.enter.exact.prevent="send" @keydown.enter.shift.exact=""></textarea>
+              <textarea class="chat-input flex-1 py-0.5" x-model="inputText" placeholder="Напишите вопрос или перетащите файл…" rows="1" :disabled="loading" @keydown="handleInputKeydown($event)"></textarea>
+              <select class="form-select !w-[170px] !py-1.5 !text-[11px] hidden sm:block" :value="currentChat?.model||''" @change="switchModel($event.target.value)">
+                <template x-for="(info,key) in modelCatalog" :key="key">
+                  <option :value="key" x-text="info.name"></option>
+                </template>
+              </select>
               <button class="btn-send" @click="send" :disabled="loading||(!inputText.trim()&&!pendingFiles.length)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
               </button>
@@ -913,6 +918,10 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                 <p class="text-[12px]" style="color:var(--text-2)">Перетащите файлы или нажмите</p>
                 <p class="text-[11px]" style="color:var(--text-3)">PDF, TXT, MD, DOCX · до 50 МБ</p>
               </div>
+              <label class="flex items-center gap-2 text-[11px] mb-2 cursor-pointer" style="color:var(--text-2)">
+                <input type="checkbox" class="accent-amber-500" x-model="cpUploadPublic">
+                <span>Сделать материалы публичными (глобальный RAG)</span>
+              </label>
 
               <!-- YouTube URL -->
               <div class="flex gap-1.5 mb-2">
@@ -956,6 +965,9 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                     </p>
                   </div>
                   <span class="text-[10px] px-1.5 py-0.5 rounded" style="background:var(--surface-3);color:var(--text-3)" x-text="doc.source_type.toUpperCase()"></span>
+                  <template x-if="doc.is_public">
+                    <span class="text-[10px] px-1.5 py-0.5 rounded" style="background:var(--accent-dim);color:var(--accent)">PUBLIC</span>
+                  </template>
                   <button class="cp-icon-btn !w-6 !h-6" @click="deleteDoc(doc.id)" title="Удалить">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
@@ -1181,6 +1193,7 @@ function app() {
     cpPollTimer: null,
     cpLightboxOpen: false,
     cpLightboxImg: '',
+    cpUploadPublic: false,
     modelCatalog: {}, templateMeta: {},
 
     // Mindmap state
@@ -1424,6 +1437,12 @@ function app() {
       } catch(ex) {
         this.messages.push({id:'err-'+Date.now(),role:'assistant',content:`⚠️ ${ex.message}`,files:[],tokens_used:0,cost_usd:0,created_at:new Date().toISOString()});
       } finally { this.loading=false; this.$nextTick(()=>this.scrollDown()); }
+    },
+    handleInputKeydown(e) {
+      if (e.key !== 'Enter') return;
+      if (e.shiftKey) return;
+      e.preventDefault();
+      this.send();
     },
 
     // ── Export ─────────────────────────────────────────────────────────────
@@ -1675,10 +1694,10 @@ function app() {
 
     async uploadCourseFile(file) {
       if (!this.cpActiveCourse) return;
-      const fd = new FormData(); fd.append('file', file);
+      const fd = new FormData(); fd.append('file', file); fd.append('is_public', this.cpUploadPublic ? 'true' : 'false');
       // Optimistic UI — show pending immediately
       const tmpId = 'tmp-' + Date.now();
-      this.cpDocs.unshift({ id: tmpId, filename: file.name, status: 'pending', source_type: file.name.split('.').pop() || 'file', chunk_count: 0 });
+      this.cpDocs.unshift({ id: tmpId, filename: file.name, status: 'pending', source_type: file.name.split('.').pop() || 'file', chunk_count: 0, is_public: this.cpUploadPublic });
       try {
         const r = await this.api(`/api/courses/${this.cpActiveCourse.id}/ingest`, { method: 'POST', body: fd });
         if (r.ok) {

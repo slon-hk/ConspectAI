@@ -3,7 +3,7 @@
 
 ---
 # Main Link
-1. [Google sheets](https://docs.google.com/spreadsheets/d/16s1q8gCboe1yT4y1dk7mcKwiI1nQ0zVRVCWBCWAC8Rw/edit?gid=59453621#gid=59453621)
+1. Google sheets https://docs.google.com/spreadsheets/d/16s1q8gCboe1yT4y1dk7mcKwiI1nQ0zVRVCWBCWAC8Rw/edit?gid=59453621#gid=59453621
 
 ---
 # TO-DO
@@ -15,7 +15,7 @@
 
 
 ## 🚀 Быстрый старт (локально)
-1. [Скачать Docker](https://desktop.docker.com/mac/main/arm64/Docker.dmg?utm_source=docker&utm_medium=webreferral&utm_campaign=dd-smartbutton&utm_location=module)
+1. Скачать Docker(https://desktop.docker.com/mac/main/arm64/Docker.dmg?utm_source=docker&utm_medium=webreferral&utm_campaign=dd-smartbutton&utm_location=module)
 
 ```bash
 # 2. Скопируйте конфиг и заполните три обязательных переменных

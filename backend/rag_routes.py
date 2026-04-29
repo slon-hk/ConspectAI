@@ -174,6 +174,7 @@ async def list_documents(course_id: str, uid: int = Depends(current_uid)):
 async def ingest_file(
     course_id: str,
     file: UploadFile = File(...),
+    is_public: bool = Form(False),
     uid: int = Depends(current_uid),
 ):
     """Upload and ingest a file (PDF, TXT, MD, DOCX). Returns immediately;
@@ -223,10 +224,10 @@ async def ingest_file(
     async with db.pool().acquire() as conn:
         doc_row = await conn.fetchrow(
             """INSERT INTO rag_documents
-                   (course_id, user_id, filename, source_type, source_ref, sha256, status)
-               VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+                   (course_id, user_id, filename, source_type, source_ref, sha256, status, is_public)
+               VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
                RETURNING id""",
-            course_id, uid, fname, source_type, fname, doc_sha,
+            course_id, uid, fname, source_type, fname, doc_sha, is_public,
         )
     document_id = str(doc_row["id"])
 

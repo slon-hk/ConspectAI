@@ -1,9 +1,10 @@
 import os
 import io
-import math
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
+import re
+import uuid
 
 import google.generativeai as genai
 import PIL.Image
@@ -21,6 +22,7 @@ import storage
 import admin
 import analytics
 import rag_routes
+from billing import calculate_cost_units
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
 
 load_dotenv()
@@ -86,6 +88,91 @@ async def http_metrics_middleware(request: Request, call_next):
         analytics.metrics.record_http(request.url.path, status, elapsed_ms)
 
 
+def _needs_quota_check(path: str, method: str) -> bool:
+    return method.upper() == "POST" and bool(re.match(r"^/api/chats/[^/]+/messages$", path))
+
+
+@app.middleware("http")
+async def subscription_quota_middleware(request: Request, call_next):
+    request.state.request_log_id = None
+    request.state.current_uid = None
+    request.state._metrics_started = __import__("time").perf_counter()
+    if _needs_quota_check(request.url.path, request.method):
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else None
+        uid = auth.decode_token(token) if token else None
+        if not uid:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        request.state.current_uid = uid
+        quota = await db.check_and_consume_limit(uid, request.url.path)
+        if not quota.get("allowed"):
+            return Response(
+                content='{"detail":"Request limit exceeded","code":"quota_exceeded"}',
+                status_code=429,
+                media_type="application/json",
+            )
+        request.state.request_log_id = quota["request_log_id"]
+        request.state.usage_remaining = quota["remaining"]
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        if request.state.request_log_id:
+            await db.fail_and_refund_request(request.state.request_log_id, str(e))
+            usage = getattr(request.state, "billing_usage", {})
+            latency_ms = int((__import__("time").perf_counter() - request.state._metrics_started) * 1000)
+            await db.log_request_metrics(
+                request_log_id=request.state.request_log_id,
+                user_id=request.state.current_uid,
+                model=usage.get("model_name", "unknown"),
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+                cost_usd=float(usage.get("cost_units", 0)),
+                status="error",
+                error_message=str(e),
+                latency_ms=latency_ms,
+                cache_hit=bool(usage.get("cache_hit", False)),
+                rag_savings_percent=float(usage.get("savings_pct", 0)),
+                session_count_inc=0,
+            )
+        raise
+
+    if request.state.request_log_id:
+        usage = getattr(request.state, "billing_usage", None)
+        latency_ms = int((__import__("time").perf_counter() - request.state._metrics_started) * 1000)
+        if response.status_code >= 400:
+            await db.fail_and_refund_request(request.state.request_log_id, f"http_{response.status_code}")
+        if usage:
+            await db.log_request_metrics(
+                request_log_id=request.state.request_log_id,
+                user_id=request.state.current_uid,
+                model=usage.get("model_name", "unknown"),
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+                cost_usd=float(usage.get("cost_units", 0)),
+                status="success" if response.status_code < 400 else "error",
+                error_message="" if response.status_code < 400 else f"http_{response.status_code}",
+                latency_ms=latency_ms,
+                cache_hit=bool(usage.get("cache_hit", False)),
+                rag_savings_percent=float(usage.get("savings_pct", 0)),
+            )
+            rag_meta = usage.get("rag_metrics")
+            if rag_meta and request.state.current_uid:
+                await db.insert_rag_metric(
+                    user_id=request.state.current_uid,
+                    query=rag_meta.get("query", ""),
+                    chunks_used=int(rag_meta.get("chunks_used", 0)),
+                    context_tokens=int(rag_meta.get("context_tokens", 0)),
+                    total_tokens=int(usage.get("total_tokens", 0)),
+                    estimated_tokens_no_rag=int(rag_meta.get("estimated_tokens_no_rag", 0)),
+                    savings_percent=float(usage.get("savings_pct", 0)),
+                    latency_ms=int(rag_meta.get("latency_ms", latency_ms)),
+                    cache_hit=bool(usage.get("cache_hit", False)),
+                )
+    return response
+
+
 # ── Auth dependency ────────────────────────────────────────────────────────────
 async def current_user_id(token: str = Depends(auth.oauth2)) -> int:
     """Resolve the JWT to a user id, then verify the user still exists.
@@ -129,6 +216,7 @@ class LoginIn(BaseModel):
 # ── Pages ─────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
+    await db.insert_funnel_event(user_id=None, event_name="visit", metadata={"path": "/"})
     return jinja.TemplateResponse("landing.html", {"request": request})
 
 
@@ -182,13 +270,14 @@ async def register(body: RegisterIn):
         raise HTTPException(409, "Это имя пользователя уже занято")
 
     pw_hash = auth.hash_password(password)
-    user    = await db.create_user(username, email, pw_hash, auth.TRIAL_TOKENS)
+    user    = await db.create_user(username, email, pw_hash)
     token   = auth.create_access_token(user["id"])
 
     # Record consent as an analytics event. The events table is append-only,
     # so this gives a defensible audit trail (timestamp + user id) of when the
     # user accepted the offer and privacy policy.
-    analytics.track("signup", user["id"], trial_tokens=auth.TRIAL_TOKENS)
+    analytics.track("signup", user["id"])
+    await db.insert_funnel_event(user_id=user["id"], event_name="signup", metadata={"channel": "auth_register"})
     analytics.track("agreement_accepted", user["id"], offer_version="2026-04-26", privacy_version="2026-04-26")
 
     return {
@@ -223,8 +312,7 @@ def _safe_user(u: dict) -> dict:
         "id":               u["id"],
         "username":         u["username"],
         "email":            u["email"],
-        "tokens_remaining": u["tokens_remaining"],
-        "is_trial":         u["is_trial"],
+        "subscription_id":  u.get("subscription_id"),
         "is_admin":         bool(u.get("is_admin", False)),
         "is_blocked":       bool(u.get("is_blocked", False)),
         "total_spent_usd":  float(u.get("total_spent_usd") or 0),
@@ -238,6 +326,13 @@ def _model_name(key: str) -> str:
     return f"models/{key}"
 
 
+def _validate_chat_id(chat_id: str) -> str:
+    try:
+        return str(uuid.UUID(str(chat_id)))
+    except Exception:
+        raise HTTPException(400, "Invalid chat_id")
+
+
 # ── User ──────────────────────────────────────────────────────────────────────
 @app.get("/api/user")
 async def get_user(uid: int = Depends(current_user_id)):
@@ -245,6 +340,42 @@ async def get_user(uid: int = Depends(current_user_id)):
     if not user:
         raise HTTPException(404, "User not found")
     return _safe_user(user)
+
+
+@app.get("/api/usage")
+async def get_usage(uid: int = Depends(current_user_id)):
+    remaining = await db.get_user_usage_snapshot(uid)
+    return remaining
+
+
+@app.get("/usage")
+async def get_usage_public(uid: int = Depends(current_user_id)):
+    return await db.get_user_usage_snapshot(uid)
+
+
+@app.get("/admin/metrics")
+async def get_admin_metrics_public(_=Depends(admin.require_admin)):
+    return await db.get_admin_metrics()
+
+
+@app.get("/admin/metrics/overview")
+async def get_admin_metrics_overview_public(_=Depends(admin.require_admin)):
+    return await db.admin_metrics_overview()
+
+
+@app.get("/admin/metrics/rag")
+async def get_admin_metrics_rag_public(_=Depends(admin.require_admin)):
+    return await db.admin_metrics_rag()
+
+
+@app.get("/admin/metrics/usage")
+async def get_admin_metrics_usage_public(_=Depends(admin.require_admin)):
+    return await db.admin_metrics_usage()
+
+
+@app.get("/admin/metrics/marketing")
+async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
+    return await db.admin_metrics_marketing()
 
 
 # ── Static data ────────────────────────────────────────────────────────────────
@@ -285,6 +416,7 @@ async def update_settings(
     model:    str = Form(None),
     uid:      int = Depends(current_user_id),
 ):
+    chat_id = _validate_chat_id(chat_id)
     kwargs = {}
     if template and template in SYSTEM_PROMPTS: kwargs["template"] = template
     if model    and model    in MODELS:          kwargs["model"]    = model
@@ -301,6 +433,7 @@ async def update_settings(
 
 @app.delete("/api/chats/{chat_id}")
 async def delete_chat(chat_id: str, uid: int = Depends(current_user_id)):
+    chat_id = _validate_chat_id(chat_id)
     await db.delete_chat(chat_id, uid)
     return {"ok": True}
 
@@ -308,6 +441,7 @@ async def delete_chat(chat_id: str, uid: int = Depends(current_user_id)):
 # ── Messages ──────────────────────────────────────────────────────────────────
 @app.get("/api/chats/{chat_id}/messages")
 async def get_messages(chat_id: str, uid: int = Depends(current_user_id)):
+    chat_id = _validate_chat_id(chat_id)
     chat = await db.get_chat(chat_id, uid)
     if not chat:
         raise HTTPException(404, "Chat not found")
@@ -318,11 +452,13 @@ async def get_messages(chat_id: str, uid: int = Depends(current_user_id)):
 @app.post("/api/chats/{chat_id}/messages")
 async def send_message(
     chat_id:    str,
+    request:    Request,
     bg:         BackgroundTasks,
     content:    str  = Form(""),
     files_json: str  = Form("[]"),
     uid:        int  = Depends(current_user_id),
 ):
+    chat_id = _validate_chat_id(chat_id)
     import json
 
     if not GEMINI_API_KEY:
@@ -335,9 +471,6 @@ async def send_message(
     user = await db.get_user_by_id(uid)
     if user.get("is_blocked"):
         raise HTTPException(403, "Аккаунт заблокирован администратором")
-    if user["tokens_remaining"] <= 0:
-        analytics.track("tokens_depleted", uid)
-        raise HTTPException(402, "Токены закончились. Пожалуйста, пополните баланс.")
 
     file_refs = json.loads(files_json)   # [{sha256, original_filename, mime_type, compressed}, ...]
 
@@ -385,6 +518,19 @@ async def send_message(
     # ── RAG path: if chat has a linked course, use retrieval ──────────────
     course_id: str | None = chat.get("course_id")
     rag_images: list[dict] = []
+    rag_result = {}
+    if file_refs:
+        try:
+            import rag as rag_engine
+            auto_course = await rag_engine.ensure_chat_course_and_ingest_uploads(
+                chat_id=chat_id,
+                user_id=uid,
+                file_refs=file_refs,
+            )
+            if auto_course and not course_id:
+                course_id = auto_course
+        except Exception as e:
+            print(f"[rag] auto-ingest failed: {e}")
 
     if course_id:
         import rag as rag_engine
@@ -397,6 +543,7 @@ async def send_message(
         )
         asst_txt   = rag_result["answer"]
         rag_images = rag_result["images"]
+        cache_hit = bool(rag_result.get("from_cache"))
 
         # For billing: RAG adds ~5K input tokens worth of context.
         # We surface this as the minimum multiplier being at least 1,
@@ -429,6 +576,7 @@ async def send_message(
 
         asst_txt = response.text
         api_tokens_override = None
+        cache_hit = False
 
         try:    api_tokens_raw = response.usage_metadata.total_token_count
         except: api_tokens_raw = max(1, len(asst_txt) // 4)
@@ -442,31 +590,26 @@ async def send_message(
     if api_tokens_override is not None:
         api_tokens = api_tokens_override
 
-    m_info = MODELS[mdl_key]
-
-    # ── User-facing billing: flat rate per model ───────────────────────────
-    # Each model has a fixed `tokens_per_request` rate (e.g. 500 / 2000 / 8000).
-    # Normally we charge exactly the flat rate regardless of actual API usage.
-    # Fallback for huge inputs (large files, very long context): if the API
-    # actually consumed more than the rate, we round UP to the next multiple
-    # of the rate. The user is never charged a non-multiple of the rate, so
-    # the price is always predictable.
-    rate          = m_info.get("tokens_per_request", 2000)
-    multiplier    = max(1, math.ceil(api_tokens / rate))
-    user_tokens   = rate * multiplier        # what we deduct from balance
-    extra_charge  = multiplier > 1           # flag for UX warning
-
-    # Real USD cost paid to Google (for analytics / margin calc, not for user)
-    cost_usd = round((api_tokens / 1_000_000) * (m_info["cost_in"] + m_info["cost_out"]) / 2, 6)
+    # Internal cost accounting (user does not see token billing).
+    input_tokens = max(1, len(content or "") // 4)
+    context_tokens = rag_result.get("context_tokens", 0) if course_id else 0
+    output_tokens = max(1, len(asst_txt or "") // 4)
+    total_tokens = input_tokens + context_tokens + output_tokens
+    estimated_without_rag = rag_result.get("estimated_without_rag_tokens", total_tokens) if course_id else total_tokens
+    actual_with_rag = rag_result.get("actual_with_rag_tokens", total_tokens) if course_id else total_tokens
+    savings_pct = 0.0
+    if estimated_without_rag > 0:
+        savings_pct = round(max((estimated_without_rag - actual_with_rag) / estimated_without_rag, 0) * 100, 3)
+    cost_usd = calculate_cost_units(mdl_key, input_tokens, output_tokens, context_tokens)
+    if cache_hit:
+        cost_usd = round(cost_usd * 0.01, 8)
 
     # Save assistant message
     asst_msg = await db.save_message(
         chat_id, "assistant", asst_txt,
-        tokens=user_tokens, model=mdl_key, cost_usd=cost_usd,
+        tokens=total_tokens, model=mdl_key, cost_usd=cost_usd,
     )
     asst_msg = dict(asst_msg)
-    if extra_charge:
-        asst_msg["extra_charge_multiplier"] = multiplier
     if rag_images:
         # Surface retrieved images to the frontend (served via /api/rag/images/{id})
         asst_msg["rag_images"] = [
@@ -479,17 +622,34 @@ async def send_message(
             for img in rag_images
         ]
 
-    # Deduct from user balance
-    await db.deduct_tokens(uid, user_tokens, cost_usd)
-
-    # Track for analytics — keep both numbers so we can later see margin
+    # Track for analytics — keep internal usage figures
     analytics.track(
         "message_sent", uid,
         chat_id=str(chat_id), template=tpl_key, model=mdl_key,
-        tokens=user_tokens, api_tokens=api_tokens,
-        multiplier=multiplier, cost_usd=cost_usd,
+        tokens=total_tokens, api_tokens=api_tokens,
+        cost_usd=cost_usd,
         files=len(file_refs),
     )
+    request.state.billing_usage = {
+        "model_name": mdl_key,
+        "cache_hit": cache_hit,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "context_tokens": context_tokens,
+        "total_tokens": total_tokens,
+        "estimated_no_rag": estimated_without_rag,
+        "actual_with_rag": actual_with_rag,
+        "savings_pct": savings_pct,
+        "cost_units": cost_usd,
+        "status": "completed",
+        "rag_metrics": {
+            "query": content or "",
+            "chunks_used": rag_result.get("chunks_used", 0) if course_id else 0,
+            "context_tokens": context_tokens,
+            "estimated_tokens_no_rag": estimated_without_rag,
+            "latency_ms": rag_result.get("latency_ms", 0) if course_id else 0,
+        } if course_id else None,
+    }
 
     title_updates = {}
     if chat["title"] in ("Новый чат", "New Chat") and content:
@@ -661,6 +821,7 @@ async def regenerate_mindmap(chat_id: str):
 
 @app.get("/api/chats/{chat_id}/mindmap")
 async def fetch_mindmap(chat_id: str, uid: int = Depends(current_user_id)):
+    chat_id = _validate_chat_id(chat_id)
     chat = await db.get_chat(chat_id, uid)
     if not chat:
         raise HTTPException(404, "Chat not found")
@@ -680,6 +841,7 @@ async def force_regenerate_mindmap(
     bg:      BackgroundTasks,
     uid:     int = Depends(current_user_id),
 ):
+    chat_id = _validate_chat_id(chat_id)
     chat = await db.get_chat(chat_id, uid)
     if not chat:
         raise HTTPException(404, "Chat not found")

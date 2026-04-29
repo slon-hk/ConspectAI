@@ -30,3 +30,4 @@ youtube-transcript-api==0.6.2 # YouTube transcript
 
 # ── Pydantic ───────────────────────────────────────────────────────────────────
 pydantic==2.7.1
+tiktoken==0.7.0

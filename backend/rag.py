@@ -32,8 +32,10 @@ from typing import Any
 
 import asyncpg
 import google.generativeai as genai
+import tiktoken
 
 import db
+import storage
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -82,10 +84,14 @@ CREATE TABLE IF NOT EXISTS rag_documents (
     status      TEXT    NOT NULL DEFAULT 'pending',  -- pending|indexing|ready|error
     error_msg   TEXT,
     chunk_count INTEGER DEFAULT 0,
+    is_public   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS rag_doc_course_idx ON rag_documents(course_id);
 CREATE INDEX IF NOT EXISTS rag_doc_sha256_idx ON rag_documents(sha256);
+CREATE INDEX IF NOT EXISTS rag_doc_public_idx ON rag_documents(is_public, status, created_at DESC);
+
+ALTER TABLE rag_documents ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Text chunks with embeddings (shared across users via content_hash)
 CREATE TABLE IF NOT EXISTS rag_chunks (
@@ -158,6 +164,7 @@ def _rough_token_count(text: str) -> int:
     """Fast approximation: 1 token ≈ 4 chars for mixed RU/EN text."""
     return max(1, len(text) // 4)
 
+_tokenizer = tiktoken.get_encoding("cl100k_base")
 
 def split_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
     """
@@ -609,9 +616,14 @@ async def retrieve(
     q_vec = to_pgvector(await embed_query(query))
 
     async with db.pool().acquire() as conn:
-        # Get all document IDs in this course
+        # Get all document IDs in this course + globally public materials
         doc_ids = await conn.fetch(
-            "SELECT id FROM rag_documents WHERE course_id = $1 AND status = 'ready'",
+            """
+            SELECT id
+            FROM rag_documents
+            WHERE status = 'ready'
+              AND (course_id = $1 OR is_public = TRUE)
+            """,
             course_id,
         )
         if not doc_ids:
@@ -802,8 +814,10 @@ async def rag_query(
           sources_found: bool,  -- False if answer is from general knowledge
         }
     """
+    started = time.perf_counter()
     # ── 1. Retrieve relevant chunks ────────────────────────────────────────
     chunks, images = await retrieve(query, course_id)
+    query_tokens = _rough_token_count(query)
 
     # ── 2. Check answer cache ──────────────────────────────────────────────
     cache_key = _answer_cache_key(query, chunks)
@@ -811,12 +825,24 @@ async def rag_query(
     if cached:
         # Resolve image objects from cached IDs
         cached_images = await _resolve_images(cached["image_ids"])
+        context_tokens = _rough_token_count(build_context(chunks, cached_images)) if chunks else 0
+        output_tokens = _rough_token_count(cached["answer"])
+        actual_with_rag = query_tokens + context_tokens + output_tokens
+        estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
+        latency_ms = int((time.perf_counter() - started) * 1000)
         return {
             "answer":        cached["answer"],
             "chunks":        chunks,
             "images":        cached_images,
             "from_cache":    True,
             "sources_found": len(chunks) > 0,
+            "query_tokens": query_tokens,
+            "context_tokens": context_tokens,
+            "response_tokens": output_tokens,
+            "actual_with_rag_tokens": actual_with_rag,
+            "estimated_without_rag_tokens": estimated_without_rag,
+            "chunks_used": len(chunks),
+            "latency_ms": latency_ms,
         }
 
     # ── 3. Build minimal context ───────────────────────────────────────────
@@ -859,6 +885,11 @@ async def rag_query(
         lambda: chat.send_message(query),
     )
     answer = response.text
+    context_tokens = _rough_token_count(context) if sources_found else 0
+    output_tokens = _rough_token_count(answer)
+    actual_with_rag = query_tokens + context_tokens + output_tokens
+    estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
+    latency_ms = int((time.perf_counter() - started) * 1000)
 
     # ── 6. Cache answer ────────────────────────────────────────────────────
     asyncio.create_task(_set_answer_cache(cache_key, answer, images))
@@ -869,6 +900,13 @@ async def rag_query(
         "images":        images,
         "from_cache":    False,
         "sources_found": sources_found,
+        "query_tokens": query_tokens,
+        "context_tokens": context_tokens,
+        "response_tokens": output_tokens,
+        "actual_with_rag_tokens": actual_with_rag,
+        "estimated_without_rag_tokens": estimated_without_rag,
+        "chunks_used": len(chunks),
+        "latency_ms": latency_ms,
     }
 
 
@@ -907,7 +945,7 @@ async def get_course_documents(course_id: str, user_id: int) -> list[dict]:
     async with db.pool().acquire() as conn:
         rows = await conn.fetch(
             """SELECT id, filename, source_type, source_ref,
-                      status, error_msg, chunk_count, created_at
+                      status, error_msg, chunk_count, is_public, created_at
                FROM rag_documents
                WHERE course_id = $1 AND user_id = $2
                ORDER BY created_at DESC""",
@@ -935,6 +973,81 @@ async def cleanup_answer_cache(max_age_days: int = 7) -> None:
             str(max_age_days),
         )
     print(f"[rag] answer cache cleanup: {result}")
+
+
+async def ensure_chat_course_and_ingest_uploads(
+    *,
+    chat_id: str,
+    user_id: int,
+    file_refs: list[dict],
+) -> str | None:
+    """
+    Ensure chat has a linked private course and ingest uploaded files into it
+    so attached files can participate in RAG retrieval.
+    """
+    if not file_refs:
+        return None
+    chat = await db.get_chat(chat_id, user_id)
+    if not chat:
+        return None
+    course_id = chat.get("course_id")
+    if not course_id:
+        async with db.pool().acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO courses (user_id, title, description, scope)
+                VALUES ($1, $2, $3, 'private')
+                RETURNING id
+                """,
+                user_id, f"Chat files {chat_id[:8]}", "Auto-generated course for chat file RAG",
+            )
+            course_id = str(row["id"])
+        await db.update_chat_settings(chat_id, user_id, course_id=course_id)
+
+    for f in file_refs:
+        sha = f.get("sha256")
+        if not sha:
+            continue
+        async with db.pool().acquire() as conn:
+            dup = await conn.fetchrow(
+                "SELECT id, status FROM rag_documents WHERE course_id=$1 AND sha256=$2",
+                course_id, sha,
+            )
+        if dup and dup["status"] == "ready":
+            continue
+        meta = await db.get_file_meta(sha)
+        if not meta:
+            continue
+        ext = (f.get("original_filename", "") or "").lower()
+        if meta["mime_type"] == "application/pdf" or ext.endswith(".pdf"):
+            source_type = "pdf"
+        elif "markdown" in (meta["mime_type"] or "") or ext.endswith(".md"):
+            source_type = "md"
+        elif "wordprocessingml" in (meta["mime_type"] or "") or ext.endswith((".doc", ".docx")):
+            source_type = "docx"
+        else:
+            source_type = "txt"
+        raw = storage.read_file(meta["sha256"], meta["compressed"])
+        async with db.pool().acquire() as conn:
+            doc = await conn.fetchrow(
+                """
+                INSERT INTO rag_documents
+                    (course_id, user_id, filename, source_type, source_ref, sha256, status, is_public)
+                VALUES ($1, $2, $3, $4, $5, $6, 'pending', FALSE)
+                RETURNING id
+                """,
+                course_id, user_id, f.get("original_filename") or "uploaded_file", source_type,
+                f.get("original_filename") or "uploaded_file", sha,
+            )
+        await ingest_document(
+            document_id=str(doc["id"]),
+            course_id=str(course_id),
+            user_id=user_id,
+            filename=f.get("original_filename") or "uploaded_file",
+            source_type=source_type,
+            raw_bytes=raw,
+        )
+    return str(course_id)
 
 def to_pgvector(vec: list[float]) -> str:
     if len(vec) != EMBED_DIM:

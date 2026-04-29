@@ -282,7 +282,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
         <!-- Trial badge on register -->
         <template x-if="authTab==='register'">
           <div class="auth-trial-badge mb-4">
-            🎁 При регистрации — тариф <strong>Free</strong> с дневным лимитом запросов
+            🎁 При регистрации — тариф <strong>Free</strong> без карты
           </div>
         </template>
 
@@ -467,20 +467,17 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
             </template>
           </div>
 
-          <!-- Usage + user -->
+          <!-- Plan + user -->
           <div style="border-top:1px solid var(--border);padding:12px">
             <div class="flex items-center justify-between mb-1.5">
               <div class="flex items-center gap-1.5">
-                <span class="text-[11px]" style="color:var(--text-3)">Запросы сегодня</span>
-                <span class="text-[11px] cursor-default" style="color:var(--text-3)" title="Лимит зависит от текущего тарифа">ⓘ</span>
+                <span class="text-[11px]" style="color:var(--text-3)">Текущий тариф</span>
                 <span class="badge-trial" x-text="planLabel(user.plan_key)"></span>
               </div>
               <div class="flex items-center gap-1.5">
-                <span class="font-mono text-[12px]" style="color:var(--accent)" x-text="`${dailyRemaining()}/${dailyLimit()}`"></span>
                 <button class="btn-buy" @click="showBuyModal=true">Тарифы</button>
               </div>
             </div>
-            <div class="token-bar mb-2"><div class="token-fill" :style="`width:${usagePercent()}%`"></div></div>
             <div class="flex items-center gap-2">
               <div class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style="background:var(--surface-2);color:var(--accent);border:1px solid var(--border-2)" x-text="user.username?user.username[0].toUpperCase():'U'"></div>
               <div class="min-w-0 flex-1">
@@ -551,8 +548,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                 <h2 class="logo text-[30px] mb-2" style="color:var(--text-1)">Добро пожаловать, <span x-text="user.username"></span></h2>
                 <p class="text-[13px] mb-2" style="color:var(--text-2)">STEM Knowledge Architect — структурированные ответы с LaTeX</p>
                 <p class="text-[12px] mb-5" style="color:var(--blue)">
-                  Тариф <span class="font-mono" x-text="planLabel(user.plan_key)"></span> ·
-                  <span class="font-mono" x-text="dailyRemaining()"></span> запросов осталось сегодня
+                  Тариф <span class="font-mono" x-text="planLabel(user.plan_key)"></span>
                 </p>
                 <button class="btn-new" style="width:auto;margin:0 auto" @click="createChat">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -641,14 +637,6 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                         </template>
 
                         <div class="flex items-center gap-3 mt-2 flex-wrap">
-                          <template x-if="msg.tokens_used>0">
-                            <p class="text-[11px]" style="color:var(--text-3)">
-                              <span x-text="fmtTokens(msg.tokens_used)+' токенов'"></span>
-                              <template x-if="msg.extra_charge_multiplier && msg.extra_charge_multiplier>1">
-                                <span style="color:var(--accent)" :title="'Большой контекст. Списано '+msg.extra_charge_multiplier+'× от обычной ставки.'" x-text="' · ×'+msg.extra_charge_multiplier"></span>
-                              </template>
-                            </p>
-                          </template>
                           <button class="text-[11px] hover:opacity-70 transition-opacity" style="color:var(--text-3)" @click="copyText(msg.content)">
                             <svg class="inline mr-0.5" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                             Копировать
@@ -1002,7 +990,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
             <!-- Model tab -->
             <template x-if="settingsTab==='model'">
               <div class="space-y-2">
-                <p class="text-[12px] mb-3" style="color:var(--text-2)">Выберите модель. Каждый ответ расходует один запрос из лимита тарифа.</p>
+                <p class="text-[12px] mb-3" style="color:var(--text-2)">Выберите модель под задачу. Более мощные модели лучше подходят для сложных рассуждений.</p>
                 <template x-for="(info,key) in modelCatalog" :key="key">
                   <button class="model-card" :class="currentChat&&currentChat.model===key?'selected':''" @click="switchModel(key)">
                     <div class="flex-1 min-w-0">
@@ -1013,12 +1001,11 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                       <p class="text-[12px]" style="color:var(--text-2)" x-text="info.desc"></p>
                       <div class="flex items-center gap-3 mt-1">
                         <span class="text-[11px]" style="color:var(--text-3)" x-text="info.speed"></span>
-                        <span class="text-[11px]" style="color:var(--text-3)" x-text="'Контекст: '+info.ctx"></span>
                       </div>
                     </div>
                     <div class="text-right flex-shrink-0 ml-3">
-                      <p class="text-[13px] font-[500] font-mono" style="color:var(--accent)">1</p>
-                      <p class="text-[10px]" style="color:var(--text-3)">запрос</p>
+                      <p class="text-[13px] font-[500] font-mono" style="color:var(--accent)">AI</p>
+                      <p class="text-[10px]" style="color:var(--text-3)">модель</p>
                     </div>
                   </button>
                 </template>
@@ -1120,9 +1107,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                       <template x-if="plan.badge"><span class="badge" x-text="plan.badge"></span></template>
                     </div>
                     <p class="text-[12px]" style="color:var(--text-3)">
-                      <span x-text="plan.daily"></span> в день ·
-                      <span x-text="plan.weekly"></span> в неделю ·
-                      <span x-text="plan.monthly"></span> в месяц
+                      <span x-text="plan.estimatedText"></span>
                     </p>
                   </div>
                   <div class="flex flex-col items-end gap-1 ml-3 flex-shrink-0">
@@ -1132,7 +1117,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
               </template>
             </div>
             <p class="text-center text-[11px] mb-4" style="color:var(--text-3)">
-              Лимиты обновляются автоматически по дням, неделям и месяцам.
+              Количество ответов указано ориентировочно для Gemini 2.5 Flash Lite.
               <a href="/pricing" target="_blank" style="color:var(--accent)">Подробнее →</a>
             </p>
             <button class="w-full py-3 rounded-xl text-[14px] font-[500]" style="background:var(--accent);color:#0c0b09" :disabled="!selPlan" :style="selPlan?'':'opacity:.4;cursor:not-allowed'" @click="pay">
@@ -1207,9 +1192,11 @@ function app() {
       accent: [{v:'#c8913a',n:'Золото'},{v:'#2563eb',n:'Синий'},{v:'#16a34a',n:'Зелёный'},{v:'#9333ea',n:'Пурпур'},{v:'#dc2626',n:'Красный'}],
     },
     plans: [
-      {id:'free', name:'Free', daily:25, weekly:100, monthly:300, price:'₽0', badge:null},
-      {id:'pro',  name:'Pro',  daily:200, weekly:1200, monthly:4000, price:'₽799/мес', badge:'Популярный'},
-      {id:'max',  name:'Max',  daily:700, weekly:4200, monthly:15000, price:'₽2 499/мес', badge:'Выгодно'},
+      {id:'free', name:'Free', estimatedText:'без включённых AI-запросов', price:'₽0', badge:null},
+      {id:'starter', name:'Starter', estimatedText:'≈ 600 запросов в месяц', price:'₽300/мес', badge:null},
+      {id:'plus', name:'Plus', estimatedText:'≈ 1 000 запросов в месяц', price:'₽500/мес', badge:'Популярный'},
+      {id:'pro', name:'Pro', estimatedText:'≈ 3 000 запросов в месяц', price:'₽1 500/мес', badge:null},
+      {id:'max', name:'Max', estimatedText:'≈ 5 000 запросов в месяц', price:'₽2 500/мес', badge:'Выгодно'},
     ],
 
     get currentChat() {
@@ -1220,12 +1207,14 @@ function app() {
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
     async init() {
-      const [models, templates] = await Promise.all([
+      const [models, templates, plans] = await Promise.all([
         fetch('/api/models').then(r=>r.json()).catch(()=>({})),
         fetch('/api/templates').then(r=>r.json()).catch(()=>({})),
+        fetch('/api/subscription-plans').then(r=>r.json()).catch(()=>[]),
       ]);
       this.modelCatalog = models;
       this.templateMeta = templates;
+      this.plans = this.normalizePlans(plans);
       if (this.token) await this.loadUser();
     },
 
@@ -1591,7 +1580,20 @@ function app() {
 
     // ── Helpers ────────────────────────────────────────────────────────────
     scrollDown() { const el=document.getElementById('msg-scroll'); if(el) el.scrollTop=el.scrollHeight; },
+    fmtNum(n) { return Number(n||0).toLocaleString('ru-RU'); },
     fmtTokens(n) { if(n==null)return'—'; if(n>=1_000_000)return(n/1_000_000).toFixed(1)+'M'; if(n>=1_000)return Math.round(n/1_000)+'K'; return String(n); },
+    normalizePlans(items) {
+      if (!Array.isArray(items) || !items.length) return this.plans;
+      return items.map(plan => ({
+        id: plan.plan_key,
+        name: plan.display_name,
+        price: plan.price_rub ? `₽${this.fmtNum(plan.price_rub)}/мес` : '₽0',
+        estimatedText: plan.estimated_monthly_requests > 0
+          ? `≈ ${this.fmtNum(plan.estimated_monthly_requests)} запросов в месяц`
+          : 'без включённых AI-запросов',
+        badge: plan.plan_key === 'plus' ? 'Популярный' : (plan.plan_key === 'max' ? 'Выгодно' : null),
+      }));
+    },
     planLabel(key) {
       const p = this.plans.find(plan => plan.id === key);
       return p ? p.name : (key || 'Free');

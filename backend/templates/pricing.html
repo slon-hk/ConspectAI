@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Тарифы · ConspectAI</title>
-<meta name="description" content="Прозрачные тарифы ConspectAI: дневные, недельные и месячные лимиты запросов для STEM-ассистента.">
+<meta name="description" content="Прозрачные тарифы ConspectAI: ориентировочное количество AI-запросов для STEM-ассистента.">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="canonical" href="https://conspectai.tech/pricing">
 <meta property="og:type"  content="website">
 <meta property="og:url"   content="https://conspectai.tech/pricing">
 <meta property="og:title" content="Тарифы · ConspectAI">
-<meta property="og:description" content="Тарифы ConspectAI с понятными лимитами запросов. Выбирайте Free, Pro или Max под учебную нагрузку.">
+<meta property="og:description" content="Тарифы ConspectAI с ориентиром по количеству AI-запросов под учебную нагрузку.">
 <meta property="og:image" content="https://conspectai.tech/static/og-image.svg">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;450;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -53,16 +53,17 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
 
 /* Packs grid */
 .packs{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:64px}
-@media(min-width:780px){.packs{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:780px){.packs{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1120px){.packs{grid-template-columns:repeat(5,1fr)}}
 
-.pack{background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);border:1px solid var(--border);border-radius:18px;padding:28px;position:relative;display:flex;flex-direction:column;transition:transform .25s,border-color .25s,box-shadow .25s}
+.pack{background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);border:1px solid var(--border);border-radius:18px;padding:22px;position:relative;display:flex;flex-direction:column;transition:transform .25s,border-color .25s,box-shadow .25s}
 .pack:hover{transform:translateY(-3px);border-color:var(--border-2);box-shadow:0 12px 36px rgba(0,0,0,.4)}
 .pack.featured{border-color:var(--accent);box-shadow:0 0 0 1px rgba(200,145,58,.4),0 12px 36px rgba(0,0,0,.4)}
 .pack.featured::before{content:'Популярный';position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0c0b09;font-size:11px;font-weight:600;padding:3px 11px;border-radius:99px;letter-spacing:.04em;text-transform:uppercase}
 .pack-name{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:24px;margin-bottom:4px}
 .pack-tokens{font-size:13px;color:var(--text-3);margin-bottom:18px}
 .pack-tokens .num{color:var(--accent);font-family:'DM Mono',monospace;font-size:14px}
-.pack-price{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:48px;line-height:1;margin-bottom:4px}
+.pack-price{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:42px;line-height:1;margin-bottom:4px}
 .pack-price-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
 .pack ul{list-style:none;margin-bottom:24px;flex:1}
 .pack li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;padding:5px 0;color:var(--text-2)}
@@ -136,62 +137,34 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
   <section class="hero">
     <div class="badge-trial mb-5">🎁 Free при регистрации · без карты</div>
     <h1>Прозрачные тарифы.<br><span class="gold">Без сюрпризов.</span></h1>
-    <p>Каждый ответ расходует один запрос. Лимиты обновляются автоматически по дням, неделям и месяцам.</p>
+    <p>Показываем примерное количество ответов для Gemini 2.5 Flash Lite. Фактический расход зависит от задачи и выбранной модели.</p>
   </section>
 
   <!-- ── PACKS ───────────────────────────────────────────────────────────── -->
   <section>
     <div class="section-h">
-      <h2>Тарифы запросов</h2>
+      <h2>Тарифы</h2>
       <span class="line"></span>
     </div>
 
     <div class="packs">
 
-      <div class="pack">
-        <div class="pack-name">Free</div>
-        <p class="pack-tokens"><span class="num">25</span> запросов в день</p>
-        <div class="pack-price">₽0</div>
-        <p class="pack-price-sub">100 в неделю · 300 в месяц</p>
+      {% for plan in plans %}
+      <div class="pack{% if plan.featured %} featured{% endif %}">
+        <div class="pack-name">{{ plan.display_name }}</div>
+        <p class="pack-tokens"><span class="num">{{ plan.estimated_requests_label }}</span></p>
+        <div class="pack-price">{{ plan.price_label }}</div>
+        <p class="pack-price-sub">ориентир для {{ plan.reference_model_name }}</p>
         <ul>
-          <li>Базовый лимит для знакомства</li>
+          <li>{% if plan.plan_key == 'free' %}Для знакомства с интерфейсом{% else %}Для регулярной работы с AI-ассистентом{% endif %}</li>
           <li>Все модели из каталога</li>
-          <li>Все шаблоны вывода</li>
+          <li>Gemini 2.5 Flash Lite как базовый ориентир</li>
           <li>Все шаблоны и карта тем</li>
           <li>Экспорт в Markdown и PDF</li>
         </ul>
-        <a href="/app?auth=register" class="pack-cta secondary">Начать бесплатно</a>
+        <a href="/app?auth=register" class="pack-cta {% if plan.featured %}primary{% else %}secondary{% endif %}">{{ plan.cta_label }}</a>
       </div>
-
-      <div class="pack featured">
-        <div class="pack-name">Pro</div>
-        <p class="pack-tokens"><span class="num">200</span> запросов в день</p>
-        <div class="pack-price">₽799</div>
-        <p class="pack-price-sub">1 200 в неделю · 4 000 в месяц</p>
-        <ul>
-          <li>Для регулярной учёбы</li>
-          <li>RAG по материалам курса</li>
-          <li>Загрузка файлов и YouTube</li>
-          <li>Все шаблоны и карта тем</li>
-          <li>Экспорт в Markdown и PDF</li>
-        </ul>
-        <a href="/app?auth=register" class="pack-cta primary">Выбрать Pro</a>
-      </div>
-
-      <div class="pack">
-        <div class="pack-name">Max</div>
-        <p class="pack-tokens"><span class="num">700</span> запросов в день</p>
-        <div class="pack-price">₽2 499</div>
-        <p class="pack-price-sub">4 200 в неделю · 15 000 в месяц</p>
-        <ul>
-          <li>Для интенсивной подготовки</li>
-          <li>Большие курсы и длинные сессии</li>
-          <li>Приоритет для тяжёлого RAG</li>
-          <li>Все шаблоны и карта тем</li>
-          <li>Экспорт в Markdown и PDF</li>
-        </ul>
-        <a href="/app?auth=register" class="pack-cta secondary">Выбрать Max</a>
-      </div>
+      {% endfor %}
 
     </div>
   </section>
@@ -199,12 +172,12 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
   <!-- ── MODELS / RATES ──────────────────────────────────────────────────── -->
   <section>
     <div class="section-h">
-      <h2>Как считается лимит</h2>
+      <h2>Как читать цифры</h2>
       <span class="line"></span>
     </div>
 
     <p style="color:var(--text-2);margin-bottom:20px;font-size:15px">
-      Один ответ ИИ — один запрос из лимита тарифа. Модель, длина ответа и наличие карты тем не меняют списание для пользователя.
+      Количество ответов на странице — ориентир для коротких и средних запросов к Gemini 2.5 Flash Lite.
     </p>
 
     <div class="models-table">
@@ -212,17 +185,17 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
         <thead>
           <tr>
             <th>Модель</th>
-            <th>Списание</th>
+            <th>Ориентир</th>
             <th>Когда выбирать</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>
-              <div class="model-name">⚡⚡ Gemini 2.0 Flash Lite</div>
+              <div class="model-name">⚡⚡ Gemini 2.5 Flash Lite</div>
               <div class="model-sub">Самый быстрый и экономичный</div>
             </td>
-            <td><span class="price">1 запрос</span></td>
+            <td><span class="price">базовый</span></td>
             <td class="examples">Быстрые конспекты и короткие объяснения</td>
           </tr>
           <tr>
@@ -230,7 +203,7 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
               <div class="model-name">⚡ Gemini 2.0 Flash</div>
               <div class="model-sub">Лучший баланс качества и скорости · рекомендуется</div>
             </td>
-            <td><span class="price">1 запрос</span></td>
+            <td><span class="price">меньше ответов</span></td>
             <td class="examples">Баланс скорости и качества для обычной учёбы</td>
           </tr>
           <tr>
@@ -238,7 +211,7 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
               <div class="model-name">🧠 Gemini 1.5 Pro</div>
               <div class="model-sub">Максимальное качество для сложных задач</div>
             </td>
-            <td><span class="price">1 запрос</span></td>
+            <td><span class="price">меньше ответов</span></td>
             <td class="examples">Сложные доказательства, длинные рассуждения, аккуратная проверка</td>
           </tr>
         </tbody>
@@ -262,12 +235,12 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
       <div class="how-card">
         <div class="how-num">02</div>
         <div class="how-title">Выбирайте модель</div>
-        <p class="how-desc">Каждый ответ расходует один запрос. Вы можете выбирать модель под задачу без пересчёта стоимости.</p>
+        <p class="how-desc">Вы можете выбирать модель под задачу. Более мощные модели обычно дают меньше ответов за тот же тариф.</p>
       </div>
       <div class="how-card">
         <div class="how-num">03</div>
         <div class="how-title">Покупайте при необходимости</div>
-        <p class="how-desc">Когда дневной, недельный или месячный лимит исчерпан, можно подождать обновления периода или перейти на тариф выше.</p>
+        <p class="how-desc">Когда доступный объём на тарифе закончится, можно дождаться нового периода или перейти на тариф выше.</p>
       </div>
     </div>
   </section>
@@ -282,23 +255,23 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
     <div class="faq">
 
       <details open>
-        <summary>Что считается запросом?</summary>
-        <div class="a">Запрос — это один успешный ответ ИИ в чате. Если обработка завершилась ошибкой, лимит возвращается. Служебные операции вроде экспорта, смены шаблона и открытия карты тем лимит не расходуют.</div>
+        <summary>Почему количество примерное?</summary>
+        <div class="a">Ответы отличаются по длине и сложности. Поэтому мы показываем понятный ориентир для Gemini 2.5 Flash Lite, а не обещаем одинаковое число ответов для всех сценариев.</div>
       </details>
 
       <details>
-        <summary>Что если ответ получится очень длинным?</summary>
-        <div class="a">Длина ответа не меняет пользовательское списание: один успешный ответ — один запрос. Внутренние токены и стоимость моделей учитываются только в админской аналитике.</div>
+        <summary>Почему у разных моделей отличается количество?</summary>
+        <div class="a">Более мощные модели обычно дороже в обработке. Их удобно выбирать для сложных доказательств, проверки решений и длинных материалов.</div>
       </details>
 
       <details>
-        <summary>Когда обновляются лимиты?</summary>
-        <div class="a">Дневной лимит обновляется каждый день, недельный — в начале новой недели, месячный — в начале нового месяца. Сервис показывает остаток на текущий период в интерфейсе.</div>
+        <summary>Когда обновляется тариф?</summary>
+        <div class="a">Тариф работает в месячном периоде. После обновления периода доступный объём для AI-ответов начисляется снова.</div>
       </details>
 
       <details>
-        <summary>Когда расходуется лимит?</summary>
-        <div class="a">Лимит расходуется <strong>только за ответ ИИ</strong>. Если вы отправили вопрос, но ИИ вернул ошибку, запрос возвращается. Также не расходуют лимит: автоматическая карта тем, экспорт в PDF/Markdown, переключение шаблонов, переименование чатов.</div>
+        <summary>Какие действия не расходуют тариф?</summary>
+        <div class="a">Служебные операции вроде экспорта, переключения шаблонов и переименования чатов не относятся к генерации AI-ответа.</div>
       </details>
 
       <details>

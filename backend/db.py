@@ -9,6 +9,8 @@ import asyncpg
 import json
 from typing import Optional, Any
 
+from subscription_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, SUBSCRIPTION_PLANS
+
 _pool: Optional[asyncpg.Pool] = None
 
 DATABASE_URL = os.getenv(
@@ -129,14 +131,16 @@ CREATE INDEX IF NOT EXISTS events_event_time_idx ON events(event, created_at DES
 CREATE INDEX IF NOT EXISTS events_user_time_idx  ON events(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS events_time_idx       ON events(created_at DESC);
 
--- Subscription plans and limits (request-based, no user-facing tokens)
+-- Subscription plans and internal token budgets
 CREATE TABLE IF NOT EXISTS subscriptions (
     id              SERIAL PRIMARY KEY,
     plan_key        TEXT NOT NULL UNIQUE,
     display_name    TEXT NOT NULL,
+    price_rub       INTEGER NOT NULL DEFAULT 0,
     daily_limit     INTEGER NOT NULL,
     weekly_limit    INTEGER NOT NULL,
     monthly_limit   INTEGER NOT NULL,
+    sort_order      INTEGER NOT NULL DEFAULT 0,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -165,6 +169,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     period_day_start      DATE,
     period_week_start     DATE,
     period_month_start    DATE,
+    consumed_units        INTEGER NOT NULL DEFAULT 0,
     input_tokens          INTEGER NOT NULL DEFAULT 0,
     output_tokens         INTEGER NOT NULL DEFAULT 0,
     context_tokens        INTEGER NOT NULL DEFAULT 0,
@@ -280,6 +285,8 @@ async def init_schema():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT FALSE",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_id INTEGER",
+                "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS price_rub INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0",
                 """
                 DO $$
                 BEGIN
@@ -297,6 +304,7 @@ async def init_schema():
                 "ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS model TEXT",
                 "ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS latency_ms INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS cost_usd NUMERIC(14,8) NOT NULL DEFAULT 0",
+                "ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS consumed_units INTEGER NOT NULL DEFAULT 0",
             ):
                 try:
                     # Use a savepoint per migration so one bad statement
@@ -305,23 +313,40 @@ async def init_schema():
                         await conn.execute(stmt)
                 except Exception as e:
                     print(f"[migrate] {stmt}: {e}")
-            await conn.execute(
-                """
-                INSERT INTO subscriptions (plan_key, display_name, daily_limit, weekly_limit, monthly_limit)
-                VALUES
-                    ('free', 'Free', 25, 100, 300),
-                    ('pro', 'Pro', 200, 1200, 4000),
-                    ('max', 'Max', 700, 4200, 15000)
-                ON CONFLICT (plan_key) DO NOTHING
-                """
-            )
+            for plan in SUBSCRIPTION_PLANS:
+                await conn.execute(
+                    """
+                    INSERT INTO subscriptions (
+                        plan_key, display_name, price_rub,
+                        daily_limit, weekly_limit, monthly_limit, sort_order
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    ON CONFLICT (plan_key) DO UPDATE
+                    SET
+                        display_name = EXCLUDED.display_name,
+                        price_rub = EXCLUDED.price_rub,
+                        daily_limit = EXCLUDED.daily_limit,
+                        weekly_limit = EXCLUDED.weekly_limit,
+                        monthly_limit = EXCLUDED.monthly_limit,
+                        sort_order = EXCLUDED.sort_order,
+                        is_active = TRUE
+                    """,
+                    plan["plan_key"],
+                    plan["display_name"],
+                    plan["price_rub"],
+                    plan["daily_limit"],
+                    plan["weekly_limit"],
+                    plan["monthly_limit"],
+                    plan["sort_order"],
+                )
             await conn.execute(
                 """
                 UPDATE users u
                 SET subscription_id = s.id
                 FROM subscriptions s
-                WHERE u.subscription_id IS NULL AND s.plan_key = COALESCE(u.plan, 'free')
-                """
+                WHERE u.subscription_id IS NULL AND s.plan_key = COALESCE(u.plan, $1)
+                """,
+                DEFAULT_PLAN_KEY,
             )
 
 
@@ -332,10 +357,10 @@ async def create_user(username: str, email: str, password_hash: str) -> dict:
             """INSERT INTO users (username, email, password_hash, subscription_id)
                VALUES (
                     $1, $2, $3,
-                    (SELECT id FROM subscriptions WHERE plan_key='free' LIMIT 1)
+                    (SELECT id FROM subscriptions WHERE plan_key=$4 LIMIT 1)
                )
                RETURNING *""",
-            username, email, password_hash,
+            username, email, password_hash, DEFAULT_PLAN_KEY,
         )
         return dict(row)
 
@@ -405,13 +430,11 @@ async def get_chat(chat_id: str, uid: int) -> Optional[dict]:
         return dict(row) if row else None
 
 def check_limits(user):
-    limits = {
-        "free": 50,
-        "pro": 500,
-        "max": 2000
-    }
+    limits = {plan["plan_key"]: plan["monthly_limit"] for plan in SUBSCRIPTION_PLANS}
+    plan_key = user.get("plan") or DEFAULT_PLAN_KEY
+    usage_count = int(user.get("usage_count") or 0)
 
-    if user["usage_count"] >= limits[user["plan"]]:
+    if usage_count >= limits.get(plan_key, limits[DEFAULT_PLAN_KEY]):
         return False
 
     return True
@@ -425,11 +448,16 @@ def _month_start_expr() -> str:
     return "(date_trunc('month', now() AT TIME ZONE 'UTC'))::date"
 
 
-async def check_and_consume_limit(user_id: int, endpoint: str) -> dict[str, Any]:
+async def check_and_consume_limit(
+    user_id: int,
+    endpoint: str,
+    units: int = DEFAULT_INTERNAL_TOKENS_PER_REQUEST,
+) -> dict[str, Any]:
     """
-    Atomically consume one request slot for daily/weekly/monthly quota.
+    Atomically consume internal quota units for daily/weekly/monthly quota.
     Returns {allowed, request_log_id, remaining{...}}.
     """
+    units = max(1, int(units or DEFAULT_INTERNAL_TOKENS_PER_REQUEST))
     async with pool().acquire() as conn:
         async with conn.transaction():
             plan = await conn.fetchrow(
@@ -451,35 +479,36 @@ async def check_and_consume_limit(user_id: int, endpoint: str) -> dict[str, Any]
                     user_id, day_start, week_start, month_start,
                     daily_used, weekly_used, monthly_used
                 )
-                VALUES ($1, CURRENT_DATE, {_week_start_expr()}, {_month_start_expr()}, 1, 1, 1)
+                SELECT $1, CURRENT_DATE, {_week_start_expr()}, {_month_start_expr()}, $5, $5, $5
+                WHERE $5 <= $2 AND $5 <= $3 AND $5 <= $4
                 ON CONFLICT (user_id) DO UPDATE
                 SET
                     day_start = CASE WHEN user_usage.day_start <> CURRENT_DATE THEN CURRENT_DATE ELSE user_usage.day_start END,
                     week_start = CASE WHEN user_usage.week_start <> {_week_start_expr()} THEN {_week_start_expr()} ELSE user_usage.week_start END,
                     month_start = CASE WHEN user_usage.month_start <> {_month_start_expr()} THEN {_month_start_expr()} ELSE user_usage.month_start END,
                     daily_used = CASE
-                        WHEN user_usage.day_start <> CURRENT_DATE THEN 1
-                        WHEN user_usage.daily_used < $2 THEN user_usage.daily_used + 1
+                        WHEN user_usage.day_start <> CURRENT_DATE THEN $5
+                        WHEN user_usage.daily_used + $5 <= $2 THEN user_usage.daily_used + $5
                         ELSE user_usage.daily_used
                     END,
                     weekly_used = CASE
-                        WHEN user_usage.week_start <> {_week_start_expr()} THEN 1
-                        WHEN user_usage.weekly_used < $3 THEN user_usage.weekly_used + 1
+                        WHEN user_usage.week_start <> {_week_start_expr()} THEN $5
+                        WHEN user_usage.weekly_used + $5 <= $3 THEN user_usage.weekly_used + $5
                         ELSE user_usage.weekly_used
                     END,
                     monthly_used = CASE
-                        WHEN user_usage.month_start <> {_month_start_expr()} THEN 1
-                        WHEN user_usage.monthly_used < $4 THEN user_usage.monthly_used + 1
+                        WHEN user_usage.month_start <> {_month_start_expr()} THEN $5
+                        WHEN user_usage.monthly_used + $5 <= $4 THEN user_usage.monthly_used + $5
                         ELSE user_usage.monthly_used
                     END,
                     updated_at = now()
                 WHERE
-                    (CASE WHEN user_usage.day_start <> CURRENT_DATE THEN 0 ELSE user_usage.daily_used END) < $2
-                    AND (CASE WHEN user_usage.week_start <> {_week_start_expr()} THEN 0 ELSE user_usage.weekly_used END) < $3
-                    AND (CASE WHEN user_usage.month_start <> {_month_start_expr()} THEN 0 ELSE user_usage.monthly_used END) < $4
+                    (CASE WHEN user_usage.day_start <> CURRENT_DATE THEN 0 ELSE user_usage.daily_used END) + $5 <= $2
+                    AND (CASE WHEN user_usage.week_start <> {_week_start_expr()} THEN 0 ELSE user_usage.weekly_used END) + $5 <= $3
+                    AND (CASE WHEN user_usage.month_start <> {_month_start_expr()} THEN 0 ELSE user_usage.monthly_used END) + $5 <= $4
                 RETURNING user_id, day_start, week_start, month_start, daily_used, weekly_used, monthly_used
                 """,
-                user_id, plan["daily_limit"], plan["weekly_limit"], plan["monthly_limit"],
+                user_id, plan["daily_limit"], plan["weekly_limit"], plan["monthly_limit"], units,
             )
             if not row:
                 await conn.execute(
@@ -492,13 +521,13 @@ async def check_and_consume_limit(user_id: int, endpoint: str) -> dict[str, Any]
             log_row = await conn.fetchrow(
                 """
                 INSERT INTO request_logs (
-                    user_id, endpoint, status,
+                    user_id, endpoint, status, consumed_units,
                     period_day_start, period_week_start, period_month_start
                 )
-                VALUES ($1, $2, 'pending', $3, $4, $5)
+                VALUES ($1, $2, 'pending', $3, $4, $5, $6)
                 RETURNING id
                 """,
-                user_id, endpoint, row["day_start"], row["week_start"], row["month_start"],
+                user_id, endpoint, units, row["day_start"], row["week_start"], row["month_start"],
             )
             usage = {
                 "daily_remaining": max(plan["daily_limit"] - row["daily_used"], 0),
@@ -518,6 +547,7 @@ async def get_user_usage_snapshot(user_id: int, conn: asyncpg.Connection | None 
             f"""
             SELECT
                 s.plan_key, s.display_name,
+                s.price_rub,
                 s.daily_limit, s.weekly_limit, s.monthly_limit,
                 COALESCE(CASE WHEN uu.day_start = CURRENT_DATE THEN uu.daily_used ELSE 0 END, 0) AS daily_used_now,
                 COALESCE(CASE WHEN uu.week_start = {_week_start_expr()} THEN uu.weekly_used ELSE 0 END, 0) AS weekly_used_now,
@@ -533,6 +563,7 @@ async def get_user_usage_snapshot(user_id: int, conn: asyncpg.Connection | None 
             return {
                 "plan_key": "free",
                 "subscription_name": "Free",
+                "price_rub": 0,
                 "daily_limit": 0,
                 "weekly_limit": 0,
                 "monthly_limit": 0,
@@ -546,6 +577,7 @@ async def get_user_usage_snapshot(user_id: int, conn: asyncpg.Connection | None 
         return {
             "plan_key": row["plan_key"],
             "subscription_name": row["display_name"],
+            "price_rub": int(row["price_rub"]),
             "daily_limit": int(row["daily_limit"]),
             "weekly_limit": int(row["weekly_limit"]),
             "monthly_limit": int(row["monthly_limit"]),
@@ -625,7 +657,7 @@ async def fail_and_refund_request(request_log_id: int, error_text: str = "") -> 
         async with conn.transaction():
             r = await conn.fetchrow(
                 """
-                SELECT user_id, period_day_start, period_week_start, period_month_start
+                SELECT user_id, period_day_start, period_week_start, period_month_start, consumed_units
                 FROM request_logs
                 WHERE id = $1
                 """,
@@ -633,17 +665,18 @@ async def fail_and_refund_request(request_log_id: int, error_text: str = "") -> 
             )
             if not r:
                 return
+            units = max(1, int(r["consumed_units"] or DEFAULT_INTERNAL_TOKENS_PER_REQUEST))
             await conn.execute(
                 """
                 UPDATE user_usage
                 SET
-                    daily_used = CASE WHEN day_start = $2 AND daily_used > 0 THEN daily_used - 1 ELSE daily_used END,
-                    weekly_used = CASE WHEN week_start = $3 AND weekly_used > 0 THEN weekly_used - 1 ELSE weekly_used END,
-                    monthly_used = CASE WHEN month_start = $4 AND monthly_used > 0 THEN monthly_used - 1 ELSE monthly_used END,
+                    daily_used = CASE WHEN day_start = $2 THEN GREATEST(daily_used - $5, 0) ELSE daily_used END,
+                    weekly_used = CASE WHEN week_start = $3 THEN GREATEST(weekly_used - $5, 0) ELSE weekly_used END,
+                    monthly_used = CASE WHEN month_start = $4 THEN GREATEST(monthly_used - $5, 0) ELSE monthly_used END,
                     updated_at = now()
                 WHERE user_id = $1
                 """,
-                r["user_id"], r["period_day_start"], r["period_week_start"], r["period_month_start"],
+                r["user_id"], r["period_day_start"], r["period_week_start"], r["period_month_start"], units,
             )
             await conn.execute(
                 "UPDATE request_logs SET status='failed', error_text=$2, completed_at=now() WHERE id=$1",
@@ -757,6 +790,7 @@ async def list_users(search: str = "", limit: int = 100, offset: int = 0) -> lis
                 u.total_spent_usd, u.created_at, u.subscription_id,
                 COALESCE(s.plan_key, u.plan, 'free') AS plan_key,
                 COALESCE(s.display_name, initcap(COALESCE(u.plan, 'free'))) AS subscription_name,
+                COALESCE(s.price_rub, 0) AS price_rub,
                 COALESCE(s.daily_limit, 0) AS daily_limit,
                 COALESCE(s.weekly_limit, 0) AS weekly_limit,
                 COALESCE(s.monthly_limit, 0) AS monthly_limit,
@@ -842,12 +876,22 @@ async def get_platform_stats() -> dict:
               (SELECT COUNT(*) FROM users WHERE created_at > now() - INTERVAL '24 hours') AS new_users_24h,
               (SELECT COUNT(*) FROM messages WHERE created_at > now() - INTERVAL '24 hours') AS messages_24h,
               (SELECT pg_size_pretty(COALESCE(SUM(stored_size), 0)) FROM files) AS storage_size,
-              (SELECT COUNT(*) FROM files)                              AS file_count,
-              (SELECT COUNT(*) FROM users u JOIN subscriptions s ON s.id = u.subscription_id WHERE s.plan_key='free') AS free_count,
-              (SELECT COUNT(*) FROM users u JOIN subscriptions s ON s.id = u.subscription_id WHERE s.plan_key='pro')  AS pro_count,
-              (SELECT COUNT(*) FROM users u JOIN subscriptions s ON s.id = u.subscription_id WHERE s.plan_key='max')  AS max_count
+              (SELECT COUNT(*) FROM files)                              AS file_count
         """)
-        return dict(row)
+        stats = dict(row)
+        plan_rows = await conn.fetch("""
+            SELECT s.plan_key, COUNT(u.id) AS users
+            FROM subscriptions s
+            LEFT JOIN users u ON u.subscription_id = s.id
+            WHERE s.is_active
+            GROUP BY s.plan_key, s.sort_order
+            ORDER BY s.sort_order, s.plan_key
+        """)
+        plan_counts = {r["plan_key"]: int(r["users"]) for r in plan_rows}
+        stats["plan_counts"] = plan_counts
+        for key, count in plan_counts.items():
+            stats[f"{key}_count"] = count
+        return stats
 
 
 async def get_recent_activity(limit: int = 50) -> list[dict]:

@@ -200,9 +200,9 @@ tr:last-child td{border-bottom:none}
                 <p class="kpi-value" style="font-size:24px" x-text="fmtNum(stats.chat_count||0)"></p>
               </div>
               <div class="kpi">
-                <p class="kpi-label">Free / Pro / Max</p>
-                <p class="kpi-value" style="font-size:24px" x-text="`${stats.free_count||0}/${stats.pro_count||0}/${stats.max_count||0}`"></p>
-                <div class="bar mt-2"><div class="bar-fill" :style="`width:${Math.min(100,(((stats.pro_count||0)+(stats.max_count||0))/(stats.user_count||1))*100)}%`"></div></div>
+                <p class="kpi-label">Тарифы</p>
+                <p class="kpi-value" style="font-size:20px" x-text="planCountSummary()"></p>
+                <div class="bar mt-2"><div class="bar-fill" :style="`width:${paidUsersPercent()}%`"></div></div>
               </div>
               <div class="kpi">
                 <p class="kpi-label">Заблокированы</p>
@@ -474,7 +474,7 @@ tr:last-child td{border-bottom:none}
                       </td>
                       <td class="text-right">
                         <p class="font-mono text-[12px]" style="color:var(--accent)" x-text="planLabel(u.plan_key)"></p>
-                        <p class="font-mono text-[10.5px]" style="color:var(--text-3)" x-text="`${u.daily_remaining||0}/${u.daily_limit||0}`"></p>
+                        <p class="font-mono text-[10.5px]" style="color:var(--text-3)" x-text="`${fmtNum(u.daily_remaining||0)}/${fmtNum(u.daily_limit||0)}`"></p>
                       </td>
                       <td class="text-right font-mono text-[12px]" x-text="'$'+(u.total_spent_usd||0).toFixed(4)"></td>
                       <td class="text-right font-mono text-[12px]" x-text="u.chat_count"></td>
@@ -709,14 +709,14 @@ tr:last-child td{border-bottom:none}
           </div>
           <div class="rounded-lg p-3" style="background:var(--surface-2);border:1px solid var(--border)">
             <p class="text-[10.5px]" style="color:var(--text-3)">ОСТАЛОСЬ СЕГОДНЯ</p>
-            <p class="text-[16px] font-mono mt-0.5" x-text="`${userModal.daily_remaining||0}/${userModal.daily_limit||0}`"></p>
+            <p class="text-[16px] font-mono mt-0.5" x-text="`${fmtNum(userModal.daily_remaining||0)}/${fmtNum(userModal.daily_limit||0)}`"></p>
           </div>
         </div>
 
         <!-- Change plan -->
         <div class="mb-4">
           <p class="text-[11px] mb-1.5 font-[500]" style="color:var(--text-3);letter-spacing:.05em;text-transform:uppercase">Тариф</p>
-          <div class="grid grid-cols-3 gap-1.5">
+          <div class="grid grid-cols-2 gap-1.5">
             <template x-for="plan in plans" :key="plan.key">
               <button class="btn justify-center" :class="userModal.plan_key===plan.key?'btn-primary':''" @click="setUserPlan(userModal, plan.key)">
                 <span x-text="plan.name"></span>
@@ -775,8 +775,10 @@ function adminApp() {
     userModal: null,
     plans: [
       {key:'free', name:'Free'},
-      {key:'pro',  name:'Pro'},
-      {key:'max',  name:'Max'},
+      {key:'starter', name:'Starter'},
+      {key:'plus', name:'Plus'},
+      {key:'pro', name:'Pro'},
+      {key:'max', name:'Max'},
     ],
 
     // Activity
@@ -842,6 +844,7 @@ function adminApp() {
         }
         this.user = me;
         this.state = 'ready';
+        await this.loadPlanConfig();
         await this.loadStats();
       } catch(e) {
         this.state = 'gate';
@@ -861,6 +864,21 @@ function adminApp() {
       try {
         const r = await this.api('/api/admin/stats');
         if (r.ok) this.stats = await r.json();
+      } catch {}
+    },
+
+    async loadPlanConfig() {
+      try {
+        const r = await fetch('/api/subscription-plans');
+        if (!r.ok) return;
+        const plans = await r.json();
+        if (Array.isArray(plans) && plans.length) {
+          this.plans = plans.map(plan => ({
+            key: plan.plan_key,
+            name: plan.display_name,
+            price_rub: plan.price_rub,
+          }));
+        }
       } catch {}
     },
 
@@ -886,6 +904,19 @@ function adminApp() {
     planLabel(key) {
       const p = this.plans.find(plan => plan.key === key);
       return p ? p.name : (key || 'Free');
+    },
+
+    planCountSummary() {
+      const counts = this.stats.plan_counts || {};
+      return this.plans.map(plan => counts[plan.key] || 0).join('/');
+    },
+
+    paidUsersPercent() {
+      const counts = this.stats.plan_counts || {};
+      const paid = this.plans
+        .filter(plan => plan.key !== 'free')
+        .reduce((sum, plan) => sum + (counts[plan.key] || 0), 0);
+      return Math.min(100, (paid / (this.stats.user_count || 1)) * 100);
     },
 
     async setUserPlan(u, planKey) {

@@ -24,6 +24,7 @@ import analytics
 import rag_routes
 from billing import calculate_cost_units
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
+from subscription_plans import public_plans
 
 load_dotenv()
 
@@ -107,7 +108,7 @@ async def subscription_quota_middleware(request: Request, call_next):
         quota = await db.check_and_consume_limit(uid, request.url.path)
         if not quota.get("allowed"):
             return Response(
-                content='{"detail":"Request limit exceeded","code":"quota_exceeded"}',
+                content='{"detail":"Доступный объём тарифа закончился","code":"quota_exceeded"}',
                 status_code=429,
                 media_type="application/json",
             )
@@ -247,7 +248,22 @@ async def contacts_page(request: Request):
 
 @app.get("/pricing", response_class=HTMLResponse)
 async def pricing_page(request: Request):
-    return jinja.TemplateResponse("pricing.html", {"request": request})
+    plans = []
+    for plan in public_plans():
+        price = int(plan["price_rub"])
+        estimated_requests = int(plan.get("estimated_monthly_requests", 0) or 0)
+        plans.append({
+            **plan,
+            "price_label": "₽0" if price == 0 else f"₽{price:,}".replace(",", " "),
+            "estimated_requests_label": (
+                "без включённых AI-запросов"
+                if estimated_requests <= 0
+                else f"≈ {estimated_requests:,}".replace(",", " ") + " запросов в месяц"
+            ),
+            "featured": plan["plan_key"] == "plus",
+            "cta_label": "Начать бесплатно" if plan["plan_key"] == "free" else f"Выбрать {plan['display_name']}",
+        })
+    return jinja.TemplateResponse("pricing.html", {"request": request, "plans": plans})
 
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
@@ -385,12 +401,25 @@ async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
 # ── Static data ────────────────────────────────────────────────────────────────
 @app.get("/api/models")
 async def get_models():
-    return MODELS
+    return {
+        key: {
+            "name": info["name"],
+            "desc": info["desc"],
+            "speed": info["speed"],
+            "recommended": bool(info.get("recommended", False)),
+        }
+        for key, info in MODELS.items()
+    }
 
 
 @app.get("/api/templates")
 async def get_templates():
     return TEMPLATE_META
+
+
+@app.get("/api/subscription-plans")
+async def get_subscription_plans():
+    return public_plans()
 
 
 # ── Chats ──────────────────────────────────────────────────────────────────────

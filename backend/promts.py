@@ -153,25 +153,25 @@ MODELS = {
     "gemini-2.5-flash-lite": {
         "name": "Gemini 2.5 Flash Lite", "desc": "Самый быстрый и экономичный",
         "speed": "⚡⚡ Мгновенный", "cost_in": 0.0375, "cost_out": 0.15,
-        "ctx": "1M токенов", "recommended": False,
-        "tokens_per_request": 500,
+        "ctx": "Большой контекст", "recommended": False,
+        "tokens_per_request": 1000,
     },
     "gemini-3.1-flash-lite-preview": {
         "name": "Gemini 3.1 Flash Lite", "desc": "Быстрый, экономичный, умнее 2.5 Lite",
         "speed": "⚡ Очень быстрый", "cost_in": 0.25, "cost_out": 1.50,
-        "ctx": "1M токенов", "recommended": True,
+        "ctx": "Большой контекст", "recommended": True,
         "tokens_per_request": 2000,
     },
     "gemini-2.5-flash": {
         "name": "Gemini 2.5 Flash", "desc": "Баланс скорости и качества",
         "speed": "🚀 Быстрый", "cost_in": 0.30, "cost_out": 2.50,
-        "ctx": "1M токенов", "recommended": False,
+        "ctx": "Большой контекст", "recommended": False,
         "tokens_per_request": 2000,
     },
     "gemini-3-flash": {
         "name": "Gemini 3 Flash", "desc": "Максимальное качество и рассуждения",
         "speed": "🧠 Умный", "cost_in": 0.50, "cost_out": 4.00,
-        "ctx": "1M токенов", "recommended": False,
+        "ctx": "Большой контекст", "recommended": False,
         "tokens_per_request": 8000,
     },
 }

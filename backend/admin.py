@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 import db
 import auth
+from subscription_plans import PLAN_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -65,7 +66,7 @@ async def admin_users(
 
 @router.post("/users/{uid}/plan")
 async def admin_set_plan(uid: int, body: SetPlanIn, _=Depends(require_admin)):
-    if body.plan_key not in {"free", "pro", "max"}:
+    if body.plan_key not in PLAN_KEYS:
         raise HTTPException(400, "Unknown plan")
     updated = await db.admin_set_user_plan(uid, body.plan_key)
     if not updated:

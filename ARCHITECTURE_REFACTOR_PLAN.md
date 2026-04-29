@@ -87,6 +87,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `analytics.py` remains the compatibility API for current callers.
 - Usage and quota SQL now lives behind `app.repositories.oltp.UsageRepository`;
   `QuotaService` and `UsageService` preserve the current `db.py` wrapper API.
+- RAG, funnel, request, user activity, and system metric writes now live behind
+  OLAP repositories while existing `db.py` metric functions remain compatible.
 
 ## Next Stages
 

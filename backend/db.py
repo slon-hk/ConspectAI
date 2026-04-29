@@ -5,11 +5,15 @@ incremental repository extraction so existing imports keep working.
 """
 
 import asyncpg
-import json
 from typing import Optional, Any
 
 from app.db.pool import database
-from app.repositories.olap import AdminReportRepository
+from app.repositories.olap import (
+    AdminReportRepository,
+    FunnelMetricRepository,
+    RagMetricRepository,
+    RequestMetricRepository,
+)
 from app.repositories.oltp import (
     AdminUserRepository,
     ChatRepository,
@@ -29,6 +33,9 @@ _files = FileRepository(database)
 _mindmaps = MindmapRepository(database)
 _admin_users = AdminUserRepository(database)
 _admin_reports = AdminReportRepository(database)
+_rag_metrics = RagMetricRepository(database)
+_funnel_metrics = FunnelMetricRepository(database)
+_request_metrics = RequestMetricRepository(database)
 _usage_repository = UsageRepository(database)
 _quota_service = QuotaService(_usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUEST)
 _usage_service = UsageService(_usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUEST)
@@ -539,18 +546,17 @@ async def insert_rag_metric(
     latency_ms: int,
     cache_hit: bool,
 ) -> None:
-    async with pool().acquire() as conn:
-        await conn.execute(
-            """
-            INSERT INTO rag_metrics (
-                user_id, query, chunks_used, context_tokens, total_tokens,
-                estimated_tokens_no_rag, savings_percent, latency_ms, cache_hit
-            )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-            """,
-            user_id, query[:4000], chunks_used, context_tokens, total_tokens,
-            estimated_tokens_no_rag, savings_percent, latency_ms, cache_hit,
-        )
+    await _rag_metrics.record_query(
+        user_id=user_id,
+        query=query,
+        chunks_used=chunks_used,
+        context_tokens=context_tokens,
+        total_tokens=total_tokens,
+        estimated_tokens_no_rag=estimated_tokens_no_rag,
+        savings_percent=savings_percent,
+        latency_ms=latency_ms,
+        cache_hit=cache_hit,
+    )
 
 
 async def insert_funnel_event(
@@ -561,14 +567,13 @@ async def insert_funnel_event(
     campaign: str | None = None,
     metadata: dict | None = None,
 ) -> None:
-    async with pool().acquire() as conn:
-        await conn.execute(
-            """
-            INSERT INTO funnel_events (user_id, event_name, source, campaign, metadata)
-            VALUES ($1, $2, $3, $4, $5::jsonb)
-            """,
-            user_id, event_name, source, campaign, json.dumps(metadata or {}),
-        )
+    await _funnel_metrics.record_event(
+        user_id=user_id,
+        event_name=event_name,
+        source=source,
+        campaign=campaign,
+        metadata=metadata,
+    )
 
 
 async def log_request_metrics(
@@ -587,95 +592,21 @@ async def log_request_metrics(
     rag_savings_percent: float,
     session_count_inc: int = 1,
 ) -> None:
-    async with pool().acquire() as conn:
-        async with conn.transaction():
-            if request_log_id:
-                await conn.execute(
-                    """
-                    UPDATE request_logs
-                    SET
-                        model_name = $2,
-                        model = $2,
-                        input_tokens = $3,
-                        output_tokens = $4,
-                        total_tokens = $5,
-                        cost_usd = $6,
-                        cost_units = $6,
-                        status = $7,
-                        error_text = $8,
-                        latency_ms = $9,
-                        cache_hit = $10,
-                        completed_at = now()
-                    WHERE id = $1
-                    """,
-                    request_log_id, model, input_tokens, output_tokens, total_tokens,
-                    cost_usd, status, error_message[:400], latency_ms, cache_hit,
-                )
-            else:
-                await conn.execute(
-                    """
-                    INSERT INTO request_logs (
-                        user_id, model_name, model, input_tokens, output_tokens, total_tokens,
-                        cost_usd, cost_units, status, error_text, latency_ms, cache_hit, completed_at
-                    )
-                    VALUES ($1,$2,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10,now())
-                    """,
-                    user_id, model, input_tokens, output_tokens, total_tokens, cost_usd,
-                    status, error_message[:400], latency_ms, cache_hit,
-                )
-
-            await conn.execute(
-                """
-                INSERT INTO user_activity_daily (
-                    user_id, date, requests_count, tokens_used, cost_usd, rag_savings_avg, session_count
-                )
-                VALUES ($1, CURRENT_DATE, 1, $2, $3, $4, $5)
-                ON CONFLICT (user_id, date) DO UPDATE
-                SET
-                    requests_count = user_activity_daily.requests_count + 1,
-                    tokens_used = user_activity_daily.tokens_used + EXCLUDED.tokens_used,
-                    cost_usd = user_activity_daily.cost_usd + EXCLUDED.cost_usd,
-                    rag_savings_avg =
-                        ((user_activity_daily.rag_savings_avg * user_activity_daily.requests_count) + EXCLUDED.rag_savings_avg)
-                        / (user_activity_daily.requests_count + 1),
-                    session_count = user_activity_daily.session_count + EXCLUDED.session_count
-                """,
-                user_id, total_tokens, cost_usd, rag_savings_percent, session_count_inc,
-            )
-
-            await conn.execute(
-                """
-                INSERT INTO system_metrics (
-                    date, total_requests, total_cost, avg_latency, cache_hit_rate, rag_savings_avg,
-                    _latency_points, _cache_hits, _rag_points
-                )
-                VALUES (
-                    CURRENT_DATE,
-                    1,
-                    $1::numeric,
-                    $2::numeric,
-                    CASE WHEN $3::boolean THEN 100::numeric ELSE 0::numeric END,
-                    $4::numeric,
-                    $2::bigint,
-                    CASE WHEN $3::boolean THEN 1::bigint ELSE 0::bigint END,
-                    $4::numeric
-                )
-                ON CONFLICT (date) DO UPDATE
-                SET
-                    total_requests = system_metrics.total_requests + 1,
-                    total_cost = system_metrics.total_cost + EXCLUDED.total_cost,
-                    _latency_points = system_metrics._latency_points + EXCLUDED._latency_points,
-                    _cache_hits = system_metrics._cache_hits + EXCLUDED._cache_hits,
-                    _rag_points = system_metrics._rag_points + EXCLUDED._rag_points,
-                    avg_latency = (system_metrics._latency_points + EXCLUDED._latency_points)::numeric
-                        / (system_metrics.total_requests + 1),
-                    cache_hit_rate = ((system_metrics._cache_hits + EXCLUDED._cache_hits)::numeric
-                        / (system_metrics.total_requests + 1)) * 100,
-                    rag_savings_avg = (system_metrics._rag_points + EXCLUDED._rag_points)
-                        / (system_metrics.total_requests + 1)
-                """,
-                cost_usd, latency_ms, cache_hit, rag_savings_percent,
-            )
+    await _request_metrics.log_request_metrics(
+        request_log_id=request_log_id,
+        user_id=user_id,
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        cost_usd=cost_usd,
+        status=status,
+        error_message=error_message,
+        latency_ms=latency_ms,
+        cache_hit=cache_hit,
+        rag_savings_percent=rag_savings_percent,
+        session_count_inc=session_count_inc,
+    )
 
 
 async def admin_metrics_overview() -> dict:

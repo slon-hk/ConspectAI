@@ -10,6 +10,7 @@ from typing import Optional, Any
 
 from app.db.pool import database
 from app.repositories.oltp import (
+    AdminUserRepository,
     ChatRepository,
     FileRepository,
     MessageRepository,
@@ -23,6 +24,7 @@ _chats = ChatRepository(database)
 _messages = MessageRepository(database)
 _files = FileRepository(database)
 _mindmaps = MindmapRepository(database)
+_admin_users = AdminUserRepository(database)
 
 
 async def create_pool():
@@ -676,84 +678,23 @@ async def save_mindmap(chat_id: str, markdown: str):
 
 # ── Admin queries ──────────────────────────────────────────────────────────────
 async def list_users(search: str = "", limit: int = 100, offset: int = 0) -> list[dict]:
-        week_start = _week_start_expr()
-        month_start = _month_start_expr()
-        sql = f"""
-            SELECT
-                u.id, u.username, u.email, u.is_admin, u.is_blocked,
-                u.total_spent_usd, u.created_at, u.subscription_id,
-                COALESCE(s.plan_key, u.plan, 'free') AS plan_key,
-                COALESCE(s.display_name, initcap(COALESCE(u.plan, 'free'))) AS subscription_name,
-                COALESCE(s.price_rub, 0) AS price_rub,
-                COALESCE(s.daily_limit, 0) AS daily_limit,
-                COALESCE(s.weekly_limit, 0) AS weekly_limit,
-                COALESCE(s.monthly_limit, 0) AS monthly_limit,
-                COALESCE(CASE WHEN uu.day_start = CURRENT_DATE THEN uu.daily_used ELSE 0 END, 0) AS daily_used,
-                COALESCE(CASE WHEN uu.week_start = {week_start} THEN uu.weekly_used ELSE 0 END, 0) AS weekly_used,
-                COALESCE(CASE WHEN uu.month_start = {month_start} THEN uu.monthly_used ELSE 0 END, 0) AS monthly_used,
-                GREATEST(COALESCE(s.daily_limit, 0) - COALESCE(CASE WHEN uu.day_start = CURRENT_DATE THEN uu.daily_used ELSE 0 END, 0), 0) AS daily_remaining,
-                GREATEST(COALESCE(s.weekly_limit, 0) - COALESCE(CASE WHEN uu.week_start = {week_start} THEN uu.weekly_used ELSE 0 END, 0), 0) AS weekly_remaining,
-                GREATEST(COALESCE(s.monthly_limit, 0) - COALESCE(CASE WHEN uu.month_start = {month_start} THEN uu.monthly_used ELSE 0 END, 0), 0) AS monthly_remaining,
-                (SELECT COUNT(*) FROM chats c WHERE c.user_id = u.id) AS chat_count,
-                (SELECT COUNT(*) FROM messages m JOIN chats c ON c.id = m.chat_id
-                 WHERE c.user_id = u.id) AS message_count
-            FROM users u
-            LEFT JOIN subscriptions s ON s.id = u.subscription_id
-            LEFT JOIN user_usage uu ON uu.user_id = u.id
-        """
-        params: list = []
-        if search:
-            sql += " WHERE u.username ILIKE $1 OR u.email ILIKE $1"
-            params.append(f"%{search}%")
-        sql += f" ORDER BY u.created_at DESC LIMIT ${len(params)+1} OFFSET ${len(params)+2}"
-        params += [limit, offset]
-        async with pool().acquire() as conn:
-            rows = await conn.fetch(sql, *params)
-            return [dict(r) for r in rows]
+    return await _admin_users.list_users(search, limit, offset)
 
 
 async def count_users(search: str = "") -> int:
-    sql, params = "SELECT COUNT(*) FROM users", []
-    if search:
-        sql += " WHERE username ILIKE $1 OR email ILIKE $1"
-        params.append(f"%{search}%")
-    async with pool().acquire() as conn:
-        return await conn.fetchval(sql, *params)
+    return await _admin_users.count_users(search)
 
 
 async def admin_set_user_field(uid: int, field: str, value):
-    allowed = {
-        "plan",
-        "period",
-        "usage_count",
-        "usage_reset_at",
-        "is_admin",
-        "is_blocked"
-    }
-    if field not in allowed:
-        raise ValueError(f"Field {field} not allowed")
-    async with pool().acquire() as conn:
-        await conn.execute(f"UPDATE users SET {field} = $1 WHERE id = $2", value, uid)
+    await _admin_users.set_user_field(uid, field, value)
 
 
 async def admin_set_user_plan(uid: int, plan_key: str) -> bool:
-    async with pool().acquire() as conn:
-        plan = await conn.fetchrow(
-            "SELECT id, plan_key FROM subscriptions WHERE plan_key=$1 AND is_active",
-            plan_key,
-        )
-        if not plan:
-            return False
-        result = await conn.execute(
-            "UPDATE users SET subscription_id=$1, plan=$2 WHERE id=$3",
-            plan["id"], plan["plan_key"], uid,
-        )
-        return result != "UPDATE 0"
+    return await _admin_users.set_user_plan(uid, plan_key)
 
 
 async def admin_delete_user(uid: int):
-    async with pool().acquire() as conn:
-        await conn.execute("DELETE FROM users WHERE id = $1", uid)
+    await _admin_users.delete_user(uid)
 
 
 async def get_platform_stats() -> dict:

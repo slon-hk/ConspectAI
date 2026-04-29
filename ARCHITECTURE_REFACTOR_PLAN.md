@@ -18,8 +18,11 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - Pool lifecycle is now owned by `app.db.pool.Database`.
 - `db.create_pool()`, `db.close_pool()`, and `db.pool()` delegate to the new DB
   infrastructure and keep existing callers working.
-- Schema initialization and SQL functions still live in `db.py` until repository
-  extraction begins.
+- Schema initialization and most legacy SQL functions still live in `db.py`
+  while repository extraction proceeds incrementally.
+- User, chat, and message SQL now lives in OLTP repositories under
+  `app.repositories.oltp`; `db.py` keeps compatibility wrappers for existing
+  imports and call sites.
 
 ## `db.py` Function Map
 
@@ -83,7 +86,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 
 ## Next Stages
 
-- Stage 4: extract OLTP repositories for users, chats, and messages first.
+- Stage 4: continue extracting OLTP repositories after users, chats, and
+  messages; next likely candidates are file metadata and mindmaps.
 - Stage 5: introduce auth, user, chat, and message services while preserving
   route behavior.
 - Stage 6: move quota reservation, commit, and refund behind `QuotaService` and

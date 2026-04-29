@@ -9,7 +9,12 @@ import json
 from typing import Optional, Any
 
 from app.db.pool import database
+from app.repositories.oltp import ChatRepository, MessageRepository, UserRepository
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, SUBSCRIPTION_PLANS
+
+_users = UserRepository(database)
+_chats = ChatRepository(database)
+_messages = MessageRepository(database)
 
 
 async def create_pool():
@@ -327,82 +332,40 @@ async def init_schema():
 
 # ── User queries ───────────────────────────────────────────────────────────────
 async def create_user(username: str, email: str, password_hash: str) -> dict:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO users (username, email, password_hash, subscription_id)
-               VALUES (
-                    $1, $2, $3,
-                    (SELECT id FROM subscriptions WHERE plan_key=$4 LIMIT 1)
-               )
-               RETURNING *""",
-            username, email, password_hash, DEFAULT_PLAN_KEY,
-        )
-        return dict(row)
+    return await _users.create(username, email, password_hash, DEFAULT_PLAN_KEY)
 
 
 async def get_user_by_email(email: str) -> Optional[dict]:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM users WHERE email=$1", email)
-        return dict(row) if row else None
+    return await _users.get_by_email(email)
 
 
 async def get_user_by_id(uid: int) -> Optional[dict]:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM users WHERE id=$1", uid)
-        return dict(row) if row else None
+    return await _users.get_by_id(uid)
 
 
 async def get_user_by_username(username: str) -> Optional[dict]:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM users WHERE username=$1", username)
-        return dict(row) if row else None
+    return await _users.get_by_username(username)
 
 
 # ── Chat queries ───────────────────────────────────────────────────────────────
 async def get_chats(uid: int) -> list[dict]:
-    async with pool().acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT * FROM chats WHERE user_id=$1 ORDER BY updated_at DESC", uid
-        )
-        return [dict(r) for r in rows]
+    return await _chats.list_for_user(uid)
 
 
 async def create_chat(uid: int, template: str, model: str) -> dict:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO chats (user_id, title, template, model)
-               VALUES ($1, 'Новый чат', $2, $3) RETURNING *""",
-            uid, template, model,
-        )
-        return dict(row)
+    return await _chats.create(uid, template, model)
 
 
 async def update_chat_settings(chat_id: str, uid: int, **kwargs):
-    allowed = {"template", "model", "title", "updated_at", "course_id"}
-    sets, vals = [], [chat_id, uid]
-    for k, v in kwargs.items():
-        if k in allowed:
-            sets.append(f"{k}=${len(vals)+1}")
-            vals.append(v)
-    if not sets:
-        return
-    async with pool().acquire() as conn:
-        await conn.execute(
-            f"UPDATE chats SET {','.join(sets)} WHERE id=$1 AND user_id=$2", *vals
-        )
+    await _chats.update_settings(chat_id, uid, **kwargs)
 
 
 async def delete_chat(chat_id: str, uid: int):
-    async with pool().acquire() as conn:
-        await conn.execute("DELETE FROM chats WHERE id=$1 AND user_id=$2", chat_id, uid)
+    await _chats.delete(chat_id, uid)
 
 
 async def get_chat(chat_id: str, uid: int) -> Optional[dict]:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM chats WHERE id=$1 AND user_id=$2", chat_id, uid
-        )
-        return dict(row) if row else None
+    return await _chats.get(chat_id, uid)
 
 def check_limits(user):
     limits = {plan["plan_key"]: plan["monthly_limit"] for plan in SUBSCRIPTION_PLANS}
@@ -660,24 +623,7 @@ async def fail_and_refund_request(request_log_id: int, error_text: str = "") -> 
 
 # ── Message queries ────────────────────────────────────────────────────────────
 async def get_messages(chat_id: str) -> list[dict]:
-    async with pool().acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT * FROM messages WHERE chat_id=$1 ORDER BY created_at ASC",
-            chat_id,
-        )
-        msgs = [dict(r) for r in rows]
-        for m in msgs:
-            file_rows = await conn.fetch(
-                """SELECT f.sha256, f.mime_type, f.compressed, f.original_size,
-                          mf.original_filename
-                   FROM message_files mf
-                   JOIN files f ON f.sha256 = mf.sha256
-                   WHERE mf.message_id=$1
-                   ORDER BY mf.display_order""",
-                m["id"],
-            )
-            m["files"] = [dict(r) for r in file_rows]
-        return msgs
+    return await _messages.list_by_chat(chat_id)
 
 
 async def save_message(
@@ -685,22 +631,15 @@ async def save_message(
     tokens: int = 0, model: str = "", cost_usd: float = 0,
     file_metas: list[dict] = None,
 ) -> dict:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO messages (chat_id, role, content, tokens_used, model, cost_usd)
-               VALUES ($1,$2,$3,$4,$5,$6) RETURNING *""",
-            chat_id, role, content, tokens, model, cost_usd,
-        )
-        msg = dict(row)
-        if file_metas:
-            for i, fm in enumerate(file_metas):
-                await conn.execute(
-                    """INSERT INTO message_files (message_id, sha256, original_filename, display_order)
-                       VALUES ($1,$2,$3,$4)""",
-                    msg["id"], fm["sha256"], fm["original_filename"], i,
-                )
-        msg["files"] = file_metas or []
-        return msg
+    return await _messages.create(
+        chat_id,
+        role,
+        content,
+        tokens=tokens,
+        model=model,
+        cost_usd=cost_usd,
+        file_metas=file_metas,
+    )
 
 
 # ── File registry ──────────────────────────────────────────────────────────────

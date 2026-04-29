@@ -1,94 +1,38 @@
-# Orion AI — STEM Knowledge Architect
-
+# ConspectAI.tech — STEM Knowledge Architect
 Полностью контейнеризованный стек: PostgreSQL + FastAPI + (опционально) Caddy с автоматическим HTTPS.
 
 ---
+# Main Link
+1. [Google sheets](https://docs.google.com/spreadsheets/d/16s1q8gCboe1yT4y1dk7mcKwiI1nQ0zVRVCWBCWAC8Rw/edit?gid=59453621#gid=59453621)
 
-#Google Sheets
-https://docs.google.com/spreadsheets/d/16s1q8gCboe1yT4y1dk7mcKwiI1nQ0zVRVCWBCWAC8Rw/edit?usp=sharing
+---
+# TO-DO
+1. Настроить систему подписки
 
 # Late
-Desmos API
-Anki card
+- Desmos API
+- Anki card
 
 
 ## 🚀 Быстрый старт (локально)
+1. [Скачать Docker](https://desktop.docker.com/mac/main/arm64/Docker.dmg?utm_source=docker&utm_medium=webreferral&utm_campaign=dd-smartbutton&utm_location=module)
 
 ```bash
-# 1. Скопируйте конфиг и заполните три обязательных переменных
+# 2. Скопируйте конфиг и заполните три обязательных переменных
 cp .env
 # Откройте .env и заполните: GEMINI_API_KEY, SECRET_KEY, POSTGRES_PASSWORD
 # Сгенерировать SECRET_KEY: openssl rand -hex 32
 
-# 2. Соберите и запустите
-docker compose up -d --build
+# 3. Соберите и запустите
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build  
 
-# 3. Откройте в браузере
+# 4. Откройте в браузере
 open http://localhost:8000
 ```
 
 Логи приложения: `docker compose logs -f app`
 Логи БД: `docker compose logs -f db`
 
----
-
-## 🌐 Деплой на сервер (продакшен с HTTPS)
-
-### Что вам нужно
-- VPS / dedicated сервер с публичным IP
-- Домен, A-запись которого указывает на IP сервера
-- Открытые порты `80` и `443`
-- Установленный Docker + Docker Compose
-
-### Шаги
-
-```bash
-# На сервере
-git clone <your-repo> orion && cd orion
-
-cp .env.example .env
-nano .env
-# Заполните: GEMINI_API_KEY, SECRET_KEY, POSTGRES_PASSWORD
-# А также: DOMAIN, ACME_EMAIL
-
-# Запуск с Caddy и автоматическим Let's Encrypt
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
-
-Caddy сам выпустит и продлит SSL-сертификат. Через 30 секунд сайт открыт по `https://your-domain.com`.
-
----
-
-## 🔧 Полезные команды
-
-```bash
-# Перезапустить только приложение, не трогая БД
-docker compose restart app
-
-# Обновить код без потери данных
-git pull
-docker compose up -d --build app
-
-# Подключиться к Postgres
-docker compose exec db psql -U orion -d orion
-
-# Бэкап БД
-docker compose exec db pg_dump -U orion orion | gzip > backup-$(date +%F).sql.gz
-
-# Восстановление
-gunzip -c backup-2026-01-15.sql.gz | docker compose exec -T db psql -U orion orion
-
-# Размер хранилища файлов (с дедупликацией)
-docker compose exec app du -sh uploads/
-
-# Полная остановка с сохранением данных
-docker compose down
-
-# ⚠️ Полное удаление вместе с данными (необратимо!)
-docker compose down -v
-```
-
----
 
 ## 📦 Архитектура
 
@@ -169,21 +113,53 @@ docker compose down -v
 ## 📁 Структура
 
 ```
-./
-├── backend/                 # Python код
-│   ├── main.py
-│   ├── db.py
+.
+├── Docker-compose.dev.yml
+├── Docker-compose.yml
+├── Readme.md
+├── backend
+│   ├── admin.py
+│   ├── analytics.py
 │   ├── auth.py
-│   ├── storage.py
+│   ├── billing.py
+│   ├── db.py
+│   ├── main.py
 │   ├── promts.py
-│   └── templates/
+│   ├── rag.py
+│   ├── rag_routes.py
+│   ├── storage.py
+│   └── templates
+│       ├── 404.html
+│       ├── 503.html
+│       ├── admin.html
+│       ├── contacts.html
 │       ├── index.html
-│       └── landing.html
-└─── conf/                   # Docker конфиг
-    ├── docker-compose.yml
-    ├── Dockerfile
-    ├── Caddyfile
-    ├── .env
-    ├── .dockerignore
-    └── requirements.txt
+│       ├── landing.html
+│       ├── offer.html
+│       ├── pricing.html
+│       └── privacy.html
+├── conf
+│   ├── Caddyfile
+│   ├── Caddyfile.dev
+│   ├── Dockerfile
+│   └── requirements.txt
+└── static
+    ├── docs
+    │   └── offer.pdf
+    ├── error-bg
+    │   ├── 1.jpg
+    │   ├── 10.jpg
+    │   ├── 2.jpg
+    │   ├── 3.jpg
+    │   ├── 4.jpg
+    │   ├── 5.jpg
+    │   ├── 6.jpg
+    │   ├── 7.jpg
+    │   ├── 8.jpg
+    │   ├── 9.jpg
+    │   ├── README.md
+    │   └── manifest.json
+    ├── favicon.svg
+    ├── icon.svg
+    └── og-image.svg
 ```

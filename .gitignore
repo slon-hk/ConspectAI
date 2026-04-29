@@ -1,0 +1,42 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+**/.venv/
+**/venv/
+
+# OS / editor noise
+.DS_Store
+**/.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Runtime data
+uploads/
+backend/uploads/
+*.sqlite
+*.sqlite3
+*.log
+UNTRACKED_ISSUES_CONTEXT.md
+
+# Frontend/build caches
+node_modules/
+dist/
+build/

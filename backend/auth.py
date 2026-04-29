@@ -17,8 +17,6 @@ TOKEN_EXPIRE_DAYS = 30
 pwd_ctx   = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2    = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
-TRIAL_TOKENS = 10000   # 20 ответов Flash Lite, 5 Flash, или 1 Pro
-
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 EMAIL_FROM = os.getenv("EMAIL_FROM", "no-reply@yourdomain.com")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")

@@ -7,7 +7,7 @@ To grant admin privileges to the first user:
         -c "UPDATE users SET is_admin=true WHERE email='you@example.com';"
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Form
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 import db
@@ -30,8 +30,8 @@ async def require_admin(token: str = Depends(auth.oauth2)) -> dict:
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
-class GrantTokensIn(BaseModel):
-    amount: int
+class SetPlanIn(BaseModel):
+    plan_key: str
 
 
 class SetFieldIn(BaseModel):
@@ -63,12 +63,14 @@ async def admin_users(
     }
 
 
-@router.post("/users/{uid}/grant-tokens")
-async def admin_grant_tokens(uid: int, body: GrantTokensIn, _=Depends(require_admin)):
-    if body.amount <= 0 or body.amount > 100_000_000:
-        raise HTTPException(400, "Invalid amount")
-    await db.admin_grant_tokens(uid, body.amount)
-    return {"ok": True}
+@router.post("/users/{uid}/plan")
+async def admin_set_plan(uid: int, body: SetPlanIn, _=Depends(require_admin)):
+    if body.plan_key not in {"free", "pro", "max"}:
+        raise HTTPException(400, "Unknown plan")
+    updated = await db.admin_set_user_plan(uid, body.plan_key)
+    if not updated:
+        raise HTTPException(404, "User or plan not found")
+    return {"ok": True, "plan_key": body.plan_key}
 
 
 @router.post("/users/{uid}/block")

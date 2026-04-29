@@ -508,7 +508,7 @@ async def check_and_consume_limit(user_id: int, endpoint: str) -> dict[str, Any]
             return {"allowed": True, "request_log_id": int(log_row["id"]), "remaining": usage}
 
 
-async def get_user_usage_snapshot(user_id: int, conn: asyncpg.Connection | None = None) -> dict[str, int]:
+async def get_user_usage_snapshot(user_id: int, conn: asyncpg.Connection | None = None) -> dict[str, Any]:
     own_conn = False
     if conn is None:
         own_conn = True
@@ -517,6 +517,7 @@ async def get_user_usage_snapshot(user_id: int, conn: asyncpg.Connection | None 
         row = await conn.fetchrow(
             f"""
             SELECT
+                s.plan_key, s.display_name,
                 s.daily_limit, s.weekly_limit, s.monthly_limit,
                 COALESCE(CASE WHEN uu.day_start = CURRENT_DATE THEN uu.daily_used ELSE 0 END, 0) AS daily_used_now,
                 COALESCE(CASE WHEN uu.week_start = {_week_start_expr()} THEN uu.weekly_used ELSE 0 END, 0) AS weekly_used_now,
@@ -529,8 +530,28 @@ async def get_user_usage_snapshot(user_id: int, conn: asyncpg.Connection | None 
             user_id,
         )
         if not row:
-            return {"daily_remaining": 0, "weekly_remaining": 0, "monthly_remaining": 0}
+            return {
+                "plan_key": "free",
+                "subscription_name": "Free",
+                "daily_limit": 0,
+                "weekly_limit": 0,
+                "monthly_limit": 0,
+                "daily_used": 0,
+                "weekly_used": 0,
+                "monthly_used": 0,
+                "daily_remaining": 0,
+                "weekly_remaining": 0,
+                "monthly_remaining": 0,
+            }
         return {
+            "plan_key": row["plan_key"],
+            "subscription_name": row["display_name"],
+            "daily_limit": int(row["daily_limit"]),
+            "weekly_limit": int(row["weekly_limit"]),
+            "monthly_limit": int(row["monthly_limit"]),
+            "daily_used": int(row["daily_used_now"]),
+            "weekly_used": int(row["weekly_used_now"]),
+            "monthly_used": int(row["monthly_used_now"]),
             "daily_remaining": max(int(row["daily_limit"]) - int(row["daily_used_now"]), 0),
             "weekly_remaining": max(int(row["weekly_limit"]) - int(row["weekly_used_now"]), 0),
             "monthly_remaining": max(int(row["monthly_limit"]) - int(row["monthly_used_now"]), 0),
@@ -728,15 +749,35 @@ async def save_mindmap(chat_id: str, markdown: str):
 
 # ── Admin queries ──────────────────────────────────────────────────────────────
 async def list_users(search: str = "", limit: int = 100, offset: int = 0) -> list[dict]:
-        sql = """SELECT id, username, email, plan, period, usage_count, is_admin, is_blocked, total_spent_usd, created_at,
-                    (SELECT COUNT(*) FROM chats c WHERE c.user_id = users.id)    AS chat_count,
-                    (SELECT COUNT(*) FROM messages m JOIN chats c ON c.id = m.chat_id
-                WHERE c.user_id = users.id)                  AS message_count  FROM users"""
+        week_start = _week_start_expr()
+        month_start = _month_start_expr()
+        sql = f"""
+            SELECT
+                u.id, u.username, u.email, u.is_admin, u.is_blocked,
+                u.total_spent_usd, u.created_at, u.subscription_id,
+                COALESCE(s.plan_key, u.plan, 'free') AS plan_key,
+                COALESCE(s.display_name, initcap(COALESCE(u.plan, 'free'))) AS subscription_name,
+                COALESCE(s.daily_limit, 0) AS daily_limit,
+                COALESCE(s.weekly_limit, 0) AS weekly_limit,
+                COALESCE(s.monthly_limit, 0) AS monthly_limit,
+                COALESCE(CASE WHEN uu.day_start = CURRENT_DATE THEN uu.daily_used ELSE 0 END, 0) AS daily_used,
+                COALESCE(CASE WHEN uu.week_start = {week_start} THEN uu.weekly_used ELSE 0 END, 0) AS weekly_used,
+                COALESCE(CASE WHEN uu.month_start = {month_start} THEN uu.monthly_used ELSE 0 END, 0) AS monthly_used,
+                GREATEST(COALESCE(s.daily_limit, 0) - COALESCE(CASE WHEN uu.day_start = CURRENT_DATE THEN uu.daily_used ELSE 0 END, 0), 0) AS daily_remaining,
+                GREATEST(COALESCE(s.weekly_limit, 0) - COALESCE(CASE WHEN uu.week_start = {week_start} THEN uu.weekly_used ELSE 0 END, 0), 0) AS weekly_remaining,
+                GREATEST(COALESCE(s.monthly_limit, 0) - COALESCE(CASE WHEN uu.month_start = {month_start} THEN uu.monthly_used ELSE 0 END, 0), 0) AS monthly_remaining,
+                (SELECT COUNT(*) FROM chats c WHERE c.user_id = u.id) AS chat_count,
+                (SELECT COUNT(*) FROM messages m JOIN chats c ON c.id = m.chat_id
+                 WHERE c.user_id = u.id) AS message_count
+            FROM users u
+            LEFT JOIN subscriptions s ON s.id = u.subscription_id
+            LEFT JOIN user_usage uu ON uu.user_id = u.id
+        """
         params: list = []
         if search:
-            sql += " WHERE username ILIKE $1 OR email ILIKE $1"
+            sql += " WHERE u.username ILIKE $1 OR u.email ILIKE $1"
             params.append(f"%{search}%")
-        sql += f" ORDER BY created_at DESC LIMIT ${len(params)+1} OFFSET ${len(params)+2}"
+        sql += f" ORDER BY u.created_at DESC LIMIT ${len(params)+1} OFFSET ${len(params)+2}"
         params += [limit, offset]
         async with pool().acquire() as conn:
             rows = await conn.fetch(sql, *params)
@@ -767,6 +808,21 @@ async def admin_set_user_field(uid: int, field: str, value):
         await conn.execute(f"UPDATE users SET {field} = $1 WHERE id = $2", value, uid)
 
 
+async def admin_set_user_plan(uid: int, plan_key: str) -> bool:
+    async with pool().acquire() as conn:
+        plan = await conn.fetchrow(
+            "SELECT id, plan_key FROM subscriptions WHERE plan_key=$1 AND is_active",
+            plan_key,
+        )
+        if not plan:
+            return False
+        result = await conn.execute(
+            "UPDATE users SET subscription_id=$1, plan=$2 WHERE id=$3",
+            plan["id"], plan["plan_key"], uid,
+        )
+        return result != "UPDATE 0"
+
+
 async def admin_delete_user(uid: int):
     async with pool().acquire() as conn:
         await conn.execute("DELETE FROM users WHERE id = $1", uid)
@@ -781,11 +837,15 @@ async def get_platform_stats() -> dict:
               (SELECT COUNT(*) FROM chats)                              AS chat_count,
               (SELECT COUNT(*) FROM messages)                           AS message_count,
               (SELECT COUNT(*) FROM messages WHERE role = 'assistant')  AS reply_count,
+              (SELECT COALESCE(SUM(tokens_used), 0) FROM messages)       AS total_tokens,
               (SELECT COALESCE(SUM(cost_usd), 0)    FROM messages)      AS total_cost,
               (SELECT COUNT(*) FROM users WHERE created_at > now() - INTERVAL '24 hours') AS new_users_24h,
               (SELECT COUNT(*) FROM messages WHERE created_at > now() - INTERVAL '24 hours') AS messages_24h,
-              (SELECT pg_size_pretty(SUM(stored_size)) FROM files)      AS storage_size,
-              (SELECT COUNT(*) FROM files)                              AS file_count
+              (SELECT pg_size_pretty(COALESCE(SUM(stored_size), 0)) FROM files) AS storage_size,
+              (SELECT COUNT(*) FROM files)                              AS file_count,
+              (SELECT COUNT(*) FROM users u JOIN subscriptions s ON s.id = u.subscription_id WHERE s.plan_key='free') AS free_count,
+              (SELECT COUNT(*) FROM users u JOIN subscriptions s ON s.id = u.subscription_id WHERE s.plan_key='pro')  AS pro_count,
+              (SELECT COUNT(*) FROM users u JOIN subscriptions s ON s.id = u.subscription_id WHERE s.plan_key='max')  AS max_count
         """)
         return dict(row)
 

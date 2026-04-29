@@ -282,7 +282,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
         <!-- Trial badge on register -->
         <template x-if="authTab==='register'">
           <div class="auth-trial-badge mb-4">
-            🎁 При регистрации — <strong>10 000 бесплатных токенов</strong> для тестирования
+            🎁 При регистрации — тариф <strong>Free</strong> с дневным лимитом запросов
           </div>
         </template>
 
@@ -467,20 +467,20 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
             </template>
           </div>
 
-          <!-- Tokens + user -->
+          <!-- Usage + user -->
           <div style="border-top:1px solid var(--border);padding:12px">
             <div class="flex items-center justify-between mb-1.5">
               <div class="flex items-center gap-1.5">
-                <span class="text-[11px]" style="color:var(--text-3)">Токены</span>
-                <span class="text-[11px] cursor-default" style="color:var(--text-3)" title="Цена за ответ: Flash Lite 500 · Flash 2000 · Pro 8000">ⓘ</span>
-                <template x-if="user.is_trial"><span class="badge-trial">Пробный</span></template>
+                <span class="text-[11px]" style="color:var(--text-3)">Запросы сегодня</span>
+                <span class="text-[11px] cursor-default" style="color:var(--text-3)" title="Лимит зависит от текущего тарифа">ⓘ</span>
+                <span class="badge-trial" x-text="planLabel(user.plan_key)"></span>
               </div>
               <div class="flex items-center gap-1.5">
-                <span class="font-mono text-[12px]" style="color:var(--accent)" x-text="fmtTokens(user.tokens_remaining)"></span>
-                <button class="btn-buy" @click="showBuyModal=true">+ Купить</button>
+                <span class="font-mono text-[12px]" style="color:var(--accent)" x-text="`${dailyRemaining()}/${dailyLimit()}`"></span>
+                <button class="btn-buy" @click="showBuyModal=true">Тарифы</button>
               </div>
             </div>
-            <div class="token-bar mb-2"><div class="token-fill" :style="`width:${Math.min(100,(user.tokens_remaining/500000)*100)}%`"></div></div>
+            <div class="token-bar mb-2"><div class="token-fill" :style="`width:${usagePercent()}%`"></div></div>
             <div class="flex items-center gap-2">
               <div class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style="background:var(--surface-2);color:var(--accent);border:1px solid var(--border-2)" x-text="user.username?user.username[0].toUpperCase():'U'"></div>
               <div class="min-w-0 flex-1">
@@ -550,9 +550,10 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                 </div>
                 <h2 class="logo text-[30px] mb-2" style="color:var(--text-1)">Добро пожаловать, <span x-text="user.username"></span></h2>
                 <p class="text-[13px] mb-2" style="color:var(--text-2)">STEM Knowledge Architect — структурированные ответы с LaTeX</p>
-                <template x-if="user.is_trial">
-                  <p class="text-[12px] mb-5" style="color:var(--blue)">🎁 Пробный режим: <span class="font-mono" x-text="fmtTokens(user.tokens_remaining)"></span> токенов</p>
-                </template>
+                <p class="text-[12px] mb-5" style="color:var(--blue)">
+                  Тариф <span class="font-mono" x-text="planLabel(user.plan_key)"></span> ·
+                  <span class="font-mono" x-text="dailyRemaining()"></span> запросов осталось сегодня
+                </p>
                 <button class="btn-new" style="width:auto;margin:0 auto" @click="createChat">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   Начать чат
@@ -1001,7 +1002,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
             <!-- Model tab -->
             <template x-if="settingsTab==='model'">
               <div class="space-y-2">
-                <p class="text-[12px] mb-3" style="color:var(--text-2)">Выберите модель. Цена за один ответ — фиксированная, длина ответа на неё не влияет.</p>
+                <p class="text-[12px] mb-3" style="color:var(--text-2)">Выберите модель. Каждый ответ расходует один запрос из лимита тарифа.</p>
                 <template x-for="(info,key) in modelCatalog" :key="key">
                   <button class="model-card" :class="currentChat&&currentChat.model===key?'selected':''" @click="switchModel(key)">
                     <div class="flex-1 min-w-0">
@@ -1016,8 +1017,8 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                       </div>
                     </div>
                     <div class="text-right flex-shrink-0 ml-3">
-                      <p class="text-[13px] font-[500] font-mono" style="color:var(--accent)" x-text="fmtTokens(info.tokens_per_request)"></p>
-                      <p class="text-[10px]" style="color:var(--text-3)">за&nbsp;ответ</p>
+                      <p class="text-[13px] font-[500] font-mono" style="color:var(--accent)">1</p>
+                      <p class="text-[10px]" style="color:var(--text-3)">запрос</p>
                     </div>
                   </button>
                 </template>
@@ -1103,26 +1104,25 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
         <div class="overlay" @click.self="showBuyModal=false">
           <div class="modal">
             <div class="flex items-center justify-between mb-5">
-              <h3 class="logo text-[22px]" style="color:var(--text-1)">Пополнить токены</h3>
+              <h3 class="logo text-[22px]" style="color:var(--text-1)">Тарифы</h3>
               <button @click="showBuyModal=false" class="hover:opacity-70" style="color:var(--text-3)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div class="flex items-center justify-between mb-4 px-4 py-3 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
-              <span class="text-[13px]" style="color:var(--text-2)">Текущий баланс</span>
-              <span class="font-mono text-[14px]" style="color:var(--accent)" x-text="fmtTokens(user.tokens_remaining)+' токенов'"></span>
+              <span class="text-[13px]" style="color:var(--text-2)">Текущий тариф</span>
+              <span class="font-mono text-[14px]" style="color:var(--accent)" x-text="planLabel(user.plan_key)"></span>
             </div>
             <div class="space-y-2.5 mb-3">
               <template x-for="plan in plans" :key="plan.id">
-                <button class="plan-card" :class="selPlan===plan.id?'selected':''" @click="selPlan=plan.id">
+                <button class="plan-card" :class="(selPlan||user.plan_key)===plan.id?'selected':''" @click="selPlan=plan.id">
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-0.5">
                       <p class="text-[14px] font-[500]" style="color:var(--text-1)" x-text="plan.name"></p>
                       <template x-if="plan.badge"><span class="badge" x-text="plan.badge"></span></template>
                     </div>
                     <p class="text-[12px]" style="color:var(--text-3)">
-                      <span x-text="fmtTokens(plan.tokens)"></span> токенов ·
-                      <span x-text="Math.floor(plan.tokens/500)"></span> Lite /
-                      <span x-text="Math.floor(plan.tokens/2000)"></span> Flash /
-                      <span x-text="Math.floor(plan.tokens/8000)"></span> Pro
+                      <span x-text="plan.daily"></span> в день ·
+                      <span x-text="plan.weekly"></span> в неделю ·
+                      <span x-text="plan.monthly"></span> в месяц
                     </p>
                   </div>
                   <div class="flex flex-col items-end gap-1 ml-3 flex-shrink-0">
@@ -1132,13 +1132,13 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
               </template>
             </div>
             <p class="text-center text-[11px] mb-4" style="color:var(--text-3)">
-              Токены не сгорают.
-              <a href="/pricing" target="_blank" style="color:var(--accent)">Подробнее о ценах →</a>
+              Лимиты обновляются автоматически по дням, неделям и месяцам.
+              <a href="/pricing" target="_blank" style="color:var(--accent)">Подробнее →</a>
             </p>
             <button class="w-full py-3 rounded-xl text-[14px] font-[500]" style="background:var(--accent);color:#0c0b09" :disabled="!selPlan" :style="selPlan?'':'opacity:.4;cursor:not-allowed'" @click="pay">
-              Оплатить <span x-text="plans.find(p=>p.id===selPlan)?.price||''"></span>
+              Выбрать <span x-text="plans.find(p=>p.id===selPlan)?.name||''"></span>
             </button>
-            <p class="text-center text-[11px] mt-3" style="color:var(--text-3)">Безопасная оплата · Мгновенное зачисление</p>
+            <p class="text-center text-[11px] mt-3" style="color:var(--text-3)">Подключение оплаты будет заведено отдельным backend-интегратором</p>
           </div>
         </div>
       </template>
@@ -1169,7 +1169,7 @@ function app() {
     regName: '', regEmail: '', regPass: '', regAgree: false,
 
     // App state
-    user: { username:'', email:'', tokens_remaining:0, is_trial:true },
+    user: { username:'', email:'', plan_key:'free', subscription_name:'Free', usage:{daily_remaining:0,daily_limit:0,daily_used:0} },
     chats: [], messages: [], currentChatId: null,
     loading: false, inputText: '', pendingFiles: [], globalDrag: false,
 
@@ -1207,9 +1207,9 @@ function app() {
       accent: [{v:'#c8913a',n:'Золото'},{v:'#2563eb',n:'Синий'},{v:'#16a34a',n:'Зелёный'},{v:'#9333ea',n:'Пурпур'},{v:'#dc2626',n:'Красный'}],
     },
     plans: [
-      {id:1,name:'Старт',    tokens:100_000,  price:'₽199', badge:null},
-      {id:2,name:'Стандарт', tokens:500_000,  price:'₽799', badge:'Популярный'},
-      {id:3,name:'Профи',    tokens:2_000_000,price:'₽2 499',badge:'Выгодно'},
+      {id:'free', name:'Free', daily:25, weekly:100, monthly:300, price:'₽0', badge:null},
+      {id:'pro',  name:'Pro',  daily:200, weekly:1200, monthly:4000, price:'₽799/мес', badge:'Популярный'},
+      {id:'max',  name:'Max',  daily:700, weekly:4200, monthly:15000, price:'₽2 499/мес', badge:'Выгодно'},
     ],
 
     get currentChat() {
@@ -1592,6 +1592,21 @@ function app() {
     // ── Helpers ────────────────────────────────────────────────────────────
     scrollDown() { const el=document.getElementById('msg-scroll'); if(el) el.scrollTop=el.scrollHeight; },
     fmtTokens(n) { if(n==null)return'—'; if(n>=1_000_000)return(n/1_000_000).toFixed(1)+'M'; if(n>=1_000)return Math.round(n/1_000)+'K'; return String(n); },
+    planLabel(key) {
+      const p = this.plans.find(plan => plan.id === key);
+      return p ? p.name : (key || 'Free');
+    },
+    dailyRemaining() {
+      return this.user?.usage?.daily_remaining ?? 0;
+    },
+    dailyLimit() {
+      return this.user?.usage?.daily_limit ?? 0;
+    },
+    usagePercent() {
+      const limit = this.dailyLimit();
+      const used = this.user?.usage?.daily_used ?? 0;
+      return limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+    },
     relTime(str) {
       if(!str)return''; const d=new Date(str.endsWith('Z')?str:str+'Z'); const s=(Date.now()-d)/1000;
       if(s<60)return'только что'; if(s<3600)return Math.floor(s/60)+' мин'; if(s<86400)return Math.floor(s/3600)+' ч';
@@ -1770,7 +1785,7 @@ function app() {
     pay() {
       if(!this.selPlan)return;
       const p=this.plans.find(p=>p.id===this.selPlan);
-      alert(`Переход к оплате: ${p.price}\nТокены зачислятся автоматически.`);
+      alert(`Выбран тариф ${p.name}: ${p.price}\nПодключение оплаты нужно привязать к billing backend.`);
       this.showBuyModal=false; this.selPlan=null;
     },
   };

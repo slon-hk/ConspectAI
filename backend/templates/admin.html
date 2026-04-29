@@ -200,9 +200,9 @@ tr:last-child td{border-bottom:none}
                 <p class="kpi-value" style="font-size:24px" x-text="fmtNum(stats.chat_count||0)"></p>
               </div>
               <div class="kpi">
-                <p class="kpi-label">Пробные</p>
-                <p class="kpi-value" style="font-size:24px" x-text="stats.trial_count||0"></p>
-                <div class="bar mt-2"><div class="bar-fill" :style="`width:${Math.min(100,((stats.trial_count||0)/(stats.user_count||1))*100)}%`"></div></div>
+                <p class="kpi-label">Free / Pro / Max</p>
+                <p class="kpi-value" style="font-size:24px" x-text="`${stats.free_count||0}/${stats.pro_count||0}/${stats.max_count||0}`"></p>
+                <div class="bar mt-2"><div class="bar-fill" :style="`width:${Math.min(100,(((stats.pro_count||0)+(stats.max_count||0))/(stats.user_count||1))*100)}%`"></div></div>
               </div>
               <div class="kpi">
                 <p class="kpi-label">Заблокированы</p>
@@ -223,7 +223,7 @@ tr:last-child td{border-bottom:none}
                   <span class="text-[12px]" style="color:var(--text-2)">Управление</span>
                 </div>
                 <p class="text-[14px] font-[500]">Пользователи</p>
-                <p class="text-[11px] mt-0.5" style="color:var(--text-3)">блокировка, выдача токенов, права админа</p>
+                <p class="text-[11px] mt-0.5" style="color:var(--text-3)">блокировка, тарифы, права админа</p>
               </button>
               <button class="kpi text-left hover:border-opacity-50" style="border-color:var(--border-2);cursor:pointer" @click="tab='activity';loadActivity()">
                 <div class="flex items-center gap-2 mb-1">
@@ -445,7 +445,7 @@ tr:last-child td{border-bottom:none}
                 <thead>
                   <tr>
                     <th>Пользователь</th>
-                    <th class="text-right">Токены</th>
+                    <th class="text-right">План / сегодня</th>
                     <th class="text-right">Расход</th>
                     <th class="text-right">Чаты</th>
                     <th class="text-right">Сообщения</th>
@@ -472,7 +472,10 @@ tr:last-child td{border-bottom:none}
                           </div>
                         </div>
                       </td>
-                      <td class="text-right font-mono text-[12px]" style="color:var(--accent)" x-text="fmtNum(u.tokens_remaining)"></td>
+                      <td class="text-right">
+                        <p class="font-mono text-[12px]" style="color:var(--accent)" x-text="planLabel(u.plan_key)"></p>
+                        <p class="font-mono text-[10.5px]" style="color:var(--text-3)" x-text="`${u.daily_remaining||0}/${u.daily_limit||0}`"></p>
+                      </td>
                       <td class="text-right font-mono text-[12px]" x-text="'$'+(u.total_spent_usd||0).toFixed(4)"></td>
                       <td class="text-right font-mono text-[12px]" x-text="u.chat_count"></td>
                       <td class="text-right font-mono text-[12px]" x-text="u.message_count"></td>
@@ -480,8 +483,8 @@ tr:last-child td{border-bottom:none}
                         <div class="flex flex-wrap gap-1">
                           <template x-if="u.is_admin"><span class="b b-admin">★ admin</span></template>
                           <template x-if="u.is_blocked"><span class="b b-blocked">⛔ блок</span></template>
-                          <template x-if="u.is_trial && !u.is_blocked"><span class="b b-trial">trial</span></template>
-                          <template x-if="!u.is_admin && !u.is_blocked && !u.is_trial"><span class="b b-active">активен</span></template>
+                          <template x-if="!u.is_blocked"><span class="b b-trial" x-text="planLabel(u.plan_key)"></span></template>
+                          <template x-if="!u.is_admin && !u.is_blocked"><span class="b b-active">активен</span></template>
                         </div>
                       </td>
                       <td class="text-[11px]" style="color:var(--text-3)" x-text="formatDate(u.created_at)"></td>
@@ -701,27 +704,23 @@ tr:last-child td{border-bottom:none}
         <!-- Stats -->
         <div class="grid grid-cols-2 gap-2 mb-4">
           <div class="rounded-lg p-3" style="background:var(--surface-2);border:1px solid var(--border)">
-            <p class="text-[10.5px]" style="color:var(--text-3)">ТОКЕНЫ</p>
-            <p class="text-[16px] font-mono mt-0.5" style="color:var(--accent)" x-text="fmtNum(userModal.tokens_remaining)"></p>
+            <p class="text-[10.5px]" style="color:var(--text-3)">ПЛАН</p>
+            <p class="text-[16px] font-mono mt-0.5" style="color:var(--accent)" x-text="planLabel(userModal.plan_key)"></p>
           </div>
           <div class="rounded-lg p-3" style="background:var(--surface-2);border:1px solid var(--border)">
-            <p class="text-[10.5px]" style="color:var(--text-3)">РАСХОД</p>
-            <p class="text-[16px] font-mono mt-0.5" x-text="'$'+(userModal.total_spent_usd||0).toFixed(4)"></p>
+            <p class="text-[10.5px]" style="color:var(--text-3)">ОСТАЛОСЬ СЕГОДНЯ</p>
+            <p class="text-[16px] font-mono mt-0.5" x-text="`${userModal.daily_remaining||0}/${userModal.daily_limit||0}`"></p>
           </div>
         </div>
 
-        <!-- Grant tokens -->
+        <!-- Change plan -->
         <div class="mb-4">
-          <p class="text-[11px] mb-1.5 font-[500]" style="color:var(--text-3);letter-spacing:.05em;text-transform:uppercase">Выдать токены</p>
-          <div class="flex gap-2">
-            <input class="input flex-1" type="number" min="1" placeholder="100000" x-model="grantAmount">
-            <button class="btn btn-primary" @click="grantTokens(userModal.id)" :disabled="!grantAmount||+grantAmount<=0">
-              + Выдать
-            </button>
-          </div>
-          <div class="flex gap-1 mt-2">
-            <template x-for="amt in [10000,100000,500000,1000000]" :key="amt">
-              <button class="btn !text-[11px] !py-1" @click="grantAmount=amt" x-text="'+'+fmtNum(amt)"></button>
+          <p class="text-[11px] mb-1.5 font-[500]" style="color:var(--text-3);letter-spacing:.05em;text-transform:uppercase">Тариф</p>
+          <div class="grid grid-cols-3 gap-1.5">
+            <template x-for="plan in plans" :key="plan.key">
+              <button class="btn justify-center" :class="userModal.plan_key===plan.key?'btn-primary':''" @click="setUserPlan(userModal, plan.key)">
+                <span x-text="plan.name"></span>
+              </button>
             </template>
           </div>
         </div>
@@ -774,7 +773,11 @@ function adminApp() {
     usersLoading: false,
     usersSearch: '',
     userModal: null,
-    grantAmount: '',
+    plans: [
+      {key:'free', name:'Free'},
+      {key:'pro',  name:'Pro'},
+      {key:'max',  name:'Max'},
+    ],
 
     // Activity
     activity: [],
@@ -813,7 +816,7 @@ function adminApp() {
         {key:'export',      label:'Экспорт MD/PDF',    value: f.export || 0},
         {key:'templates',   label:'Смена шаблонов',    value: f.templates || 0},
         {key:'buy_modal',   label:'Открыли покупку',   value: f.buy_modal || 0},
-        {key:'tokens_out',  label:'Кончились токены', value: f.tokens_out || 0},
+        {key:'tokens_out',  label:'Достигли лимита', value: f.tokens_out || 0},
       ];
     },
 
@@ -878,23 +881,29 @@ function adminApp() {
 
     openUser(u) {
       this.userModal = { ...u };
-      this.grantAmount = '';
     },
 
-    async grantTokens(uid) {
-      const amount = parseInt(this.grantAmount, 10);
-      if (!amount || amount <= 0) return;
+    planLabel(key) {
+      const p = this.plans.find(plan => plan.key === key);
+      return p ? p.name : (key || 'Free');
+    },
+
+    async setUserPlan(u, planKey) {
+      if (!u || u.plan_key === planKey) return;
       try {
-        const r = await this.api(`/api/admin/users/${uid}/grant-tokens`, {
+        const r = await this.api(`/api/admin/users/${u.id}/plan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount }),
+          body: JSON.stringify({ plan_key: planKey }),
         });
         if (r.ok) {
-          this.userModal.tokens_remaining = (this.userModal.tokens_remaining || 0) + amount;
-          this.userModal.is_trial = false;
-          this.grantAmount = '';
+          this.userModal.plan_key = planKey;
+          this.userModal.subscription_name = this.planLabel(planKey);
           await this.loadUsers();
+          await this.loadStats();
+        } else {
+          const e = await r.json().catch(()=>({detail:'Ошибка'}));
+          alert(e.detail || 'Ошибка');
         }
       } catch(e) { console.error(e); }
     },

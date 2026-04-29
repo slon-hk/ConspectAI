@@ -283,7 +283,7 @@ async def register(body: RegisterIn):
     return {
         "access_token": token,
         "token_type":   "bearer",
-        "user": _safe_user(user),
+        "user": await _safe_user(user),
     }
 
 
@@ -303,16 +303,20 @@ async def login(body: LoginIn):
     return {
         "access_token": token,
         "token_type":   "bearer",
-        "user": _safe_user(user),
+        "user": await _safe_user(user),
     }
 
 
-def _safe_user(u: dict) -> dict:
+async def _safe_user(u: dict) -> dict:
+    usage = await db.get_user_usage_snapshot(u["id"])
     return {
         "id":               u["id"],
         "username":         u["username"],
         "email":            u["email"],
         "subscription_id":  u.get("subscription_id"),
+        "plan_key":         usage.get("plan_key", "free"),
+        "subscription_name": usage.get("subscription_name", "Free"),
+        "usage":            usage,
         "is_admin":         bool(u.get("is_admin", False)),
         "is_blocked":       bool(u.get("is_blocked", False)),
         "total_spent_usd":  float(u.get("total_spent_usd") or 0),
@@ -339,7 +343,7 @@ async def get_user(uid: int = Depends(current_user_id)):
     user = await db.get_user_by_id(uid)
     if not user:
         raise HTTPException(404, "User not found")
-    return _safe_user(user)
+    return await _safe_user(user)
 
 
 @app.get("/api/usage")
@@ -715,7 +719,7 @@ async def serve_file(sha256: str, uid: int = Depends(current_user_id)):
 # arbitrary clients from injecting fake events into the analytics table.
 CLIENT_EVENT_ALLOWLIST = {
     "landing_cta_click",      # which CTA on the landing page was clicked
-    "buy_modal_opened",       # user clicked the "Buy tokens" button
+    "buy_modal_opened",       # user opened the pricing/plan modal
     "export_md",              # user downloaded a chat as Markdown
     "export_pdf",             # user opened the PDF export view
     "settings_opened",        # user opened the settings modal

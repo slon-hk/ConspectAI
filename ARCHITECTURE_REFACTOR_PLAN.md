@@ -20,9 +20,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   infrastructure and keep existing callers working.
 - Schema initialization and most legacy SQL functions still live in `db.py`
   while repository extraction proceeds incrementally.
-- User, chat, and message SQL now lives in OLTP repositories under
-  `app.repositories.oltp`; `db.py` keeps compatibility wrappers for existing
-  imports and call sites.
+- User, chat, message, file metadata, and mindmap SQL now lives in OLTP
+  repositories under `app.repositories.oltp`; `db.py` keeps compatibility
+  wrappers for existing imports and call sites.
 
 ## `db.py` Function Map
 
@@ -86,8 +86,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 
 ## Next Stages
 
-- Stage 4: continue extracting OLTP repositories after users, chats, and
-  messages; next likely candidates are file metadata and mindmaps.
+- Stage 4: continue extracting OLTP repositories after users, chats, messages,
+  file metadata, and mindmaps; next likely candidates are admin OLTP actions
+  and usage/quota.
 - Stage 5: introduce auth, user, chat, and message services while preserving
   route behavior.
 - Stage 6: move quota reservation, commit, and refund behind `QuotaService` and

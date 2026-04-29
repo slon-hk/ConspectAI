@@ -9,12 +9,20 @@ import json
 from typing import Optional, Any
 
 from app.db.pool import database
-from app.repositories.oltp import ChatRepository, MessageRepository, UserRepository
+from app.repositories.oltp import (
+    ChatRepository,
+    FileRepository,
+    MessageRepository,
+    MindmapRepository,
+    UserRepository,
+)
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, SUBSCRIPTION_PLANS
 
 _users = UserRepository(database)
 _chats = ChatRepository(database)
 _messages = MessageRepository(database)
+_files = FileRepository(database)
+_mindmaps = MindmapRepository(database)
 
 
 async def create_pool():
@@ -645,53 +653,25 @@ async def save_message(
 # ── File registry ──────────────────────────────────────────────────────────────
 async def register_file(sha256: str, mime: str, compressed: bool, orig_size: int, stored_size: int) -> dict:
     """Upsert file record, increment ref_count on existing."""
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO files (sha256, mime_type, compressed, original_size, stored_size, ref_count)
-               VALUES ($1,$2,$3,$4,$5,1)
-               ON CONFLICT (sha256) DO UPDATE
-                 SET ref_count = files.ref_count + 1
-               RETURNING *""",
-            sha256, mime, compressed, orig_size, stored_size,
-        )
-        return dict(row)
+    return await _files.register(sha256, mime, compressed, orig_size, stored_size)
 
 
 async def release_file(sha256: str) -> int:
     """Decrement ref_count. Returns new count (0 = can delete from disk)."""
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "UPDATE files SET ref_count=ref_count-1 WHERE sha256=$1 RETURNING ref_count",
-            sha256,
-        )
-        return row["ref_count"] if row else 0
+    return await _files.release(sha256)
 
 
 async def get_file_meta(sha256: str) -> Optional[dict]:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM files WHERE sha256=$1", sha256)
-        return dict(row) if row else None
+    return await _files.get(sha256)
 
 
 # ── Mindmap queries ────────────────────────────────────────────────────────────
 async def get_mindmap(chat_id: str) -> Optional[dict]:
-    async with pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT markdown, updated_at FROM mindmaps WHERE chat_id=$1", chat_id
-        )
-        return dict(row) if row else None
+    return await _mindmaps.get(chat_id)
 
 
 async def save_mindmap(chat_id: str, markdown: str):
-    async with pool().acquire() as conn:
-        await conn.execute(
-            """INSERT INTO mindmaps (chat_id, markdown, updated_at)
-               VALUES ($1, $2, now())
-               ON CONFLICT (chat_id) DO UPDATE
-                 SET markdown = EXCLUDED.markdown,
-                     updated_at = now()""",
-            chat_id, markdown,
-        )
+    await _mindmaps.save(chat_id, markdown)
 
 
 # ── Admin queries ──────────────────────────────────────────────────────────────

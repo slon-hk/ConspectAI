@@ -12,9 +12,12 @@ import time
 from collections import defaultdict, deque
 from typing import Optional
 
+from app.events import BaseEvent, event_bus
+from app.events.handlers.analytics_handlers import ANALYTICS_EVENT_TYPE, AnalyticsEventHandler
 from app.repositories.olap import AnalyticsEventRepository
 
 _events = AnalyticsEventRepository()
+event_bus.subscribe(ANALYTICS_EVENT_TYPE, AnalyticsEventHandler(_events))
 
 
 # ── Event tracking ────────────────────────────────────────────────────────────
@@ -22,7 +25,14 @@ async def _record(event: str, user_id: Optional[int], props: dict):
     """Insert a single event. Errors are logged but never raised — analytics
     must never break user-facing flows."""
     try:
-        await _events.append_event(event, user_id, props)
+        await event_bus.publish(
+            BaseEvent(
+                event_type=ANALYTICS_EVENT_TYPE,
+                aggregate_id=event,
+                user_id=user_id,
+                payload={"event": event, "props": props or {}},
+            )
+        )
     except Exception as e:
         print(f"[analytics] failed to record {event}: {e}")
 

@@ -89,6 +89,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `QuotaService` and `UsageService` preserve the current `db.py` wrapper API.
 - RAG, funnel, request, user activity, and system metric writes now live behind
   OLAP repositories while existing `db.py` metric functions remain compatible.
+- An in-process event bus now provides the first `publish`/`subscribe` boundary;
+  `analytics.track()` publishes an analytics event handled by an OLAP handler.
 
 ## Next Stages
 

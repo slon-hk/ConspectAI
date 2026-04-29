@@ -1,14 +1,17 @@
-"""Subscription plan configuration."""
+"""Subscription plan loader and derived billing budgets."""
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
 from typing import Any
 
 
 DEFAULT_PLAN_KEY = "free"
+CONFIG_PATH = Path(__file__).with_name("subscription_plans.json")
+PERCENT_BASE = Decimal("100")
 PRICE_RUB_PER_MILLION_INTERNAL_TOKENS = Decimal("100")
-BILLING_TOKEN_BUDGET_SHARE = Decimal("0.2")
 INTERNAL_TOKENS_IN_MILLION = Decimal("1000000")
 DEFAULT_INTERNAL_TOKENS_PER_REQUEST = 1_000
 REFERENCE_MODEL_KEY = "gemini-2.5-flash-lite"
@@ -19,19 +22,28 @@ def _round_int(value: Decimal) -> int:
     return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
-def _monthly_tokens_for_price(price_rub: int) -> int:
+def _load_config() -> dict[str, Any]:
+    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+def _billing_budget_share(config: dict[str, Any]) -> Decimal:
+    margin_percent = Decimal(str(config["margin_percent"]))
+    return (PERCENT_BASE - margin_percent) / PERCENT_BASE
+
+
+def _monthly_tokens_for_price(price_rub: int, budget_share: Decimal) -> int:
     if price_rub <= 0:
         return 0
     return _round_int(
         Decimal(price_rub)
-        * BILLING_TOKEN_BUDGET_SHARE
+        * budget_share
         / PRICE_RUB_PER_MILLION_INTERNAL_TOKENS
         * INTERNAL_TOKENS_IN_MILLION
     )
 
 
-def _with_calculated_limits(plan: dict[str, Any]) -> dict[str, Any]:
-    monthly_limit = _monthly_tokens_for_price(int(plan["price_rub"]))
+def _with_calculated_limits(plan: dict[str, Any], budget_share: Decimal) -> dict[str, Any]:
+    monthly_limit = _monthly_tokens_for_price(int(plan["price_rub"]), budget_share)
     return {
         **plan,
         "daily_limit": _round_int(Decimal(monthly_limit) / Decimal("31")),
@@ -45,41 +57,11 @@ def _with_calculated_limits(plan: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_PLAN_DEFS: tuple[dict[str, Any], ...] = (
-    {
-        "plan_key": "free",
-        "display_name": "Free",
-        "price_rub": 0,
-        "sort_order": 0,
-    },
-    {
-        "plan_key": "starter",
-        "display_name": "Starter",
-        "price_rub": 300,
-        "sort_order": 1,
-    },
-    {
-        "plan_key": "plus",
-        "display_name": "Plus",
-        "price_rub": 500,
-        "sort_order": 2,
-    },
-    {
-        "plan_key": "pro",
-        "display_name": "Pro",
-        "price_rub": 1500,
-        "sort_order": 3,
-    },
-    {
-        "plan_key": "max",
-        "display_name": "Max",
-        "price_rub": 2500,
-        "sort_order": 4,
-    },
-)
+_CONFIG = _load_config()
+_BUDGET_SHARE = _billing_budget_share(_CONFIG)
 
 SUBSCRIPTION_PLANS: tuple[dict[str, Any], ...] = tuple(
-    _with_calculated_limits(plan) for plan in _PLAN_DEFS
+    _with_calculated_limits(plan, _BUDGET_SHARE) for plan in _CONFIG["plans"]
 )
 PLAN_KEYS = frozenset(plan["plan_key"] for plan in SUBSCRIPTION_PLANS)
 
@@ -97,7 +79,3 @@ def public_plans() -> list[dict[str, Any]]:
         }
         for plan in SUBSCRIPTION_PLANS
     ]
-
-
-def plan_by_key(plan_key: str) -> dict[str, Any] | None:
-    return next((plan for plan in SUBSCRIPTION_PLANS if plan["plan_key"] == plan_key), None)

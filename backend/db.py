@@ -9,7 +9,7 @@ import asyncpg
 import json
 from typing import Optional, Any
 
-from subscription_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, SUBSCRIPTION_PLANS
+from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, SUBSCRIPTION_PLANS
 
 _pool: Optional[asyncpg.Pool] = None
 

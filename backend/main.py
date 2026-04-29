@@ -24,7 +24,7 @@ import analytics
 import rag_routes
 from billing import calculate_cost_units
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
-from subscription_plans import public_plans
+from billing_plans import public_plans
 
 load_dotenv()
 

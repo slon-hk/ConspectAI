@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import db
 import auth
-from subscription_plans import PLAN_KEYS
+from billing_plans import PLAN_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 

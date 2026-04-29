@@ -1,0 +1,35 @@
+{
+  "margin_percent": 80,
+  "plans": [
+    {
+      "plan_key": "free",
+      "display_name": "Free",
+      "price_rub": 0,
+      "sort_order": 0
+    },
+    {
+      "plan_key": "starter",
+      "display_name": "Starter",
+      "price_rub": 300,
+      "sort_order": 1
+    },
+    {
+      "plan_key": "plus",
+      "display_name": "Plus",
+      "price_rub": 500,
+      "sort_order": 2
+    },
+    {
+      "plan_key": "pro",
+      "display_name": "Pro",
+      "price_rub": 1500,
+      "sort_order": 3
+    },
+    {
+      "plan_key": "max",
+      "display_name": "Max",
+      "price_rub": 2500,
+      "sort_order": 4
+    }
+  ]
+}

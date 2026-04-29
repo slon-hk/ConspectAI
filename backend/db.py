@@ -1,53 +1,28 @@
-"""
-Async PostgreSQL layer using asyncpg directly (no ORM overhead).
-Connection pool is created once at startup and shared across requests.
+"""Legacy compatibility data access layer.
+
+The pool lifecycle has moved to app.db. SQL functions remain here during the
+incremental repository extraction so existing imports keep working.
 """
 
-import os
-import asyncio
 import asyncpg
 import json
 from typing import Optional, Any
 
+from app.db.pool import database
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, SUBSCRIPTION_PLANS
-
-_pool: Optional[asyncpg.Pool] = None
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://orion:orion@localhost:5432/orion"
-)
 
 
 async def create_pool():
-    global _pool
-    last_err = None
-    # Retry briefly in case Postgres is still warming up after healthcheck
-    for attempt in range(20):
-        try:
-            _pool = await asyncpg.create_pool(
-                DATABASE_URL,
-                min_size=2,
-                max_size=20,
-                command_timeout=30,
-            )
-            break
-        except (OSError, asyncpg.PostgresError) as e:
-            last_err = e
-            await asyncio.sleep(1.5)
-    else:
-        raise RuntimeError(f"Could not connect to Postgres after 20 tries: {last_err}")
+    await database.create_pool()
     await init_schema()
 
 
 async def close_pool():
-    if _pool:
-        await _pool.close()
+    await database.close_pool()
 
 
 def pool() -> asyncpg.Pool:
-    assert _pool is not None, "DB pool not initialized"
-    return _pool
+    return database.pool()
 
 
 # ── Schema ─────────────────────────────────────────────────────────────────────

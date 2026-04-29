@@ -37,9 +37,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `get_user_usage_snapshot`, `finalize_request_usage`,
   `fail_and_refund_request`.
 - Admin OLTP actions: `list_users`, `count_users`, `admin_set_user_field`,
-  `admin_set_user_plan`, `admin_delete_user`, `get_platform_stats`,
-  `get_recent_activity`, `get_model_usage`.
-- OLAP/reporting writes and reads: `get_admin_metrics`, `insert_rag_metric`,
+  `admin_set_user_plan`, `admin_delete_user`.
+- OLAP/reporting writes and reads: `get_platform_stats`, `get_recent_activity`,
+  `get_model_usage`, `get_admin_metrics`, `insert_rag_metric`,
   `insert_funnel_event`, `log_request_metrics`, `admin_metrics_overview`,
   `admin_metrics_rag`, `admin_metrics_usage`, `admin_metrics_marketing`.
 
@@ -83,6 +83,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   transactions, external clients, and events, but must not contain raw SQL.
 - Event-driven analytics should be introduced before removing current analytics
   writes from hot request paths.
+- Admin reporting SQL now lives behind `app.repositories.olap.AdminReportRepository`,
+  even though it still runs on the same Postgres database for now.
 
 ## Next Stages
 

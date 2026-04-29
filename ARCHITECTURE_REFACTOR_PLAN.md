@@ -43,10 +43,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `insert_funnel_event`, `log_request_metrics`, `admin_metrics_overview`,
   `admin_metrics_rag`, `admin_metrics_usage`, `admin_metrics_marketing`.
 
-## Raw SQL Outside `db.py`
+## Raw SQL Outside Repository Packages
 
-- `analytics.py`: writes to `events`, reads analytics reports, deletes old
-  events.
 - `rag.py`: query cache, document ingestion, retrieval, image resolution,
   course/document helpers, answer cache cleanup.
 - `rag_routes.py`: course CRUD, document validation/creation/deletion, image
@@ -85,6 +83,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   writes from hot request paths.
 - Admin reporting SQL now lives behind `app.repositories.olap.AdminReportRepository`,
   even though it still runs on the same Postgres database for now.
+- Analytics event SQL now lives behind `app.repositories.olap.AnalyticsEventRepository`;
+  `analytics.py` remains the compatibility API for current callers.
 
 ## Next Stages
 

@@ -9,6 +9,15 @@ class AdminMetricsService:
     def __init__(self, admin_report_repository: AdminReportRepository) -> None:
         self._admin_report_repository = admin_report_repository
 
+    async def platform_stats(self) -> dict:
+        return await self._admin_report_repository.platform_stats()
+
+    async def recent_activity(self, limit: int = 50) -> list[dict]:
+        return await self._admin_report_repository.recent_activity(limit)
+
+    async def model_usage(self) -> list[dict]:
+        return await self._admin_report_repository.model_usage()
+
     async def admin_metrics(self) -> dict:
         return await self._admin_report_repository.admin_metrics()
 

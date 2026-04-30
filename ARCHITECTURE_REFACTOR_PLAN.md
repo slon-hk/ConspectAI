@@ -142,8 +142,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   user-facing request path. The handlers still persist through OLAP repositories
   on the same Postgres database until durable outbox/batch workers are added.
 - `app.services.AdminMetricsService` now owns admin metrics endpoint orchestration
-  over `AdminReportRepository`, removing live admin metric endpoints in `main.py`
-  and `admin.py` from the legacy `db.py` wrapper path.
+  over `AdminReportRepository`, removing live admin metric, platform stats,
+  recent activity, and model usage endpoints in `main.py` and `admin.py` from
+  the legacy `db.py` wrapper path.
 - `app.services.AdminUserService` now owns admin user-management orchestration
   for listing users, changing plans/admin/block flags, and deleting users.
   `/api/admin/users*` routes call this service over `AdminUserRepository` instead

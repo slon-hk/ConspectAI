@@ -48,7 +48,7 @@ class SetFieldIn(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 @router.get("/stats")
 async def admin_stats(_=Depends(require_admin)):
-    stats = await db.get_platform_stats()
+    stats = await admin_metrics_service.platform_stats()
     # Convert Decimal/datetime to JSON-safe values
     return _serialize(stats)
 
@@ -99,13 +99,13 @@ async def admin_delete_user(uid: int, admin: dict = Depends(require_admin)):
 
 @router.get("/activity")
 async def admin_activity(limit: int = 50, _=Depends(require_admin)):
-    rows = await db.get_recent_activity(min(limit, 200))
+    rows = await admin_metrics_service.recent_activity(min(limit, 200))
     return [_serialize(r) for r in rows]
 
 
 @router.get("/models")
 async def admin_model_usage(_=Depends(require_admin)):
-    rows = await db.get_model_usage()
+    rows = await admin_metrics_service.model_usage()
     return [_serialize(r) for r in rows]
 
 

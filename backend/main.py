@@ -1,5 +1,4 @@
 import os
-import asyncio
 from contextlib import asynccontextmanager
 import re
 import uuid
@@ -19,6 +18,7 @@ import admin
 import analytics
 import rag_routes
 from app.db.pool import database
+from app.workers import start_analytics_cleanup_task
 from app.repositories.olap import (
     AdminReportRepository,
     FunnelMetricRepository,
@@ -76,7 +76,7 @@ if GEMINI_API_KEY:
 async def lifespan(app: FastAPI):
     await db.create_pool()
     # Periodic cleanup of old analytics events (older than 90 days)
-    cleanup_task = asyncio.create_task(analytics.cleanup_loop())
+    cleanup_task = start_analytics_cleanup_task()
     yield
     cleanup_task.cancel()
     await db.close_pool()

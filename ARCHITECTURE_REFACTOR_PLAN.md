@@ -143,7 +143,7 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   on the same Postgres database until durable outbox/batch workers are added.
 - `app.services.AdminMetricsService` now owns admin metrics endpoint orchestration
   over `AdminReportRepository`, removing live admin metric endpoints in `main.py`
-  from the legacy `db.py` wrapper path.
+  and `admin.py` from the legacy `db.py` wrapper path.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

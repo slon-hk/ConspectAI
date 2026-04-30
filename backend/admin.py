@@ -12,9 +12,13 @@ from pydantic import BaseModel
 
 import db
 import auth
+from app.db.pool import database
+from app.repositories.olap import AdminReportRepository
+from app.services import AdminMetricsService
 from billing_plans import PLAN_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
 
 
 # ── Dependency ────────────────────────────────────────────────────────────────
@@ -110,24 +114,24 @@ async def admin_model_usage(_=Depends(require_admin)):
 
 @router.get("/metrics")
 async def admin_metrics(_=Depends(require_admin)):
-    return _serialize(await db.get_admin_metrics())
+    return _serialize(await admin_metrics_service.admin_metrics())
 
 
 @router.get("/metrics/overview")
 async def admin_metrics_overview(_=Depends(require_admin)):
-    return _serialize(await db.admin_metrics_overview())
+    return _serialize(await admin_metrics_service.overview())
 
 
 @router.get("/metrics/rag")
 async def admin_metrics_rag(_=Depends(require_admin)):
-    out = await db.admin_metrics_rag()
+    out = await admin_metrics_service.rag()
     out["slowest_queries"] = [_serialize(r) for r in out["slowest_queries"]]
     return _serialize(out)
 
 
 @router.get("/metrics/usage")
 async def admin_metrics_usage(_=Depends(require_admin)):
-    out = await db.admin_metrics_usage()
+    out = await admin_metrics_service.usage()
     out["requests_per_day"] = [_serialize(r) for r in out["requests_per_day"]]
     out["top_users"] = [_serialize(r) for r in out["top_users"]]
     out["top_models"] = [_serialize(r) for r in out["top_models"]]
@@ -136,7 +140,7 @@ async def admin_metrics_usage(_=Depends(require_admin)):
 
 @router.get("/metrics/marketing")
 async def admin_metrics_marketing(_=Depends(require_admin)):
-    out = await db.admin_metrics_marketing()
+    out = await admin_metrics_service.marketing()
     out["traffic_sources"] = [_serialize(r) for r in out["traffic_sources"]]
     out["campaign_performance"] = [_serialize(r) for r in out["campaign_performance"]]
     return _serialize(out)

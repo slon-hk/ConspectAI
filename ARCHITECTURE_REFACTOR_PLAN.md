@@ -208,6 +208,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   inclusion.
 - `app.api.router` now owns API/page router registration. `main.py` passes the
   container and legacy router dependencies into a single registration function.
+- `app.main` now owns FastAPI app assembly. The top-level `main.py` remains a
+  compatibility wrapper for the existing `uvicorn main:app` Docker entrypoint.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

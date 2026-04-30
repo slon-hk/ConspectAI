@@ -235,7 +235,7 @@ async def current_user_id(token: str = Depends(auth.oauth2)) -> int:
     uid = auth.decode_token(token)
     if not uid:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user = await db.get_user_by_id(uid)
+    user = await user_service.get_by_id(uid)
     if not user:
         # Token's signature is valid but the user no longer exists.
         raise HTTPException(status_code=401, detail="User no longer exists — please log in again")

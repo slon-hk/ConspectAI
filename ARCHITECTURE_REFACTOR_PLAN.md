@@ -121,6 +121,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   task scheduling for the mindmap feature.
 - `app.services.UserService` now owns the safe user profile payload and usage
   snapshot composition used by auth responses and `/api/user`.
+- `current_user_id` in `main.py` now verifies user existence/block status through
+  `UserService`; JWT extraction/HTTP error mapping remains in the dependency.
 - `app.services.AuthService` now owns register/login validation, uniqueness
   checks, password hashing/verification, token creation, and auth response
   payload composition. `main.py` keeps HTTP status mapping and signup/login

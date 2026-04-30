@@ -384,13 +384,13 @@ async def get_user(uid: int = Depends(current_user_id)):
 
 @app.get("/api/usage")
 async def get_usage(uid: int = Depends(current_user_id)):
-    remaining = await db.get_user_usage_snapshot(uid)
+    remaining = await usage_service.get_usage_snapshot(uid)
     return remaining
 
 
 @app.get("/usage")
 async def get_usage_public(uid: int = Depends(current_user_id)):
-    return await db.get_user_usage_snapshot(uid)
+    return await usage_service.get_usage_snapshot(uid)
 
 
 @app.get("/admin/metrics")

@@ -29,6 +29,16 @@ from app.repositories.oltp import (
     UserRepository,
 )
 from app.services import ChatService, MindmapService, UsageService, UserService
+from app.services.auth_service import (
+    AgreementRequiredError,
+    AuthAccountBlockedError,
+    AuthService,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    PasswordTooShortError,
+    UsernameAlreadyExistsError,
+    UsernameTooShortError,
+)
 from app.services.ai_chat_service import (
     AccountBlockedError,
     AiChatService,
@@ -38,7 +48,7 @@ from app.services.ai_chat_service import (
 )
 from app.services.billing_service import BillingService
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
-from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, public_plans
+from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, public_plans
 
 load_dotenv()
 
@@ -68,7 +78,9 @@ usage_repository = UsageRepository(database)
 chat_service = ChatService(chat_repository, message_repository)
 mindmap_service = MindmapService(chat_repository, message_repository, MindmapRepository(database))
 usage_service = UsageService(usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUEST)
-user_service = UserService(UserRepository(database), usage_service)
+user_repository = UserRepository(database)
+user_service = UserService(user_repository, usage_service)
+auth_service = AuthService(user_repository, user_service, DEFAULT_PLAN_KEY)
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
@@ -301,25 +313,19 @@ async def pricing_page(request: Request):
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 @app.post("/api/auth/register")
 async def register(body: RegisterIn):
-    username = body.username.strip()
-    email    = body.email.strip().lower()
-    password = body.password
+    try:
+        result = await auth_service.register(
+            username=body.username,
+            email=body.email,
+            password=body.password,
+            agreement=body.agreement,
+        )
+    except (UsernameTooShortError, PasswordTooShortError, AgreementRequiredError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except (EmailAlreadyExistsError, UsernameAlreadyExistsError) as exc:
+        raise HTTPException(409, str(exc)) from exc
 
-    if len(username) < 2:
-        raise HTTPException(400, "Имя пользователя слишком короткое (мин. 2 символа)")
-    if len(password) < 6:
-        raise HTTPException(400, "Пароль слишком короткий (мин. 6 символов)")
-    if not body.agreement:
-        raise HTTPException(400, "Для регистрации необходимо принять условия оферты и политики конфиденциальности")
-
-    if await db.get_user_by_email(email):
-        raise HTTPException(409, "Пользователь с таким email уже существует")
-    if await db.get_user_by_username(username):
-        raise HTTPException(409, "Это имя пользователя уже занято")
-
-    pw_hash = auth.hash_password(password)
-    user    = await db.create_user(username, email, pw_hash)
-    token   = auth.create_access_token(user["id"])
+    user = result.pop("raw_user")
 
     # Record consent as an analytics event. The events table is append-only,
     # so this gives a defensible audit trail (timestamp + user id) of when the
@@ -328,31 +334,21 @@ async def register(body: RegisterIn):
     await db.insert_funnel_event(user_id=user["id"], event_name="signup", metadata={"channel": "auth_register"})
     analytics.track("agreement_accepted", user["id"], offer_version="2026-04-26", privacy_version="2026-04-26")
 
-    return {
-        "access_token": token,
-        "token_type":   "bearer",
-        "user": await _safe_user(user),
-    }
+    return result
 
 
 @app.post("/api/auth/login")
 async def login(body: LoginIn):
-    email = body.email.strip().lower()
-    user  = await db.get_user_by_email(email)
+    try:
+        result = await auth_service.login(email=body.email, password=body.password)
+    except InvalidCredentialsError as exc:
+        raise HTTPException(401, str(exc)) from exc
+    except AuthAccountBlockedError as exc:
+        raise HTTPException(403, str(exc)) from exc
 
-    if not user or not auth.verify_password(body.password, user["password_hash"]):
-        raise HTTPException(401, "Неверный email или пароль")
-
-    if user.get("is_blocked"):
-        raise HTTPException(403, "Аккаунт заблокирован администратором")
-
-    token = auth.create_access_token(user["id"])
+    user = result.pop("raw_user")
     analytics.track("login", user["id"])
-    return {
-        "access_token": token,
-        "token_type":   "bearer",
-        "user": await _safe_user(user),
-    }
+    return result
 
 
 async def _safe_user(u: dict) -> dict:

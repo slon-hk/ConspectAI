@@ -121,6 +121,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   task scheduling for the mindmap feature.
 - `app.services.UserService` now owns the safe user profile payload and usage
   snapshot composition used by auth responses and `/api/user`.
+- `app.services.AuthService` now owns register/login validation, uniqueness
+  checks, password hashing/verification, token creation, and auth response
+  payload composition. `main.py` keeps HTTP status mapping and signup/login
+  analytics side effects.
 - Usage endpoints in `main.py` now read snapshots through `UsageService`
   instead of the legacy `db.py` wrapper.
 - `app.services.ai_chat_service.AiChatService` now owns the core chat turn

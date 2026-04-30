@@ -8,12 +8,11 @@ Analytics layer:
 """
 
 import asyncio
-import time
-from collections import defaultdict, deque
 from typing import Optional
 
 from app.events import BaseEvent, event_bus
 from app.events.handlers.analytics_handlers import ANALYTICS_EVENT_TYPE, AnalyticsEventHandler
+from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
 
 _events = AnalyticsEventRepository()
@@ -48,84 +47,7 @@ def track(event: str, user_id: Optional[int] = None, **props):
         pass
 
 
-# ── In-memory system metrics ─────────────────────────────────────────────────
-class SysMetrics:
-    """
-    Lightweight per-process metrics for the dashboard.
-    Reset on every restart (that's fine — they're for live monitoring).
-    """
-    def __init__(self):
-        self.started_at = time.time()
-        # HTTP: counters per (route, status_class)
-        self.http_calls   = defaultdict(int)        # key: (path, status_class)
-        self.http_errors  = 0
-        # Latency samples for percentiles: rolling window of last N
-        self.http_latencies = deque(maxlen=2000)    # ms floats
-        # Gemini API
-        self.gemini_calls       = defaultdict(int)  # by model
-        self.gemini_errors      = defaultdict(int)
-        self.gemini_latencies   = deque(maxlen=500)
-        # Background tasks
-        self.bg_mindmap_runs    = 0
-        self.bg_mindmap_failed  = 0
-
-    def record_http(self, path: str, status: int, latency_ms: float):
-        # Group dynamic paths so we don't explode the counter dict
-        key_path = self._normalise_path(path)
-        cls = f"{status // 100}xx"
-        self.http_calls[(key_path, cls)] += 1
-        if status >= 500:
-            self.http_errors += 1
-        self.http_latencies.append(latency_ms)
-
-    def record_gemini(self, model: str, latency_ms: float, ok: bool):
-        if ok:
-            self.gemini_calls[model] += 1
-            self.gemini_latencies.append(latency_ms)
-        else:
-            self.gemini_errors[model] += 1
-
-    @staticmethod
-    def _normalise_path(p: str) -> str:
-        """Replace UUIDs and ints in URL paths so /api/chats/<uuid>/messages
-        gets grouped instead of producing a unique counter per chat."""
-        import re
-        p = re.sub(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "/{uuid}", p, flags=re.I)
-        p = re.sub(r"/\d+(?=/|$)", "/{id}", p)
-        return p
-
-    def snapshot(self) -> dict:
-        """Build a JSON-serialisable summary of current metrics."""
-        lat = sorted(self.http_latencies) if self.http_latencies else [0]
-        gem_lat = sorted(self.gemini_latencies) if self.gemini_latencies else [0]
-        def pct(arr, p):
-            if not arr: return 0
-            return round(arr[min(len(arr) - 1, int(len(arr) * p))], 1)
-
-        # Top 12 routes by request count
-        top_routes = sorted(
-            ((path, cls, count) for (path, cls), count in self.http_calls.items()),
-            key=lambda x: -x[2],
-        )[:12]
-
-        return {
-            "uptime_seconds":     int(time.time() - self.started_at),
-            "http_total":         sum(self.http_calls.values()),
-            "http_errors":        self.http_errors,
-            "http_p50_ms":        pct(lat, 0.50),
-            "http_p95_ms":        pct(lat, 0.95),
-            "http_p99_ms":        pct(lat, 0.99),
-            "top_routes":         [{"path": p, "status": s, "count": c} for p, s, c in top_routes],
-            "gemini_calls":       dict(self.gemini_calls),
-            "gemini_errors":      dict(self.gemini_errors),
-            "gemini_p50_ms":      pct(gem_lat, 0.50),
-            "gemini_p95_ms":      pct(gem_lat, 0.95),
-            "bg_mindmap_runs":    self.bg_mindmap_runs,
-            "bg_mindmap_failed":  self.bg_mindmap_failed,
-        }
-
-
-metrics = SysMetrics()
+metrics = system_metrics
 
 
 # ── Aggregation queries (read-side) ───────────────────────────────────────────

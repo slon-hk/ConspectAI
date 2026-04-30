@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import analytics
+from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
 
 
@@ -29,4 +30,4 @@ class AdminAnalyticsService:
         return await self._analytics_repository.feature_adoption(days)
 
     def system_metrics(self) -> dict:
-        return analytics.metrics.snapshot()
+        return system_metrics.snapshot()

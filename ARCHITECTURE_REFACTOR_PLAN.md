@@ -160,6 +160,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   in-memory metric updates for `main.py` and `AiChatService`, keeping
   API/middleware/chat orchestration code off the legacy top-level `analytics.py`
   module.
+- `app.infrastructure.observability.system_metrics` now owns live per-process
+  counters. The legacy `analytics.metrics` object remains as a compatibility
+  alias to the same singleton.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

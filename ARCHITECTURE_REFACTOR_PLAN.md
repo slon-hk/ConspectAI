@@ -220,6 +220,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   app container and shared dependencies into a single registration function.
 - `app.api.router` now constructs admin and RAG routers from factories using
   container services, keeping `app.main` focused on process assembly.
+- Legacy `rag.py` no longer initializes a `tiktoken` encoding at import time,
+  keeping app import/startup from performing a network-backed cache download.
 - `app.main` now owns FastAPI app assembly. The top-level `main.py` remains a
   compatibility wrapper for the existing `uvicorn main:app` Docker entrypoint.
 - `app.main.create_app()` now exposes explicit app construction for import

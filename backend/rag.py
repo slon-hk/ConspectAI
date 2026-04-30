@@ -32,7 +32,6 @@ from typing import Any
 
 import asyncpg
 import google.generativeai as genai
-import tiktoken
 
 import storage
 from app.repositories.oltp import (
@@ -177,8 +176,6 @@ ALTER TABLE chats ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES courses(id)
 def _rough_token_count(text: str) -> int:
     """Fast approximation: 1 token ≈ 4 chars for mixed RU/EN text."""
     return max(1, len(text) // 4)
-
-_tokenizer = tiktoken.get_encoding("cl100k_base")
 
 def split_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
     """

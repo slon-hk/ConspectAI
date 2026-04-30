@@ -36,8 +36,9 @@ import tiktoken
 
 import db
 import storage
-from app.repositories.oltp import RagRouteRepository
+from app.repositories.oltp import RagCacheRepository, RagRouteRepository
 
+_rag_cache_repository = RagCacheRepository()
 _rag_routes_repository = RagRouteRepository()
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -252,12 +253,9 @@ async def embed_query(query: str) -> list[float]:
     """Embed a single query string with caching in rag_query_cache."""
     q_hash = _sha256(query)
 
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT embedding FROM rag_query_cache WHERE query_hash = $1", q_hash
-        )
-        if row:
-            return list(row["embedding"])
+    cached_embedding = await _rag_cache_repository.get_query_embedding(query_hash=q_hash)
+    if cached_embedding:
+        return cached_embedding
 
     # Not cached → embed
     loop = asyncio.get_event_loop()
@@ -280,12 +278,10 @@ async def embed_query(query: str) -> list[float]:
 
 async def _store_query_cache(q_hash: str, embedding: list[float]) -> None:
     try:
-        async with db.pool().acquire() as conn:
-            await conn.execute(
-                """INSERT INTO rag_query_cache (query_hash, embedding)
-                VALUES ($1, $2::vector)""",
-                q_hash, to_pgvector(embedding),
-            )
+        await _rag_cache_repository.store_query_embedding(
+            query_hash=q_hash,
+            embedding_pgvector=to_pgvector(embedding),
+        )
     except Exception as e:
         print(f"[rag] query cache write failed: {e}")
 
@@ -763,35 +759,22 @@ def _answer_cache_key(query: str, chunks: list[dict]) -> str:
 
 
 async def _get_answer_cache(key: str) -> dict | None:
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT answer, image_ids FROM rag_answer_cache WHERE cache_key = $1",
-            key,
-        )
-        if row:
-            # Update usage stats (fire and forget)
-            asyncio.create_task(conn.execute(
-                """UPDATE rag_answer_cache
-                   SET hit_count = hit_count + 1, last_used = now()
-                   WHERE cache_key = $1""",
-                key,
-            ))
-            return {"answer": row["answer"], "image_ids": json.loads(row["image_ids"])}
+    row = await _rag_cache_repository.get_answer_cache(cache_key=key)
+    if row:
+        # Update usage stats (fire and forget)
+        asyncio.create_task(_rag_cache_repository.touch_answer_cache(cache_key=key))
+        return {"answer": row["answer"], "image_ids": json.loads(row["image_ids"])}
     return None
 
 
 async def _set_answer_cache(key: str, answer: str, images: list[dict]) -> None:
     image_ids = [img["id"] for img in images]
     try:
-        async with db.pool().acquire() as conn:
-            await conn.execute(
-                """INSERT INTO rag_answer_cache (cache_key, answer, image_ids)
-                   VALUES ($1, $2, $3)
-                   ON CONFLICT (cache_key) DO UPDATE
-                       SET hit_count = rag_answer_cache.hit_count + 1,
-                           last_used = now()""",
-                key, answer, json.dumps(image_ids),
-            )
+        await _rag_cache_repository.set_answer_cache(
+            cache_key=key,
+            answer=answer,
+            image_ids_json=json.dumps(image_ids),
+        )
     except Exception as e:
         print(f"[rag] answer cache write failed: {e}")
 
@@ -916,16 +899,7 @@ async def rag_query(
 async def _resolve_images(image_ids: list[str]) -> list[dict]:
     if not image_ids:
         return []
-    async with db.pool().acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT id, file_path, caption, mime_type FROM rag_images WHERE id = ANY($1::uuid[])",
-            image_ids,
-        )
-    return [
-        {"id": str(r["id"]), "file_path": r["file_path"],
-         "caption": r["caption"], "mime_type": r["mime_type"]}
-        for r in rows
-    ]
+    return await _rag_cache_repository.resolve_images(image_ids=image_ids)
 
 
 # ── Course helpers (used by API layer) ────────────────────────────────────────
@@ -945,12 +919,7 @@ async def delete_course(course_id: str, user_id: int) -> bool:
 
 async def cleanup_answer_cache(max_age_days: int = 7) -> None:
     """Evict old unused cache entries. Call from analytics cleanup_loop."""
-    async with db.pool().acquire() as conn:
-        result = await conn.execute(
-            """DELETE FROM rag_answer_cache
-               WHERE last_used < now() - ($1 || ' days')::interval""",
-            str(max_age_days),
-        )
+    result = await _rag_cache_repository.cleanup_answer_cache(max_age_days=max_age_days)
     print(f"[rag] answer cache cleanup: {result}")
 
 

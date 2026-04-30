@@ -94,8 +94,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - Route-level RAG SQL for courses, document records, image access, and chat
   course linking now lives behind `app.repositories.oltp.RagRouteRepository`.
   RAG helper SQL for course listing, document listing, course deletion, and
-  chat-file auto-course creation uses the same repository. Deep ingestion,
-  retrieval, image, and cache SQL in `rag.py` remains a separate migration block.
+  chat-file auto-course creation uses the same repository.
+- RAG query/answer cache SQL and cached image resolution now live behind
+  `app.repositories.oltp.RagCacheRepository`. Deep ingestion and retrieval SQL in
+  `rag.py` remains a separate migration block.
 
 ## Next Stages
 

@@ -14,6 +14,9 @@ class AnalyticsTrackingService:
     def record_http(self, path: str, status: int, latency_ms: float) -> None:
         analytics.metrics.record_http(path, status, latency_ms)
 
+    def record_gemini(self, model: str, latency_ms: float, *, ok: bool) -> None:
+        analytics.metrics.record_gemini(model, latency_ms, ok=ok)
+
     def increment_mindmap_runs(self) -> None:
         analytics.metrics.bg_mindmap_runs += 1
 

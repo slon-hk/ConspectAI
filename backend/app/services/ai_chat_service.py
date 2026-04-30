@@ -12,10 +12,10 @@ from typing import Any
 import google.generativeai as genai
 import PIL.Image
 
-import analytics
 import rag as rag_engine
 import storage
 from app.repositories.oltp import FileRepository
+from app.services.analytics_tracking_service import AnalyticsTrackingService
 from app.services.billing_service import BillingService
 from app.services.chat_service import ChatService
 from app.services.user_service import UserService
@@ -48,6 +48,7 @@ class AiChatService:
         chat_service: ChatService,
         user_service: UserService,
         billing_service: BillingService,
+        analytics_tracking_service: AnalyticsTrackingService,
         file_repository: FileRepository,
         system_prompts: Mapping[str, str],
         models: Mapping[str, Mapping[str, Any]],
@@ -58,6 +59,7 @@ class AiChatService:
         self._chat_service = chat_service
         self._user_service = user_service
         self._billing_service = billing_service
+        self._analytics_tracking_service = analytics_tracking_service
         self._file_repository = file_repository
         self._system_prompts = system_prompts
         self._models = models
@@ -141,7 +143,7 @@ class AiChatService:
             rag_images = rag_result["images"]
             cache_hit = bool(rag_result.get("from_cache"))
             api_tokens_override = rag_result.get("api_tokens", None)
-            analytics.track(
+            self._analytics_tracking_service.track(
                 "rag_query",
                 user_id,
                 chat_id=str(chat_id),
@@ -196,7 +198,7 @@ class AiChatService:
                 for image in rag_images
             ]
 
-        analytics.track(
+        self._analytics_tracking_service.track(
             "message_sent",
             user_id,
             chat_id=str(chat_id),
@@ -266,18 +268,18 @@ class AiChatService:
         started = time.perf_counter()
         try:
             response = await loop.run_in_executor(None, lambda: session.send_message(parts))
-            analytics.metrics.record_gemini(
+            self._analytics_tracking_service.record_gemini(
                 model_key,
                 (time.perf_counter() - started) * 1000,
                 ok=True,
             )
         except Exception as exc:
-            analytics.metrics.record_gemini(
+            self._analytics_tracking_service.record_gemini(
                 model_key,
                 (time.perf_counter() - started) * 1000,
                 ok=False,
             )
-            analytics.track("gemini_error", user_id, model=model_key, error=str(exc)[:200])
+            self._analytics_tracking_service.track("gemini_error", user_id, model=model_key, error=str(exc)[:200])
             raise
 
         assistant_text = response.text

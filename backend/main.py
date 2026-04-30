@@ -107,6 +107,7 @@ ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
     billing_service=BillingService(),
+    analytics_tracking_service=analytics_tracking_service,
     file_repository=file_repository,
     system_prompts=SYSTEM_PROMPTS,
     models=MODELS,

@@ -157,8 +157,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   read-side orchestration over `AnalyticsEventRepository`; `admin.py` no longer
   calls top-level analytics query helpers directly.
 - `app.services.AnalyticsTrackingService` now owns event tracking and live
-  in-memory metric updates for `main.py`, keeping API/middleware code off the
-  legacy top-level `analytics.py` module.
+  in-memory metric updates for `main.py` and `AiChatService`, keeping
+  API/middleware/chat orchestration code off the legacy top-level `analytics.py`
+  module.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

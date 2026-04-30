@@ -74,7 +74,13 @@ def register_routes(
             analytics_tracking_service=container.analytics_tracking_service,
         )
     )
-    app.include_router(create_pages_router(templates=templates, funnel_service=container.funnel_service))
+    app.include_router(
+        create_pages_router(
+            templates=templates,
+            catalog_service=container.catalog_service,
+            funnel_service=container.funnel_service,
+        )
+    )
     app.include_router(
         create_admin_metrics_router(
             require_admin=require_admin,

@@ -223,6 +223,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.services.CatalogService` now owns public model/template/subscription-plan
   catalog composition; `app.api.routes.catalog` is a router factory over that
   service.
+- Server-rendered pricing now reads subscription plan data through
+  `CatalogService` instead of importing billing config directly in the route.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.

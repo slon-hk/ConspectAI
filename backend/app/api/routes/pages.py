@@ -7,13 +7,14 @@ from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from billing_plans import public_plans
+from app.services.catalog_service import CatalogService
 from app.services.funnel_service import FunnelService
 
 
 def create_pages_router(
     *,
     templates: Jinja2Templates,
+    catalog_service: CatalogService,
     funnel_service: FunnelService,
 ) -> APIRouter:
     router = APIRouter()
@@ -46,7 +47,7 @@ def create_pages_router(
     @router.get("/pricing", response_class=HTMLResponse)
     async def pricing_page(request: Request):
         plans = []
-        for plan in public_plans():
+        for plan in catalog_service.subscription_plans():
             price = int(plan["price_rub"])
             estimated_requests = int(plan.get("estimated_monthly_requests", 0) or 0)
             plans.append({

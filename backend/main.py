@@ -43,6 +43,7 @@ from app.services import (
     ChatService,
     FileService,
     FunnelService,
+    MindmapGenerationService,
     MindmapService,
     RequestMetricsService,
     UsageService,
@@ -95,6 +96,13 @@ request_metrics_service = RequestMetricsService(
 )
 admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
 analytics_tracking_service = AnalyticsTrackingService(AnalyticsEventRepository(database))
+mindmap_generation_service = MindmapGenerationService(
+    mindmap_service=mindmap_service,
+    analytics_tracking_service=analytics_tracking_service,
+    gemini_api_key=GEMINI_API_KEY,
+    model_key="gemini-2.5-flash-lite",
+    system_prompt=MINDMAP_PROMPT,
+)
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
@@ -318,13 +326,6 @@ async def pricing_page(request: Request):
     return jinja.TemplateResponse("pricing.html", {"request": request, "plans": plans})
 
 
-def _model_name(key: str) -> str:
-    """Ensure model name has the required 'models/' prefix for Gemini API."""
-    if key.startswith("models/"):
-        return key
-    return f"models/{key}"
-
-
 def _validate_chat_id(chat_id: str) -> str:
     try:
         return str(uuid.UUID(str(chat_id)))
@@ -357,38 +358,13 @@ async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
     return await admin_metrics_service.marketing()
 
 
-# ── Mindmap auto-generation ────────────────────────────────────────────────────
-MINDMAP_MODEL = "gemini-2.5-flash-lite"   # cheapest model — platform-paid feature
-
-async def regenerate_mindmap(chat_id: str):
-    """
-    Build/refresh the topic mindmap for a chat. Runs in the background after
-    each assistant reply. Uses Flash Lite to keep cost negligible. Does NOT
-    deduct from the user's token balance — this is a platform feature.
-    """
-    if not GEMINI_API_KEY:
-        return
-    try:
-        generated = await mindmap_service.regenerate(
-            chat_id=chat_id,
-            model_name=_model_name(MINDMAP_MODEL),
-            system_prompt=MINDMAP_PROMPT,
-            enabled=bool(GEMINI_API_KEY),
-        )
-        if generated:
-            analytics_tracking_service.increment_mindmap_runs()
-    except Exception as e:
-        analytics_tracking_service.increment_mindmap_failures()
-        print(f"[mindmap] error for chat {chat_id}: {e}")
-
-
 app.include_router(
     create_chat_router(
         current_user_id=current_user_id,
         chat_service=chat_service,
         ai_chat_service=ai_chat_service,
         analytics_tracking_service=analytics_tracking_service,
-        regenerate_mindmap=regenerate_mindmap,
+        regenerate_mindmap=mindmap_generation_service.regenerate_background,
         system_prompts=SYSTEM_PROMPTS,
         models=MODELS,
         default_template="deep",
@@ -416,6 +392,6 @@ async def force_regenerate_mindmap(
     chat_id = _validate_chat_id(chat_id)
     if not await mindmap_service.user_can_access_chat(chat_id=chat_id, user_id=uid):
         raise HTTPException(404, "Chat not found")
-    bg.add_task(regenerate_mindmap, chat_id)
+    bg.add_task(mindmap_generation_service.regenerate_background, chat_id)
     analytics_tracking_service.track("mindmap_regenerated", uid, chat_id=str(chat_id))
     return {"ok": True, "queued": True}

@@ -180,6 +180,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   including the hot `/api/chats/{chat_id}/messages` path. The router keeps the
   same quota middleware interaction by setting `request.state.billing_usage` and
   receives the existing mindmap background callback from `main.py`.
+- `app.services.MindmapGenerationService` now owns background mindmap
+  regeneration orchestration, including model-name normalization and live
+  success/failure counters.
 - `app.api.routes.files` now owns upload and raw-file serving endpoints over
   `FileService`, preserving upload analytics tracking and response behavior.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,

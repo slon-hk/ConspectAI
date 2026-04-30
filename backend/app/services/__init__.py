@@ -12,6 +12,7 @@ from .funnel_service import FunnelService
 from .quota_service import QuotaService
 from .chat_service import ChatService
 from .mindmap_service import MindmapService
+from .mindmap_generation_service import MindmapGenerationService
 from .usage_service import UsageService
 from .user_service import UserService
 from .request_metrics_service import RequestMetricsService
@@ -28,6 +29,7 @@ __all__ = [
     "FileService",
     "FunnelService",
     "MindmapService",
+    "MindmapGenerationService",
     "QuotaService",
     "RequestMetricsService",
     "UsageService",

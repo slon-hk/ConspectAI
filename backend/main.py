@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import auth
 import admin
 import rag_routes
+from app.api.dependencies import create_current_user_id_dependency
 from app.api.routes.admin_metrics import create_admin_metrics_router
 from app.api.routes.analytics import create_analytics_router
 from app.api.routes.auth import create_auth_router
@@ -230,29 +231,11 @@ async def subscription_quota_middleware(request: Request, call_next):
     return response
 
 
-# ── Auth dependency ────────────────────────────────────────────────────────────
-async def current_user_id(token: str = Depends(auth.oauth2)) -> int:
-    """Resolve the JWT to a user id, then verify the user still exists.
-
-    A token is "valid" if it's signed correctly and not expired, but the user
-    it points to may have been deleted (or the DB may have been recreated).
-    In either case we return 401 so the frontend forces a fresh login instead
-    of silently sending requests for a ghost user.
-    """
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    uid = auth.decode_token(token)
-    if not uid:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user = await user_service.get_by_id(uid)
-    if not user:
-        # Token's signature is valid but the user no longer exists.
-        raise HTTPException(status_code=401, detail="User no longer exists — please log in again")
-    if user.get("is_blocked"):
-        raise HTTPException(status_code=403, detail="Аккаунт заблокирован администратором")
-    return uid
-
-
+current_user_id = create_current_user_id_dependency(
+    token_dependency=auth.oauth2,
+    decode_token=auth.decode_token,
+    user_service=user_service,
+)
 app.include_router(
     create_user_router(
         current_user_id=current_user_id,

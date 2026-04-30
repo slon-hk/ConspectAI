@@ -192,6 +192,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   rendering, preserving landing funnel tracking and pricing labels.
 - `app.api.routes.admin_metrics` now owns legacy `/admin/metrics*` aliases over
   `AdminMetricsService`, leaving `main.py` with no direct business endpoints.
+- `app.api.dependencies` now owns the current-user dependency factory. `main.py`
+  wires it with the existing token decoder and `UserService`, preserving 401/403
+  behavior.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

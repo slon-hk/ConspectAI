@@ -36,6 +36,7 @@ from app.services.ai_chat_service import (
     EmptyMessageError,
     GeminiApiKeyMissingError,
 )
+from app.services.billing_service import BillingService
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, public_plans
 
@@ -71,6 +72,7 @@ user_service = UserService(UserRepository(database), usage_service)
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
+    billing_service=BillingService(),
     file_repository=FileRepository(database),
     system_prompts=SYSTEM_PROMPTS,
     models=MODELS,

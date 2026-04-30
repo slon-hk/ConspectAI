@@ -16,9 +16,9 @@ import analytics
 import rag as rag_engine
 import storage
 from app.repositories.oltp import FileRepository
+from app.services.billing_service import BillingService
 from app.services.chat_service import ChatService
 from app.services.user_service import UserService
-from billing import calculate_cost_units
 
 
 class AiChatServiceError(Exception):
@@ -47,6 +47,7 @@ class AiChatService:
         *,
         chat_service: ChatService,
         user_service: UserService,
+        billing_service: BillingService,
         file_repository: FileRepository,
         system_prompts: Mapping[str, str],
         models: Mapping[str, Mapping[str, Any]],
@@ -56,6 +57,7 @@ class AiChatService:
     ) -> None:
         self._chat_service = chat_service
         self._user_service = user_service
+        self._billing_service = billing_service
         self._file_repository = file_repository
         self._system_prompts = system_prompts
         self._models = models
@@ -165,7 +167,7 @@ class AiChatService:
         if api_tokens_override is not None:
             api_tokens = api_tokens_override
 
-        usage = self._calculate_usage(
+        usage = self._billing_service.calculate_turn_usage(
             content=content,
             assistant_text=assistant_text,
             model_key=model_key,
@@ -213,26 +215,14 @@ class AiChatService:
             content=content,
         )
 
-        billing_usage = {
-            "model_name": model_key,
-            "cache_hit": cache_hit,
-            "input_tokens": usage["input_tokens"],
-            "output_tokens": usage["output_tokens"],
-            "context_tokens": usage["context_tokens"],
-            "total_tokens": usage["total_tokens"],
-            "estimated_no_rag": usage["estimated_without_rag"],
-            "actual_with_rag": usage["actual_with_rag"],
-            "savings_pct": usage["savings_pct"],
-            "cost_units": usage["cost_usd"],
-            "status": "completed",
-            "rag_metrics": {
-                "query": content or "",
-                "chunks_used": rag_result.get("chunks_used", 0) if course_id else 0,
-                "context_tokens": usage["context_tokens"],
-                "estimated_tokens_no_rag": usage["estimated_without_rag"],
-                "latency_ms": rag_result.get("latency_ms", 0) if course_id else 0,
-            } if course_id else None,
-        }
+        billing_usage = self._billing_service.build_request_billing_usage(
+            model_key=model_key,
+            cache_hit=cache_hit,
+            usage=usage,
+            course_id=course_id,
+            rag_result=rag_result,
+            content=content,
+        )
 
         return {
             "assistant_message": assistant_message,
@@ -296,46 +286,6 @@ class AiChatService:
         except Exception:
             api_tokens_raw = max(1, len(assistant_text) // 4)
         return assistant_text, api_tokens_raw
-
-    def _calculate_usage(
-        self,
-        *,
-        content: str,
-        assistant_text: str,
-        model_key: str,
-        course_id: str | None,
-        rag_result: dict,
-        cache_hit: bool,
-    ) -> dict:
-        input_tokens = max(1, len(content or "") // 4)
-        context_tokens = rag_result.get("context_tokens", 0) if course_id else 0
-        output_tokens = max(1, len(assistant_text or "") // 4)
-        total_tokens = input_tokens + context_tokens + output_tokens
-        estimated_without_rag = (
-            rag_result.get("estimated_without_rag_tokens", total_tokens)
-            if course_id else total_tokens
-        )
-        actual_with_rag = (
-            rag_result.get("actual_with_rag_tokens", total_tokens)
-            if course_id else total_tokens
-        )
-        savings_pct = 0.0
-        if estimated_without_rag > 0:
-            savings_pct = round(max((estimated_without_rag - actual_with_rag) / estimated_without_rag, 0) * 100, 3)
-        cost_usd = calculate_cost_units(model_key, input_tokens, output_tokens, context_tokens)
-        if cache_hit:
-            cost_usd = round(cost_usd * 0.01, 8)
-
-        return {
-            "input_tokens": input_tokens,
-            "context_tokens": context_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "estimated_without_rag": estimated_without_rag,
-            "actual_with_rag": actual_with_rag,
-            "savings_pct": savings_pct,
-            "cost_usd": cost_usd,
-        }
 
     @staticmethod
     def _model_name(key: str) -> str:

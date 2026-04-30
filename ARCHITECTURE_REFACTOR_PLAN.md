@@ -126,6 +126,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   branching, assistant persistence, billing usage payload construction, and chat
   title refresh. `main.py` keeps HTTP error mapping, `request.state` assignment,
   and background mindmap scheduling.
+- `app.services.billing_service.BillingService` now owns per-turn internal cost
+  calculation and request billing usage payload construction. `billing.py`
+  remains the legacy pricing function module underneath this service.
 
 ## Next Stages
 

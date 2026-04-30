@@ -199,6 +199,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   middleware registration. Quota middleware remains thin over `QuotaService`,
   `UsageService`, and `RequestMetricsService`, preserving the hot chat-message
   request path behavior.
+- `app.core.exceptions` now owns 404/500 handler registration, preserving JSON
+  responses for API paths and HTML error pages for browser routes.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

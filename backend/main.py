@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 
 import google.generativeai as genai
 from fastapi import FastAPI
-from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
@@ -21,6 +20,7 @@ from app.api.routes.files import create_file_router
 from app.api.routes.mindmaps import create_mindmap_router
 from app.api.routes.pages import create_pages_router
 from app.api.routes.users import create_user_router
+from app.core.exceptions import register_exception_handlers
 from app.db.pool import database
 from app.middleware import (
     register_http_metrics_middleware,
@@ -139,25 +139,7 @@ app.include_router(
 )
 # Static assets (error-page backgrounds, etc.) — served directly without auth
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-# ── 404 handler ───────────────────────────────────────────────────────────────
-@app.exception_handler(404)
-async def not_found(request: Request, exc):
-    """Pretty 404 page for browser routes; JSON for API endpoints."""
-    from fastapi.responses import JSONResponse
-    if request.url.path.startswith("/api/"):
-        return JSONResponse({"detail": "Not Found"}, status_code=404)
-    return jinja.TemplateResponse("404.html", {"request": request}, status_code=404)
-
-
-@app.exception_handler(500)
-async def internal_error(request: Request, exc):
-    """Pretty 503 page for browser; JSON for API endpoints."""
-    from fastapi.responses import JSONResponse
-    if request.url.path.startswith("/api/"):
-        return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
-    return jinja.TemplateResponse("503.html", {"request": request}, status_code=503)
+register_exception_handlers(app, jinja)
 
 
 current_user_id = create_current_user_id_dependency(

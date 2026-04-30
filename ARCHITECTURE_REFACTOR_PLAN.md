@@ -96,7 +96,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   RAG helper SQL for course listing, document listing, course deletion, and
   chat-file auto-course creation uses the same repository.
 - RAG query/answer cache SQL and cached image resolution now live behind
-  `app.repositories.oltp.RagCacheRepository`. Deep ingestion and retrieval SQL in
+  `app.repositories.oltp.RagCacheRepository`.
+- RAG hybrid retrieval SQL now lives behind
+  `app.repositories.oltp.RagRetrievalRepository`. Deep ingestion write SQL in
   `rag.py` remains a separate migration block.
 
 ## Next Stages

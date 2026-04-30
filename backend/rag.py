@@ -36,9 +36,10 @@ import tiktoken
 
 import db
 import storage
-from app.repositories.oltp import RagCacheRepository, RagRouteRepository
+from app.repositories.oltp import RagCacheRepository, RagRetrievalRepository, RagRouteRepository
 
 _rag_cache_repository = RagCacheRepository()
+_rag_retrieval_repository = RagRetrievalRepository()
 _rag_routes_repository = RagRouteRepository()
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -614,106 +615,14 @@ async def retrieve(
     """
     q_vec = to_pgvector(await embed_query(query))
 
-    async with db.pool().acquire() as conn:
-        # Get all document IDs in this course + globally public materials
-        doc_ids = await conn.fetch(
-            """
-            SELECT id
-            FROM rag_documents
-            WHERE status = 'ready'
-              AND (course_id = $1 OR is_public = TRUE)
-            """,
-            course_id,
-        )
-        if not doc_ids:
-            return [], []
-
-        doc_id_list = [str(r["id"]) for r in doc_ids]
-
-        # Hybrid search: cosine + BM25
-        rows = await conn.fetch(
-            """
-            WITH semantic AS (
-                SELECT
-                    id,
-                    content,
-                    content_hash,
-                    1 - (embedding <=> $1::vector) AS cos_sim
-                FROM rag_chunks
-                WHERE document_id = ANY($2::uuid[])
-                  AND embedding IS NOT NULL
-                ORDER BY embedding <=> $1::vector
-                LIMIT $3
-            ),
-            bm25 AS (
-                SELECT
-                    id,
-                    ts_rank(tsv, plainto_tsquery('russian', $4)) AS bm25_score
-                FROM rag_chunks
-                WHERE document_id = ANY($2::uuid[])
-                  AND tsv @@ plainto_tsquery('russian', $4)
-                LIMIT $3
-            ),
-            combined AS (
-                SELECT
-                    s.id,
-                    s.content,
-                    s.content_hash,
-                    ($5 * s.cos_sim + $6 * COALESCE(b.bm25_score, 0)) AS score
-                FROM semantic s
-                LEFT JOIN bm25 b ON s.id = b.id
-            )
-            SELECT id, content, content_hash, score
-            FROM combined
-            ORDER BY score DESC
-            LIMIT $3
-            """,
-            q_vec,
-            doc_id_list,
-            top_k,
-            query,
-            HYBRID_ALPHA,
-            1.0 - HYBRID_ALPHA,
-        )
-
-        chunks = [
-            {
-                "id": str(r["id"]),
-                "content": r["content"],
-                "content_hash": r["content_hash"],
-                "score": float(r["score"]),
-            }
-            for r in rows
-        ]
-
-        if not chunks:
-            return [], []
-
-        # Retrieve images linked to top chunks
-        chunk_ids = [c["id"] for c in chunks]
-        img_rows = await conn.fetch(
-            """
-            SELECT DISTINCT ri.id, ri.file_path, ri.caption, ri.mime_type
-            FROM rag_chunk_images rci
-            JOIN rag_images ri ON ri.id = rci.image_id
-            WHERE rci.chunk_id = ANY($1::uuid[])
-            LIMIT $2
-            """,
-            chunk_ids,
-            IMAGE_CTX_LIMIT,
-        )
-
-        images = [
-            {
-                "id": str(r["id"]),
-                "file_path": r["file_path"],
-                "caption": r["caption"],
-                "mime_type": r["mime_type"],
-            }
-            for r in img_rows
-        ]
-
-    return chunks, images
+    return await _rag_retrieval_repository.retrieve_chunks_and_images(
+        course_id=course_id,
+        query=query,
+        query_embedding_pgvector=q_vec,
+        top_k=top_k,
+        hybrid_alpha=HYBRID_ALPHA,
+        image_ctx_limit=IMAGE_CTX_LIMIT,
+    )
 
 
 # ── Context builder ────────────────────────────────────────────────────────────

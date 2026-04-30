@@ -127,6 +127,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   analytics side effects.
 - Usage endpoints in `main.py` now read snapshots through `UsageService`
   instead of the legacy `db.py` wrapper.
+- `app.services.FileService` now owns file storage/metadata registration and raw
+  file lookup. `main.py` keeps HTTP upload reading, response serving, and upload
+  analytics side effects.
 - `app.services.ai_chat_service.AiChatService` now owns the core chat turn
   orchestration for `send_message`: file attachment preparation, Gemini/RAG
   branching, assistant persistence, billing usage payload construction, and chat

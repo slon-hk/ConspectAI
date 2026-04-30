@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 
 import db
 import auth
-import storage
 import admin
 import analytics
 import rag_routes
@@ -28,7 +27,7 @@ from app.repositories.oltp import (
     UsageRepository,
     UserRepository,
 )
-from app.services import ChatService, MindmapService, UsageService, UserService
+from app.services import ChatService, FileService, MindmapService, UsageService, UserService
 from app.services.auth_service import (
     AgreementRequiredError,
     AuthAccountBlockedError,
@@ -75,17 +74,19 @@ app.include_router(rag_routes.router)
 chat_repository = ChatRepository(database)
 message_repository = MessageRepository(database)
 usage_repository = UsageRepository(database)
+file_repository = FileRepository(database)
 chat_service = ChatService(chat_repository, message_repository)
 mindmap_service = MindmapService(chat_repository, message_repository, MindmapRepository(database))
 usage_service = UsageService(usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUEST)
 user_repository = UserRepository(database)
 user_service = UserService(user_repository, usage_service)
 auth_service = AuthService(user_repository, user_service, DEFAULT_PLAN_KEY)
+file_service = FileService(file_repository)
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
     billing_service=BillingService(),
-    file_repository=FileRepository(database),
+    file_repository=file_repository,
     system_prompts=SYSTEM_PROMPTS,
     models=MODELS,
     default_template="deep",
@@ -550,45 +551,28 @@ async def upload_file(
     file: UploadFile = File(...),
     uid:  int        = Depends(current_user_id),
 ):
-    raw  = await file.read()
-    mime = file.content_type or storage.guess_mime(file.filename)
-
-    meta = storage.store_file(raw, mime)
-    await db.register_file(
-        meta["sha256"], mime, meta["compressed"],
-        meta["original_size"], meta["stored_size"],
+    upload = await file_service.store_upload(
+        raw=await file.read(),
+        filename=file.filename,
+        content_type=file.content_type,
     )
-
-    saved_kb    = round((meta["original_size"] - meta["stored_size"]) / 1024, 1)
-    compression = round((1 - meta["stored_size"] / max(meta["original_size"], 1)) * 100, 1)
 
     analytics.track(
         "file_uploaded", uid,
-        mime=mime, size=meta["original_size"],
-        compressed=meta["compressed"], saved_kb=saved_kb,
+        mime=upload["mime_type"], size=upload["original_size"],
+        compressed=upload["compressed"], saved_kb=upload["saved_kb"],
     )
 
-    return {
-        "sha256":           meta["sha256"],
-        "original_filename": file.filename,
-        "mime_type":        mime,
-        "compressed":       meta["compressed"],
-        "original_size":    meta["original_size"],
-        "stored_size":      meta["stored_size"],
-        "saved_kb":         saved_kb,
-        "compression_pct":  compression,
-        # preview URL for images
-        "preview_url": f"/api/files/{meta['sha256']}/raw" if mime.startswith("image/") else None,
-    }
+    return upload
 
 
 @app.get("/api/files/{sha256}/raw")
 async def serve_file(sha256: str, uid: int = Depends(current_user_id)):
-    meta = await db.get_file_meta(sha256)
-    if not meta:
+    result = await file_service.read_raw_file(sha256=sha256)
+    if not result:
         raise HTTPException(404, "File not found")
-    raw = storage.read_file(meta["sha256"], meta["compressed"])
-    return Response(content=raw, media_type=meta["mime_type"])
+    raw, mime_type = result
+    return Response(content=raw, media_type=mime_type)
 
 
 # ── Client-side analytics endpoint ─────────────────────────────────────────────

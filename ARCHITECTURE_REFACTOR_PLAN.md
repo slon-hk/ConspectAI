@@ -163,6 +163,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.infrastructure.observability.system_metrics` now owns live per-process
   counters. The legacy `analytics.metrics` object remains as a compatibility
   alias to the same singleton.
+- `app.services.AnalyticsMaintenanceService` now owns analytics event cleanup
+  orchestration. Worker startup uses this service directly; legacy
+  `analytics.cleanup_*` functions remain thin compatibility wrappers.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

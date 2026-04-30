@@ -14,6 +14,7 @@ from app.events import BaseEvent, event_bus
 from app.events.handlers.analytics_handlers import ANALYTICS_EVENT_TYPE, AnalyticsEventHandler
 from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
+from app.services.analytics_maintenance_service import AnalyticsMaintenanceService
 
 _events = AnalyticsEventRepository()
 event_bus.subscribe(ANALYTICS_EVENT_TYPE, AnalyticsEventHandler(_events))
@@ -82,15 +83,9 @@ async def feature_adoption(days: int = 30) -> dict:
 # ── Maintenance ───────────────────────────────────────────────────────────────
 async def cleanup_old_events(retain_days: int = 90):
     """Delete events older than `retain_days`. Call from a startup task / cron."""
-    try:
-        result = await _events.cleanup_old_events(retain_days)
-        print(f"[analytics] cleanup_old_events: {result}")
-    except Exception as e:
-        print(f"[analytics] cleanup failed: {e}")
+    await AnalyticsMaintenanceService(_events).cleanup_old_events(retain_days)
 
 
 async def cleanup_loop(interval_hours: int = 24):
     """Background loop run from main app lifespan."""
-    while True:
-        await asyncio.sleep(interval_hours * 3600)
-        await cleanup_old_events()
+    await AnalyticsMaintenanceService(_events).cleanup_loop(interval_hours=interval_hours)

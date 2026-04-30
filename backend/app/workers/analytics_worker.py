@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import asyncio
 
-import analytics
+from app.db.pool import database
+from app.repositories.olap import AnalyticsEventRepository
+from app.services.analytics_maintenance_service import AnalyticsMaintenanceService
 
 
 def start_analytics_cleanup_task(interval_hours: int = 24) -> asyncio.Task[None]:
     """Start periodic cleanup of old analytics events on the current loop."""
-    return asyncio.create_task(analytics.cleanup_loop(interval_hours=interval_hours))
+    service = AnalyticsMaintenanceService(AnalyticsEventRepository(database))
+    return asyncio.create_task(service.cleanup_loop(interval_hours=interval_hours))

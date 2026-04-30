@@ -203,6 +203,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   responses for API paths and HTML error pages for browser routes.
 - `app.core.lifecycle` now owns FastAPI lifespan creation for DB pool
   startup/shutdown and analytics cleanup task management.
+- `app.core.container` now owns repository/service construction, keeping
+  `main.py` focused on process setup, middleware registration, and router
+  inclusion.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

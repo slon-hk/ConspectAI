@@ -223,6 +223,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.services.CatalogService` now owns public model/template/subscription-plan
   catalog composition; `app.api.routes.catalog` is a router factory over that
   service.
+- `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
+  `AnalyticsEventRepository`, removing hidden repository construction from that
+  service path.
 - Legacy `rag.py` no longer initializes a `tiktoken` encoding at import time,
   keeping app import/startup from performing a network-backed cache download.
 - `app.main` now owns FastAPI app assembly. The top-level `main.py` remains a

@@ -9,8 +9,8 @@ ANALYTICS_EVENT_TYPE = "analytics.event"
 
 
 class AnalyticsEventHandler:
-    def __init__(self, repository: AnalyticsEventRepository | None = None) -> None:
-        self._repository = repository or AnalyticsEventRepository()
+    def __init__(self, repository: AnalyticsEventRepository) -> None:
+        self._repository = repository
 
     async def __call__(self, event: BaseEvent) -> None:
         analytics_event = str(event.payload.get("event", ""))
@@ -22,4 +22,3 @@ class AnalyticsEventHandler:
             event.user_id,
             props if isinstance(props, dict) else {},
         )
-

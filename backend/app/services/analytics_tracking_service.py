@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 class AnalyticsTrackingService:
     def __init__(
         self,
-        analytics_repository: AnalyticsEventRepository | None = None,
+        analytics_repository: AnalyticsEventRepository,
         bus: EventBus = event_bus,
     ) -> None:
         self._event_bus = bus
         self._event_bus.subscribe(
             ANALYTICS_EVENT_TYPE,
-            AnalyticsEventHandler(analytics_repository or AnalyticsEventRepository()),
+            AnalyticsEventHandler(analytics_repository),
         )
 
     def track(self, event: str, user_id: int | None = None, **props: Any) -> None:

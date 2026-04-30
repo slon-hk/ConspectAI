@@ -150,7 +150,7 @@ async def subscription_quota_middleware(request: Request, call_next):
         if not uid:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         request.state.current_uid = uid
-        quota = await db.check_and_consume_limit(uid, request.url.path)
+        quota = await quota_service.check_and_consume_limit(uid, request.url.path)
         if not quota.get("allowed"):
             return Response(
                 content='{"detail":"Доступный объём тарифа закончился","code":"quota_exceeded"}',
@@ -163,7 +163,7 @@ async def subscription_quota_middleware(request: Request, call_next):
         response = await call_next(request)
     except Exception as e:
         if request.state.request_log_id:
-            await db.fail_and_refund_request(request.state.request_log_id, str(e))
+            await usage_service.fail_and_refund_request(request.state.request_log_id, str(e))
             usage = getattr(request.state, "billing_usage", {})
             latency_ms = int((__import__("time").perf_counter() - request.state._metrics_started) * 1000)
             await db.log_request_metrics(
@@ -187,7 +187,7 @@ async def subscription_quota_middleware(request: Request, call_next):
         usage = getattr(request.state, "billing_usage", None)
         latency_ms = int((__import__("time").perf_counter() - request.state._metrics_started) * 1000)
         if response.status_code >= 400:
-            await db.fail_and_refund_request(request.state.request_log_id, f"http_{response.status_code}")
+            await usage_service.fail_and_refund_request(request.state.request_log_id, f"http_{response.status_code}")
         if usage:
             await db.log_request_metrics(
                 request_log_id=request.state.request_log_id,

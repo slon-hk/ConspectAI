@@ -127,6 +127,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   analytics side effects.
 - Usage endpoints in `main.py` now read snapshots through `UsageService`
   instead of the legacy `db.py` wrapper.
+- Quota middleware now reserves quota through `QuotaService` and refunds
+  failed/blocked requests through `UsageService`; OLAP request/RAG metric writes
+  remain a separate service extraction block.
 - `app.services.FileService` now owns file storage/metadata registration and raw
   file lookup. `main.py` keeps HTTP upload reading, response serving, and upload
   analytics side effects.

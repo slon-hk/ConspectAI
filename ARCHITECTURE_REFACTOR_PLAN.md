@@ -153,6 +153,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.services.AdminAccessService` now owns admin user lookup/permission
   checks for the admin router dependency, removing the final `db.py` runtime
   dependency from `admin.py`.
+- `app.services.AdminAnalyticsService` now owns `/api/admin/analytics/*`
+  read-side orchestration over `AnalyticsEventRepository`; `admin.py` no longer
+  calls top-level analytics query helpers directly.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

@@ -1,6 +1,7 @@
 """Application service layer."""
 
 from .admin_access_service import AdminAccessService
+from .admin_analytics_service import AdminAnalyticsService
 from .admin_metrics_service import AdminMetricsService
 from .admin_user_service import AdminUserService
 from .auth_service import AuthService
@@ -15,6 +16,7 @@ from .request_metrics_service import RequestMetricsService
 
 __all__ = [
     "AdminAccessService",
+    "AdminAnalyticsService",
     "AuthService",
     "AdminMetricsService",
     "AdminUserService",

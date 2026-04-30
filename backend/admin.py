@@ -12,13 +12,19 @@ from pydantic import BaseModel
 
 import auth
 from app.db.pool import database
-from app.repositories.olap import AdminReportRepository
+from app.repositories.olap import AdminReportRepository, AnalyticsEventRepository
 from app.repositories.oltp import AdminUserRepository, UserRepository
-from app.services import AdminAccessService, AdminMetricsService, AdminUserService
+from app.services import (
+    AdminAccessService,
+    AdminAnalyticsService,
+    AdminMetricsService,
+    AdminUserService,
+)
 from billing_plans import PLAN_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 admin_access_service = AdminAccessService(UserRepository(database))
+admin_analytics_service = AdminAnalyticsService(AnalyticsEventRepository(database))
 admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
 admin_user_service = AdminUserService(AdminUserRepository(database))
 
@@ -160,41 +166,37 @@ def _serialize(d) -> dict:
     return out
 
 
-# ── Analytics routes ──────────────────────────────────────────────────────────
-import analytics
-
-
 @router.get("/analytics/dau")
 async def dau(days: int = 30, _=Depends(require_admin)):
-    return await analytics.daily_active_users(min(days, 180))
+    return await admin_analytics_service.daily_active_users(min(days, 180))
 
 
 @router.get("/analytics/signups")
 async def signups(days: int = 30, _=Depends(require_admin)):
-    return await analytics.signups_by_day(min(days, 180))
+    return await admin_analytics_service.signups_by_day(min(days, 180))
 
 
 @router.get("/analytics/messages")
 async def msgs(days: int = 30, _=Depends(require_admin)):
-    return await analytics.messages_by_day(min(days, 180))
+    return await admin_analytics_service.messages_by_day(min(days, 180))
 
 
 @router.get("/analytics/events")
 async def top_events(days: int = 7, _=Depends(require_admin)):
-    return await analytics.top_events(min(days, 180), 12)
+    return await admin_analytics_service.top_events(min(days, 180), 12)
 
 
 @router.get("/analytics/funnel")
 async def funnel(days: int = 30, _=Depends(require_admin)):
-    return await analytics.funnel(min(days, 180))
+    return await admin_analytics_service.funnel(min(days, 180))
 
 
 @router.get("/analytics/features")
 async def features(days: int = 30, _=Depends(require_admin)):
-    return await analytics.feature_adoption(min(days, 180))
+    return await admin_analytics_service.feature_adoption(min(days, 180))
 
 
 @router.get("/analytics/system")
 async def system_metrics(_=Depends(require_admin)):
     """Live in-memory system metrics (HTTP, Gemini, BG tasks)."""
-    return analytics.metrics.snapshot()
+    return admin_analytics_service.system_metrics()

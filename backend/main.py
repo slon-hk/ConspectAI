@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 import auth
 import admin
 import rag_routes
+from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import router as catalog_router
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
@@ -44,16 +45,7 @@ from app.services import (
     UsageService,
     UserService,
 )
-from app.services.auth_service import (
-    AgreementRequiredError,
-    AuthAccountBlockedError,
-    AuthService,
-    EmailAlreadyExistsError,
-    InvalidCredentialsError,
-    PasswordTooShortError,
-    UsernameAlreadyExistsError,
-    UsernameTooShortError,
-)
+from app.services.auth_service import AuthService
 from app.services.ai_chat_service import (
     AccountBlockedError,
     AiChatService,
@@ -117,6 +109,13 @@ ai_chat_service = AiChatService(
     default_template="deep",
     default_model="gemini-3.1-flash-lite-preview",
     gemini_api_key=GEMINI_API_KEY,
+)
+app.include_router(
+    create_auth_router(
+        auth_service=auth_service,
+        analytics_tracking_service=analytics_tracking_service,
+        funnel_service=funnel_service,
+    )
 )
 
 # Static assets (error-page backgrounds, etc.) — served directly without auth
@@ -248,23 +247,6 @@ async def current_user_id(token: str = Depends(auth.oauth2)) -> int:
     return uid
 
 
-# ── Pydantic schemas ───────────────────────────────────────────────────────────
-class RegisterIn(BaseModel):
-    username: str
-    email:    str
-    password: str
-    # Acceptance of public offer + privacy policy. Required by Russian law to
-    # establish a contract with the user — without this, technically no договор
-    # is concluded. UI enforces the checkbox; backend enforces it as a final
-    # safety net in case someone bypasses the UI (DevTools / curl).
-    agreement: bool = False
-
-
-class LoginIn(BaseModel):
-    email: str
-    password: str
-
-
 # ── Pages ─────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
@@ -315,52 +297,6 @@ async def pricing_page(request: Request):
             "cta_label": "Начать бесплатно" if plan["plan_key"] == "free" else f"Выбрать {plan['display_name']}",
         })
     return jinja.TemplateResponse("pricing.html", {"request": request, "plans": plans})
-
-
-# ── Auth endpoints ────────────────────────────────────────────────────────────
-@app.post("/api/auth/register")
-async def register(body: RegisterIn):
-    try:
-        result = await auth_service.register(
-            username=body.username,
-            email=body.email,
-            password=body.password,
-            agreement=body.agreement,
-        )
-    except (UsernameTooShortError, PasswordTooShortError, AgreementRequiredError) as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except (EmailAlreadyExistsError, UsernameAlreadyExistsError) as exc:
-        raise HTTPException(409, str(exc)) from exc
-
-    user = result.pop("raw_user")
-
-    # Record consent as an analytics event. The events table is append-only,
-    # so this gives a defensible audit trail (timestamp + user id) of when the
-    # user accepted the offer and privacy policy.
-    analytics_tracking_service.track("signup", user["id"])
-    await funnel_service.record_signup(user_id=user["id"], channel="auth_register")
-    analytics_tracking_service.track(
-        "agreement_accepted",
-        user["id"],
-        offer_version="2026-04-26",
-        privacy_version="2026-04-26",
-    )
-
-    return result
-
-
-@app.post("/api/auth/login")
-async def login(body: LoginIn):
-    try:
-        result = await auth_service.login(email=body.email, password=body.password)
-    except InvalidCredentialsError as exc:
-        raise HTTPException(401, str(exc)) from exc
-    except AuthAccountBlockedError as exc:
-        raise HTTPException(403, str(exc)) from exc
-
-    user = result.pop("raw_user")
-    analytics_tracking_service.track("login", user["id"])
-    return result
 
 
 async def _safe_user(u: dict) -> dict:

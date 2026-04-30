@@ -170,6 +170,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   catalog/static data (`/api/models`, `/api/templates`,
   `/api/subscription-plans`), preserving endpoint contracts while shrinking
   `main.py`.
+- `app.api.routes.auth` now owns `/api/auth/register` and `/api/auth/login`
+  through a router factory that receives existing services from `main.py`.
+  Public auth request/response contracts and side effects are preserved.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

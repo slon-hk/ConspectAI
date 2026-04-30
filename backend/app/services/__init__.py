@@ -3,7 +3,7 @@
 from .admin_access_service import AdminAccessService
 from .admin_analytics_service import AdminAnalyticsService
 from .admin_metrics_service import AdminMetricsService
-from .admin_user_service import AdminUserService
+from .admin_user_service import AdminUserService, UnknownPlanError
 from .analytics_maintenance_service import AnalyticsMaintenanceService
 from .analytics_tracking_service import AnalyticsTrackingService
 from .auth_service import AuthService
@@ -26,6 +26,7 @@ __all__ = [
     "AnalyticsTrackingService",
     "AdminMetricsService",
     "AdminUserService",
+    "UnknownPlanError",
     "AnalyticsMaintenanceService",
     "ChatService",
     "FileService",

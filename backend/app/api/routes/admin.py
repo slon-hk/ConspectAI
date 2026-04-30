@@ -14,7 +14,7 @@ from app.services import (
     AdminMetricsService,
     AdminUserService,
 )
-from billing_plans import PLAN_KEYS
+from app.services.admin_user_service import UnknownPlanError
 
 
 class SetPlanIn(BaseModel):
@@ -67,9 +67,11 @@ def create_admin_router(
 
     @router.post("/users/{uid}/plan")
     async def admin_set_plan(uid: int, body: SetPlanIn, _=Depends(require_admin)):
-        if body.plan_key not in PLAN_KEYS:
-            raise HTTPException(400, "Unknown plan")
-        updated = await admin_user_service.set_plan(user_id=uid, plan_key=body.plan_key)
+        try:
+            updated = await admin_user_service.set_plan(user_id=uid, plan_key=body.plan_key)
+        except UnknownPlanError as exc:
+            raise HTTPException(400, "Unknown plan") from exc
+
         if not updated:
             raise HTTPException(404, "User or plan not found")
         return {"ok": True, "plan_key": body.plan_key}

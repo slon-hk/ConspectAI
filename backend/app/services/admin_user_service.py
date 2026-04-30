@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from app.repositories.oltp import AdminUserRepository
+from billing_plans import PLAN_KEYS
+
+
+class UnknownPlanError(ValueError):
+    pass
 
 
 class AdminUserService:
@@ -20,6 +25,8 @@ class AdminUserService:
         }
 
     async def set_plan(self, *, user_id: int, plan_key: str) -> bool:
+        if plan_key not in PLAN_KEYS:
+            raise UnknownPlanError("Unknown plan")
         return await self._admin_user_repository.set_user_plan(user_id, plan_key)
 
     async def set_blocked(self, *, user_id: int, is_blocked: bool) -> None:

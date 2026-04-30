@@ -5,7 +5,7 @@ import re
 import google.generativeai as genai
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.requests import Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
@@ -19,6 +19,7 @@ from app.api.routes.catalog import router as catalog_router
 from app.api.routes.chats import create_chat_router
 from app.api.routes.files import create_file_router
 from app.api.routes.mindmaps import create_mindmap_router
+from app.api.routes.pages import create_pages_router
 from app.api.routes.users import create_user_router
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
@@ -53,7 +54,7 @@ from app.services.auth_service import AuthService
 from app.services.ai_chat_service import AiChatService
 from app.services.billing_service import BillingService
 from promts import SYSTEM_PROMPTS, MODELS, MINDMAP_PROMPT
-from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, public_plans
+from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY
 
 load_dotenv()
 
@@ -272,58 +273,7 @@ app.include_router(
         analytics_tracking_service=analytics_tracking_service,
     )
 )
-
-
-# ── Pages ─────────────────────────────────────────────────────────────────────
-@app.get("/", response_class=HTMLResponse)
-async def landing(request: Request):
-    await funnel_service.record_visit(path="/")
-    return jinja.TemplateResponse("landing.html", {"request": request})
-
-
-@app.get("/app", response_class=HTMLResponse)
-async def app_page(request: Request):
-    return jinja.TemplateResponse("index.html", {"request": request})
-
-
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request):
-    return jinja.TemplateResponse("admin.html", {"request": request})
-
-
-@app.get("/privacy", response_class=HTMLResponse)
-async def privacy_page(request: Request):
-    return jinja.TemplateResponse("privacy.html", {"request": request})
-
-
-@app.get("/offer", response_class=HTMLResponse)
-async def offer_page(request: Request):
-    return jinja.TemplateResponse("offer.html", {"request": request})
-
-
-@app.get("/contacts", response_class=HTMLResponse)
-async def contacts_page(request: Request):
-    return jinja.TemplateResponse("contacts.html", {"request": request})
-
-
-@app.get("/pricing", response_class=HTMLResponse)
-async def pricing_page(request: Request):
-    plans = []
-    for plan in public_plans():
-        price = int(plan["price_rub"])
-        estimated_requests = int(plan.get("estimated_monthly_requests", 0) or 0)
-        plans.append({
-            **plan,
-            "price_label": "₽0" if price == 0 else f"₽{price:,}".replace(",", " "),
-            "estimated_requests_label": (
-                "без включённых AI-запросов"
-                if estimated_requests <= 0
-                else f"≈ {estimated_requests:,}".replace(",", " ") + " запросов в месяц"
-            ),
-            "featured": plan["plan_key"] == "plus",
-            "cta_label": "Начать бесплатно" if plan["plan_key"] == "free" else f"Выбрать {plan['display_name']}",
-        })
-    return jinja.TemplateResponse("pricing.html", {"request": request, "plans": plans})
+app.include_router(create_pages_router(templates=jinja, funnel_service=funnel_service))
 
 
 @app.get("/admin/metrics")

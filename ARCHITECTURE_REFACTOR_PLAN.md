@@ -188,6 +188,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.api.routes.mindmaps` now owns mindmap fetch/regeneration endpoints over
   `MindmapService` and `MindmapGenerationService`, preserving background task
   scheduling and analytics side effects.
+- `app.api.routes.pages` now owns server-rendered public pages and pricing page
+  rendering, preserving landing funnel tracking and pricing labels.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

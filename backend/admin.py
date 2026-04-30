@@ -10,15 +10,15 @@ To grant admin privileges to the first user:
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-import db
 import auth
 from app.db.pool import database
 from app.repositories.olap import AdminReportRepository
-from app.repositories.oltp import AdminUserRepository
-from app.services import AdminMetricsService, AdminUserService
+from app.repositories.oltp import AdminUserRepository, UserRepository
+from app.services import AdminAccessService, AdminMetricsService, AdminUserService
 from billing_plans import PLAN_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+admin_access_service = AdminAccessService(UserRepository(database))
 admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
 admin_user_service = AdminUserService(AdminUserRepository(database))
 
@@ -30,8 +30,8 @@ async def require_admin(token: str = Depends(auth.oauth2)) -> dict:
     uid = auth.decode_token(token)
     if not uid:
         raise HTTPException(401, "Invalid token")
-    user = await db.get_user_by_id(uid)
-    if not user or not user.get("is_admin"):
+    user = await admin_access_service.get_admin_user(uid)
+    if not user:
         raise HTTPException(403, "Admin access required")
     return user
 

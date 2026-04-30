@@ -149,6 +149,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   for listing users, changing plans/admin/block flags, and deleting users.
   `/api/admin/users*` routes call this service over `AdminUserRepository` instead
   of legacy `db.py` wrappers.
+- `app.services.AdminAccessService` now owns admin user lookup/permission
+  checks for the admin router dependency, removing the final `db.py` runtime
+  dependency from `admin.py`.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

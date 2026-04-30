@@ -22,11 +22,17 @@ import admin
 import analytics
 import rag_routes
 from app.db.pool import database
-from app.repositories.oltp import ChatRepository, MessageRepository, MindmapRepository
-from app.services import ChatService, MindmapService
+from app.repositories.oltp import (
+    ChatRepository,
+    MessageRepository,
+    MindmapRepository,
+    UsageRepository,
+    UserRepository,
+)
+from app.services import ChatService, MindmapService, UsageService, UserService
 from billing import calculate_cost_units
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
-from billing_plans import public_plans
+from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, public_plans
 
 load_dotenv()
 
@@ -52,8 +58,11 @@ app.include_router(admin.router)
 app.include_router(rag_routes.router)
 chat_repository = ChatRepository(database)
 message_repository = MessageRepository(database)
+usage_repository = UsageRepository(database)
 chat_service = ChatService(chat_repository, message_repository)
 mindmap_service = MindmapService(chat_repository, message_repository, MindmapRepository(database))
+usage_service = UsageService(usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUEST)
+user_service = UserService(UserRepository(database), usage_service)
 
 # Static assets (error-page backgrounds, etc.) — served directly without auth
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -330,19 +339,7 @@ async def login(body: LoginIn):
 
 
 async def _safe_user(u: dict) -> dict:
-    usage = await db.get_user_usage_snapshot(u["id"])
-    return {
-        "id":               u["id"],
-        "username":         u["username"],
-        "email":            u["email"],
-        "subscription_id":  u.get("subscription_id"),
-        "plan_key":         usage.get("plan_key", "free"),
-        "subscription_name": usage.get("subscription_name", "Free"),
-        "usage":            usage,
-        "is_admin":         bool(u.get("is_admin", False)),
-        "is_blocked":       bool(u.get("is_blocked", False)),
-        "total_spent_usd":  float(u.get("total_spent_usd") or 0),
-    }
+    return await user_service.to_safe_user(u)
 
 
 def _model_name(key: str) -> str:
@@ -362,10 +359,10 @@ def _validate_chat_id(chat_id: str) -> str:
 # ── User ──────────────────────────────────────────────────────────────────────
 @app.get("/api/user")
 async def get_user(uid: int = Depends(current_user_id)):
-    user = await db.get_user_by_id(uid)
+    user = await user_service.get_safe_user_by_id(uid)
     if not user:
         raise HTTPException(404, "User not found")
-    return await _safe_user(user)
+    return user
 
 
 @app.get("/api/usage")

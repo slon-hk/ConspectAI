@@ -119,6 +119,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   digest construction, Gemini mindmap regeneration, and mindmap persistence.
   `main.py` keeps endpoint error mapping, analytics counters, and background
   task scheduling for the mindmap feature.
+- `app.services.UserService` now owns the safe user profile payload and usage
+  snapshot composition used by auth responses and `/api/user`.
 
 ## Next Stages
 

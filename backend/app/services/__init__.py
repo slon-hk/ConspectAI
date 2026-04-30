@@ -7,6 +7,7 @@ from .chat_service import ChatService
 from .mindmap_service import MindmapService
 from .usage_service import UsageService
 from .user_service import UserService
+from .request_metrics_service import RequestMetricsService
 
 __all__ = [
     "AuthService",
@@ -14,6 +15,7 @@ __all__ = [
     "FileService",
     "MindmapService",
     "QuotaService",
+    "RequestMetricsService",
     "UsageService",
     "UserService",
 ]

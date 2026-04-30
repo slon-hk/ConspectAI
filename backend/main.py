@@ -19,6 +19,7 @@ import admin
 import analytics
 import rag_routes
 from app.db.pool import database
+from app.repositories.olap import RagMetricRepository, RequestMetricRepository
 from app.repositories.oltp import (
     ChatRepository,
     FileRepository,
@@ -27,7 +28,14 @@ from app.repositories.oltp import (
     UsageRepository,
     UserRepository,
 )
-from app.services import ChatService, FileService, MindmapService, UsageService, UserService
+from app.services import (
+    ChatService,
+    FileService,
+    MindmapService,
+    RequestMetricsService,
+    UsageService,
+    UserService,
+)
 from app.services.auth_service import (
     AgreementRequiredError,
     AuthAccountBlockedError,
@@ -82,6 +90,10 @@ user_repository = UserRepository(database)
 user_service = UserService(user_repository, usage_service)
 auth_service = AuthService(user_repository, user_service, DEFAULT_PLAN_KEY)
 file_service = FileService(file_repository)
+request_metrics_service = RequestMetricsService(
+    RequestMetricRepository(database),
+    RagMetricRepository(database),
+)
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
@@ -166,19 +178,13 @@ async def subscription_quota_middleware(request: Request, call_next):
             await usage_service.fail_and_refund_request(request.state.request_log_id, str(e))
             usage = getattr(request.state, "billing_usage", {})
             latency_ms = int((__import__("time").perf_counter() - request.state._metrics_started) * 1000)
-            await db.log_request_metrics(
+            await request_metrics_service.log_request_from_usage(
                 request_log_id=request.state.request_log_id,
                 user_id=request.state.current_uid,
-                model=usage.get("model_name", "unknown"),
-                input_tokens=usage.get("input_tokens", 0),
-                output_tokens=usage.get("output_tokens", 0),
-                total_tokens=usage.get("total_tokens", 0),
-                cost_usd=float(usage.get("cost_units", 0)),
+                usage=usage,
                 status="error",
                 error_message=str(e),
                 latency_ms=latency_ms,
-                cache_hit=bool(usage.get("cache_hit", False)),
-                rag_savings_percent=float(usage.get("savings_pct", 0)),
                 session_count_inc=0,
             )
         raise
@@ -189,32 +195,19 @@ async def subscription_quota_middleware(request: Request, call_next):
         if response.status_code >= 400:
             await usage_service.fail_and_refund_request(request.state.request_log_id, f"http_{response.status_code}")
         if usage:
-            await db.log_request_metrics(
+            await request_metrics_service.log_request_from_usage(
                 request_log_id=request.state.request_log_id,
                 user_id=request.state.current_uid,
-                model=usage.get("model_name", "unknown"),
-                input_tokens=usage.get("input_tokens", 0),
-                output_tokens=usage.get("output_tokens", 0),
-                total_tokens=usage.get("total_tokens", 0),
-                cost_usd=float(usage.get("cost_units", 0)),
+                usage=usage,
                 status="success" if response.status_code < 400 else "error",
                 error_message="" if response.status_code < 400 else f"http_{response.status_code}",
                 latency_ms=latency_ms,
-                cache_hit=bool(usage.get("cache_hit", False)),
-                rag_savings_percent=float(usage.get("savings_pct", 0)),
             )
-            rag_meta = usage.get("rag_metrics")
-            if rag_meta and request.state.current_uid:
-                await db.insert_rag_metric(
+            if request.state.current_uid:
+                await request_metrics_service.log_rag_from_usage(
                     user_id=request.state.current_uid,
-                    query=rag_meta.get("query", ""),
-                    chunks_used=int(rag_meta.get("chunks_used", 0)),
-                    context_tokens=int(rag_meta.get("context_tokens", 0)),
-                    total_tokens=int(usage.get("total_tokens", 0)),
-                    estimated_tokens_no_rag=int(rag_meta.get("estimated_tokens_no_rag", 0)),
-                    savings_percent=float(usage.get("savings_pct", 0)),
-                    latency_ms=int(rag_meta.get("latency_ms", latency_ms)),
-                    cache_hit=bool(usage.get("cache_hit", False)),
+                    usage=usage,
+                    latency_ms=latency_ms,
                 )
     return response
 

@@ -130,6 +130,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - Quota middleware now reserves quota through `QuotaService` and refunds
   failed/blocked requests through `UsageService`; OLAP request/RAG metric writes
   remain a separate service extraction block.
+- `app.services.RequestMetricsService` now owns request metric logging and RAG
+  metric logging from middleware usage payloads. The underlying writes still use
+  OLAP repositories on the same Postgres database until worker batching is added.
 - `app.services.FileService` now owns file storage/metadata registration and raw
   file lookup. `main.py` keeps HTTP upload reading, response serving, and upload
   analytics side effects.

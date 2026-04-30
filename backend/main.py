@@ -19,6 +19,7 @@ from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
 from app.repositories.olap import (
     AdminReportRepository,
+    AnalyticsEventRepository,
     FunnelMetricRepository,
     RagMetricRepository,
     RequestMetricRepository,
@@ -102,7 +103,7 @@ request_metrics_service = RequestMetricsService(
     RagMetricRepository(database),
 )
 admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
-analytics_tracking_service = AnalyticsTrackingService()
+analytics_tracking_service = AnalyticsTrackingService(AnalyticsEventRepository(database))
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,

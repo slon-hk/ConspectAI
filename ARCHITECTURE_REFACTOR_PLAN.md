@@ -159,7 +159,7 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.services.AnalyticsTrackingService` now owns event tracking and live
   in-memory metric updates for `main.py` and `AiChatService`, keeping
   API/middleware/chat orchestration code off the legacy top-level `analytics.py`
-  module.
+  module. It publishes `analytics.event` directly through the event bus.
 - `app.infrastructure.observability.system_metrics` now owns live per-process
   counters. The legacy `analytics.metrics` object remains as a compatibility
   alias to the same singleton.

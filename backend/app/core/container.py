@@ -19,6 +19,7 @@ from app.repositories.oltp import (
     FileRepository,
     MessageRepository,
     MindmapRepository,
+    RagRouteRepository,
     UsageRepository,
     UserRepository,
 )
@@ -37,6 +38,7 @@ from app.services import (
 )
 from app.services.auth_service import AuthService
 from app.services.ai_chat_service import AiChatService
+from app.services.rag_service import RagService
 from app.services.billing_service import BillingService
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY
 from promts import MINDMAP_PROMPT, MODELS, SYSTEM_PROMPTS
@@ -58,6 +60,7 @@ class AppContainer:
     mindmap_generation_service: MindmapGenerationService
     mindmap_service: MindmapService
     quota_service: QuotaService
+    rag_service: RagService
     request_metrics_service: RequestMetricsService
     usage_service: UsageService
     user_service: UserService
@@ -81,6 +84,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
     user_service = UserService(user_repository, usage_service)
     auth_service = AuthService(user_repository, user_service, DEFAULT_PLAN_KEY)
     file_service = FileService(file_repository)
+    rag_service = RagService(RagRouteRepository(database))
     funnel_service = FunnelService(FunnelMetricRepository(database))
     request_metrics_service = RequestMetricsService(
         RequestMetricRepository(database),
@@ -118,6 +122,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         mindmap_generation_service=mindmap_generation_service,
         mindmap_service=mindmap_service,
         quota_service=quota_service,
+        rag_service=rag_service,
         request_metrics_service=request_metrics_service,
         usage_service=usage_service,
         user_service=user_service,

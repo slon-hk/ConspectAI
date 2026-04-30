@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.api.dependencies import create_current_user_id_dependency
 from app.api.routes.admin import require_admin, router as admin_router
-from app.api.routes.rag import router as rag_router
+from app.api.routes.rag import create_rag_router
 from app.api.router import register_routes
 from app.core.config import configure_gemini, load_settings
 from app.core.container import create_container
@@ -46,6 +46,10 @@ def create_app() -> FastAPI:
         token_dependency=security.oauth2,
         decode_token=security.decode_token,
         user_service=container.user_service,
+    )
+    rag_router = create_rag_router(
+        current_user_id=current_user_id,
+        rag_service=container.rag_service,
     )
     register_routes(
         app,

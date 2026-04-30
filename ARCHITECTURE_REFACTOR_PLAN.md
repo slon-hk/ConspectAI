@@ -196,6 +196,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   dependency. The top-level `admin.py` remains a compatibility wrapper.
 - `app.api.routes.rag` now owns RAG/course API routes. The top-level
   `rag_routes.py` remains a compatibility wrapper for old imports.
+- `app.api.routes.rag` now exposes a router factory that receives
+  `current_user_id` and `RagService` from the app container, removing route-level
+  repository/service construction from the active app path.
 - `app.api.dependencies` now owns the current-user dependency factory. `main.py`
   wires it with the existing token decoder and `UserService`, preserving 401/403
   behavior.

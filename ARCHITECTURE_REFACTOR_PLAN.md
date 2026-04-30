@@ -98,8 +98,11 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - RAG query/answer cache SQL and cached image resolution now live behind
   `app.repositories.oltp.RagCacheRepository`.
 - RAG hybrid retrieval SQL now lives behind
-  `app.repositories.oltp.RagRetrievalRepository`. Deep ingestion write SQL in
-  `rag.py` remains a separate migration block.
+  `app.repositories.oltp.RagRetrievalRepository`.
+- RAG ingestion write SQL for document status, chunk dedupe/upsert, image
+  upsert, chunk-image links, and ready finalization now lives behind
+  `app.repositories.oltp.RagIngestionRepository`. `rag.py` still owns extraction,
+  embedding, captioning, and ingestion orchestration.
 
 ## Next Stages
 

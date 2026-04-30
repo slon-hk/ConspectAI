@@ -36,9 +36,15 @@ import tiktoken
 
 import db
 import storage
-from app.repositories.oltp import RagCacheRepository, RagRetrievalRepository, RagRouteRepository
+from app.repositories.oltp import (
+    RagCacheRepository,
+    RagIngestionRepository,
+    RagRetrievalRepository,
+    RagRouteRepository,
+)
 
 _rag_cache_repository = RagCacheRepository()
+_rag_ingestion_repository = RagIngestionRepository()
 _rag_retrieval_repository = RagRetrievalRepository()
 _rag_routes_repository = RagRouteRepository()
 
@@ -436,11 +442,11 @@ async def ingest_document(
     start = time.monotonic()
 
     async def _set_status(status: str, msg: str = "") -> None:
-        async with db.pool().acquire() as conn:
-            await conn.execute(
-                "UPDATE rag_documents SET status=$1, error_msg=$2 WHERE id=$3",
-                status, msg or None, document_id,
-            )
+        await _rag_ingestion_repository.set_document_status(
+            document_id=document_id,
+            status=status,
+            error_msg=msg or None,
+        )
 
     await _set_status("indexing")
 
@@ -473,12 +479,9 @@ async def ingest_document(
 
         # ── 3. Deduplicate chunks by content hash ──────────────────────────
         chunk_hashes = [_sha256(c) for c in raw_chunks]
-        async with db.pool().acquire() as conn:
-            existing = await conn.fetch(
-                "SELECT content_hash, id FROM rag_chunks WHERE content_hash = ANY($1)",
-                chunk_hashes,
-            )
-        existing_map: dict[str, str] = {r["content_hash"]: str(r["id"]) for r in existing}
+        existing_map = await _rag_ingestion_repository.find_existing_chunks(
+            content_hashes=chunk_hashes,
+        )
 
         new_chunks = [
             (i, c, h) for i, (c, h) in enumerate(zip(raw_chunks, chunk_hashes))
@@ -492,34 +495,18 @@ async def ingest_document(
             texts_to_embed = [c for _, c, _ in new_chunks]
             embeddings = await embed_texts(texts_to_embed)
 
-            async with db.pool().acquire() as conn:
-                async with conn.transaction():
-                    for (idx, content, chash), emb in zip(new_chunks, embeddings):
-                        row = await conn.fetchrow(
-                            """
-                            INSERT INTO rag_chunks
-                                (document_id, content, content_hash, embedding, tsv,
-                                chunk_index, char_start, char_end)
-                            VALUES (
-                                $1, $2, $3, $4::vector,
-                                to_tsvector('russian', $2),
-                                $5, NULL, NULL
-                            )
-                            ON CONFLICT (content_hash) DO UPDATE
-                                SET source_count = rag_chunks.source_count + 1
-                            RETURNING id
-                            """,
-                            document_id, content, chash, to_pgvector(emb), idx,
-                        )
-                        chunk_ids[chash] = str(row["id"])
+            chunk_ids.update(
+                await _rag_ingestion_repository.upsert_chunks(
+                    document_id=document_id,
+                    chunks=[
+                        (idx, content, chash, to_pgvector(emb))
+                        for (idx, content, chash), emb in zip(new_chunks, embeddings)
+                    ],
+                )
+            )
         else:
             # All chunks already exist — update source_count for existing ones
-            async with db.pool().acquire() as conn:
-                await conn.execute(
-                    """UPDATE rag_chunks SET source_count = source_count + 1
-                       WHERE content_hash = ANY($1)""",
-                    chunk_hashes,
-                )
+            await _rag_ingestion_repository.increment_chunk_sources(content_hashes=chunk_hashes)
 
         # ── 5. Process images (PDF only) ───────────────────────────────────
         image_count = 0
@@ -532,13 +519,9 @@ async def ingest_document(
             surrounding = img_data["surrounding_text"]
 
             # Check if image already stored (dedup)
-            async with db.pool().acquire() as conn:
-                existing_img = await conn.fetchrow(
-                    "SELECT id FROM rag_images WHERE sha256 = $1", sha
-                )
-
-            if existing_img:
-                img_id = str(existing_img["id"])
+            existing_img_id = await _rag_ingestion_repository.get_image_id_by_sha(sha256=sha)
+            if existing_img_id:
+                img_id = existing_img_id
             else:
                 # Save to disk
                 ext = mime.split("/")[-1]
@@ -552,42 +535,33 @@ async def ingest_document(
                 cap_embeddings = await embed_texts([caption])
                 cap_emb = cap_embeddings[0] if cap_embeddings else None
 
-                async with db.pool().acquire() as conn:
-                    row = await conn.fetchrow(
-                        """INSERT INTO rag_images
-                               (document_id, sha256, file_path, mime_type,
-                                caption, embedding, page_num)
-                           VALUES ($1, $2, $3, $4, $5, $6, $7)
-                           ON CONFLICT (sha256) DO UPDATE
-                               SET caption = EXCLUDED.caption
-                           RETURNING id""",
-                        document_id, sha, str(img_path), mime,
-                        caption, to_pgvector(cap_emb), page_num,
-                    )
-                    img_id = str(row["id"])
+                img_id = await _rag_ingestion_repository.upsert_image(
+                    document_id=document_id,
+                    sha256=sha,
+                    file_path=str(img_path),
+                    mime_type=mime,
+                    caption=caption,
+                    embedding_pgvector=to_pgvector(cap_emb),
+                    page_num=page_num,
+                )
 
             # Link image to nearby chunks (same page heuristic)
             for _, content, chash in (new_chunks or [(None, None, h) for h in chunk_hashes]):
                 if chash in chunk_ids:
                     try:
-                        async with db.pool().acquire() as conn:
-                            await conn.execute(
-                                """INSERT INTO rag_chunk_images (chunk_id, image_id)
-                                   VALUES ($1, $2) ON CONFLICT DO NOTHING""",
-                                chunk_ids[chash], img_id,
-                            )
+                        await _rag_ingestion_repository.link_chunk_image(
+                            chunk_id=chunk_ids[chash],
+                            image_id=img_id,
+                        )
                     except Exception:
                         pass
             image_count += 1
 
         # ── 6. Finalise document record ────────────────────────────────────
-        async with db.pool().acquire() as conn:
-            await conn.execute(
-                """UPDATE rag_documents
-                   SET status = 'ready', chunk_count = $1
-                   WHERE id = $2""",
-                len(raw_chunks), document_id,
-            )
+        await _rag_ingestion_repository.mark_document_ready(
+            document_id=document_id,
+            chunk_count=len(raw_chunks),
+        )
 
         elapsed = round(time.monotonic() - start, 2)
         print(f"[rag] ingested {filename}: {len(raw_chunks)} chunks, "

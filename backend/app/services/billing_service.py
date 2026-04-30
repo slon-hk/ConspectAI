@@ -2,7 +2,50 @@
 
 from __future__ import annotations
 
-from billing import calculate_cost_units
+from typing import Any
+
+
+MODEL_PRICING: dict[str, dict[str, float]] = {
+    "gemini-3.1-flash-lite-preview": {
+        "input_per_1m": 0.10,
+        "output_per_1m": 0.40,
+        "context_multiplier": 0.15,
+    },
+    "gemini-2.0-flash": {
+        "input_per_1m": 0.20,
+        "output_per_1m": 0.80,
+        "context_multiplier": 0.15,
+    },
+    "gemini-2.5-flash-lite": {
+        "input_per_1m": 0.10,
+        "output_per_1m": 0.40,
+        "context_multiplier": 0.15,
+    },
+    "gemini-2.5-pro": {
+        "input_per_1m": 1.25,
+        "output_per_1m": 5.00,
+        "context_multiplier": 0.15,
+    },
+}
+
+DEFAULT_PRICING = {
+    "input_per_1m": 0.30,
+    "output_per_1m": 1.20,
+    "context_multiplier": 0.15,
+}
+
+
+def calculate_cost_units(
+    model_name: str,
+    input_tokens: int,
+    output_tokens: int,
+    context_tokens: int,
+) -> float:
+    p = MODEL_PRICING.get(model_name, DEFAULT_PRICING)
+    in_cost = (max(input_tokens, 0) / 1_000_000) * p["input_per_1m"]
+    out_cost = (max(output_tokens, 0) / 1_000_000) * p["output_per_1m"]
+    ctx_cost = (max(context_tokens, 0) / 1_000_000) * p["input_per_1m"] * p["context_multiplier"]
+    return round(in_cost + out_cost + ctx_cost, 8)
 
 
 class BillingService:
@@ -15,7 +58,7 @@ class BillingService:
         course_id: str | None,
         rag_result: dict,
         cache_hit: bool,
-    ) -> dict:
+    ) -> dict[str, Any]:
         input_tokens = max(1, len(content or "") // 4)
         context_tokens = rag_result.get("context_tokens", 0) if course_id else 0
         output_tokens = max(1, len(assistant_text or "") // 4)
@@ -55,7 +98,7 @@ class BillingService:
         course_id: str | None,
         rag_result: dict,
         content: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         return {
             "model_name": model_key,
             "cache_hit": cache_hit,

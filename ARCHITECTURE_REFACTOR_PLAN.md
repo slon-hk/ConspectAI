@@ -228,6 +228,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   service path.
 - Request/RAG metrics and funnel event handlers now require explicit OLAP
   repositories, keeping event persistence dependencies wired through services.
+- `app.services.billing_service` now owns model pricing and internal cost
+  calculation; top-level `billing.py` remains a compatibility wrapper.
 - Legacy `rag.py` no longer initializes a `tiktoken` encoding at import time,
   keeping app import/startup from performing a network-backed cache download.
 - `app.main` now owns FastAPI app assembly. The top-level `main.py` remains a

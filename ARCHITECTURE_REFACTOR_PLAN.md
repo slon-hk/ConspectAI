@@ -206,6 +206,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.core.container` now owns repository/service construction, keeping
   `main.py` focused on process setup, middleware registration, and router
   inclusion.
+- `app.api.router` now owns API/page router registration. `main.py` passes the
+  container and legacy router dependencies into a single registration function.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

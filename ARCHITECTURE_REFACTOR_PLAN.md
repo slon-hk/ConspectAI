@@ -217,7 +217,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `main.py` focused on process setup, middleware registration, and router
   inclusion.
 - `app.api.router` now owns API/page router registration. `main.py` passes the
-  container and legacy router dependencies into a single registration function.
+  app container and shared dependencies into a single registration function.
+- `app.api.router` now constructs admin and RAG routers from factories using
+  container services, keeping `app.main` focused on process assembly.
 - `app.main` now owns FastAPI app assembly. The top-level `main.py` remains a
   compatibility wrapper for the existing `uvicorn main:app` Docker entrypoint.
 - `app.main.create_app()` now exposes explicit app construction for import

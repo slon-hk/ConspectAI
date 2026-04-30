@@ -7,6 +7,7 @@ from collections.abc import Callable
 from fastapi import FastAPI
 from fastapi.templating import Jinja2Templates
 
+from app.api.routes.admin import create_admin_router, create_require_admin_dependency
 from app.api.routes.admin_metrics import create_admin_metrics_router
 from app.api.routes.analytics import create_analytics_router
 from app.api.routes.auth import create_auth_router
@@ -15,6 +16,7 @@ from app.api.routes.chats import create_chat_router
 from app.api.routes.files import create_file_router
 from app.api.routes.mindmaps import create_mindmap_router
 from app.api.routes.pages import create_pages_router
+from app.api.routes.rag import create_rag_router
 from app.api.routes.users import create_user_router
 from app.core.container import AppContainer
 
@@ -27,13 +29,23 @@ def register_routes(
     templates: Jinja2Templates,
     token_dependency: Callable,
     decode_token: Callable[[str], int | None],
-    admin_router,
-    require_admin: Callable,
-    rag_router,
 ) -> None:
-    app.include_router(admin_router)
+    require_admin = create_require_admin_dependency(container.admin_access_service)
+    app.include_router(
+        create_admin_router(
+            require_admin=require_admin,
+            admin_analytics_service=container.admin_analytics_service,
+            admin_metrics_service=container.admin_metrics_service,
+            admin_user_service=container.admin_user_service,
+        )
+    )
     app.include_router(catalog_router)
-    app.include_router(rag_router)
+    app.include_router(
+        create_rag_router(
+            current_user_id=current_user_id,
+            rag_service=container.rag_service,
+        )
+    )
     app.include_router(
         create_auth_router(
             auth_service=container.auth_service,

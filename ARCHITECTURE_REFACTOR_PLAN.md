@@ -226,6 +226,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.
+- Request/RAG metrics and funnel event handlers now require explicit OLAP
+  repositories, keeping event persistence dependencies wired through services.
 - Legacy `rag.py` no longer initializes a `tiktoken` encoding at import time,
   keeping app import/startup from performing a network-backed cache download.
 - `app.main` now owns FastAPI app assembly. The top-level `main.py` remains a

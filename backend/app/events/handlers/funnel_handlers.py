@@ -9,8 +9,8 @@ FUNNEL_STEP_EVENT_TYPE = "funnel.step.recorded"
 
 
 class FunnelStepEventHandler:
-    def __init__(self, repository: FunnelMetricRepository | None = None) -> None:
-        self._repository = repository or FunnelMetricRepository()
+    def __init__(self, repository: FunnelMetricRepository) -> None:
+        self._repository = repository
 
     async def __call__(self, event: BaseEvent) -> None:
         payload = event.payload

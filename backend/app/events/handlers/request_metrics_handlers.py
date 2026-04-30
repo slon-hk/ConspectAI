@@ -10,8 +10,8 @@ RAG_METRICS_EVENT_TYPE = "metrics.rag.query"
 
 
 class RequestMetricsEventHandler:
-    def __init__(self, repository: RequestMetricRepository | None = None) -> None:
-        self._repository = repository or RequestMetricRepository()
+    def __init__(self, repository: RequestMetricRepository) -> None:
+        self._repository = repository
 
     async def __call__(self, event: BaseEvent) -> None:
         payload = event.payload
@@ -33,8 +33,8 @@ class RequestMetricsEventHandler:
 
 
 class RagMetricsEventHandler:
-    def __init__(self, repository: RagMetricRepository | None = None) -> None:
-        self._repository = repository or RagMetricRepository()
+    def __init__(self, repository: RagMetricRepository) -> None:
+        self._repository = repository
 
     async def __call__(self, event: BaseEvent) -> None:
         payload = event.payload

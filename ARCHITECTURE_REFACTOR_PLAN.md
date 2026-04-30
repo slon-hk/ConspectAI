@@ -194,6 +194,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `AdminMetricsService`, leaving `main.py` with no direct business endpoints.
 - `app.api.routes.admin` now owns `/api/admin/*` routes and admin auth
   dependency. The top-level `admin.py` remains a compatibility wrapper.
+- `app.api.routes.admin` now exposes router/dependency factories that receive
+  admin services from the app container, removing active route-level repository
+  construction from the app path.
 - `app.api.routes.rag` now owns RAG/course API routes. The top-level
   `rag_routes.py` remains a compatibility wrapper for old imports.
 - `app.api.routes.rag` now exposes a router factory that receives

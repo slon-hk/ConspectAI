@@ -20,11 +20,15 @@ from app.repositories.oltp import (
     MessageRepository,
     MindmapRepository,
     RagRouteRepository,
+    AdminUserRepository,
     UsageRepository,
     UserRepository,
 )
 from app.services import (
+    AdminAccessService,
+    AdminAnalyticsService,
     AdminMetricsService,
+    AdminUserService,
     AnalyticsTrackingService,
     ChatService,
     FileService,
@@ -50,7 +54,10 @@ MINDMAP_MODEL = "gemini-2.5-flash-lite"
 
 @dataclass(frozen=True)
 class AppContainer:
+    admin_access_service: AdminAccessService
+    admin_analytics_service: AdminAnalyticsService
     admin_metrics_service: AdminMetricsService
+    admin_user_service: AdminUserService
     ai_chat_service: AiChatService
     analytics_tracking_service: AnalyticsTrackingService
     auth_service: AuthService
@@ -90,7 +97,10 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         RequestMetricRepository(database),
         RagMetricRepository(database),
     )
+    admin_access_service = AdminAccessService(user_repository)
+    admin_analytics_service = AdminAnalyticsService(AnalyticsEventRepository(database))
     admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
+    admin_user_service = AdminUserService(AdminUserRepository(database))
     analytics_tracking_service = AnalyticsTrackingService(AnalyticsEventRepository(database))
     mindmap_generation_service = MindmapGenerationService(
         mindmap_service=mindmap_service,
@@ -112,7 +122,10 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         gemini_api_key=gemini_api_key,
     )
     return AppContainer(
+        admin_access_service=admin_access_service,
+        admin_analytics_service=admin_analytics_service,
         admin_metrics_service=admin_metrics_service,
+        admin_user_service=admin_user_service,
         ai_chat_service=ai_chat_service,
         analytics_tracking_service=analytics_tracking_service,
         auth_service=auth_service,

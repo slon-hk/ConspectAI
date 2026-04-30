@@ -18,43 +18,47 @@ from app.middleware import (
 )
 from app.workers import start_analytics_cleanup_task
 
-settings = load_settings()
-configure_gemini(settings)
+
+def create_app() -> FastAPI:
+    settings = load_settings()
+    configure_gemini(settings)
+
+    lifespan = create_lifespan(
+        database=database,
+        start_analytics_cleanup_task=start_analytics_cleanup_task,
+    )
+    app = FastAPI(title="ConspectAI", lifespan=lifespan)
+    jinja = Jinja2Templates(directory="templates")
+    container = create_container(database=database, gemini_api_key=settings.gemini_api_key)
+    register_http_metrics_middleware(app, container.analytics_tracking_service)
+    register_subscription_quota_middleware(
+        app,
+        decode_token=auth.decode_token,
+        quota_service=container.quota_service,
+        usage_service=container.usage_service,
+        request_metrics_service=container.request_metrics_service,
+    )
+    # Static assets (error-page backgrounds, etc.) are served directly without auth.
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    register_exception_handlers(app, jinja)
+
+    current_user_id = create_current_user_id_dependency(
+        token_dependency=auth.oauth2,
+        decode_token=auth.decode_token,
+        user_service=container.user_service,
+    )
+    register_routes(
+        app,
+        container=container,
+        current_user_id=current_user_id,
+        templates=jinja,
+        token_dependency=auth.oauth2,
+        decode_token=auth.decode_token,
+        admin_router=admin.router,
+        require_admin=admin.require_admin,
+        rag_router=rag_routes.router,
+    )
+    return app
 
 
-lifespan = create_lifespan(
-    database=database,
-    start_analytics_cleanup_task=start_analytics_cleanup_task,
-)
-app = FastAPI(title="ConspectAI", lifespan=lifespan)
-jinja = Jinja2Templates(directory="templates")
-container = create_container(database=database, gemini_api_key=settings.gemini_api_key)
-register_http_metrics_middleware(app, container.analytics_tracking_service)
-register_subscription_quota_middleware(
-    app,
-    decode_token=auth.decode_token,
-    quota_service=container.quota_service,
-    usage_service=container.usage_service,
-    request_metrics_service=container.request_metrics_service,
-)
-# Static assets (error-page backgrounds, etc.) are served directly without auth.
-app.mount("/static", StaticFiles(directory="static"), name="static")
-register_exception_handlers(app, jinja)
-
-
-current_user_id = create_current_user_id_dependency(
-    token_dependency=auth.oauth2,
-    decode_token=auth.decode_token,
-    user_service=container.user_service,
-)
-register_routes(
-    app,
-    container=container,
-    current_user_id=current_user_id,
-    templates=jinja,
-    token_dependency=auth.oauth2,
-    decode_token=auth.decode_token,
-    admin_router=admin.router,
-    require_admin=admin.require_admin,
-    rag_router=rag_routes.router,
-)
+app = create_app()

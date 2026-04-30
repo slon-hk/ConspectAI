@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.db.pool import Database
+from app.infrastructure.storage import FileStorage
 from app.repositories.olap import (
     AdminReportRepository,
     AnalyticsEventRepository,
@@ -97,7 +98,8 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         template_meta=TEMPLATE_META,
         public_plans=public_plans,
     )
-    file_service = FileService(file_repository)
+    file_storage = FileStorage()
+    file_service = FileService(file_repository, file_storage)
     rag_service = RagService(RagRouteRepository(database))
     funnel_service = FunnelService(FunnelMetricRepository(database))
     request_metrics_service = RequestMetricsService(

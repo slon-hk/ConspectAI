@@ -227,6 +227,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `CatalogService` instead of importing billing config directly in the route.
 - Admin plan validation now lives in `AdminUserService`; admin routes no longer
   import subscription plan config directly.
+- `app.infrastructure.storage.FileStorage` now wraps legacy content-addressed
+  file storage, and `FileService` receives storage through explicit injection.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.

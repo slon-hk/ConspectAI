@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import storage
+from app.infrastructure.storage import FileStorage
 from app.repositories.oltp import FileRepository
 
 
 class FileService:
-    def __init__(self, file_repository: FileRepository) -> None:
+    def __init__(self, file_repository: FileRepository, file_storage: FileStorage) -> None:
         self._file_repository = file_repository
+        self._file_storage = file_storage
 
     async def store_upload(
         self,
@@ -17,8 +18,8 @@ class FileService:
         filename: str | None,
         content_type: str | None,
     ) -> dict:
-        mime = content_type or storage.guess_mime(filename or "")
-        meta = storage.store_file(raw, mime)
+        mime = content_type or self._file_storage.guess_mime(filename or "")
+        meta = self._file_storage.store_file(raw, mime)
         await self._file_repository.register(
             meta["sha256"],
             mime,
@@ -46,5 +47,5 @@ class FileService:
         meta = await self._file_repository.get(sha256)
         if not meta:
             return None
-        raw = storage.read_file(meta["sha256"], meta["compressed"])
+        raw = self._file_storage.read_file(meta["sha256"], meta["compressed"])
         return raw, meta["mime_type"]

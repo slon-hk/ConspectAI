@@ -195,6 +195,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.api.dependencies` now owns the current-user dependency factory. `main.py`
   wires it with the existing token decoder and `UserService`, preserving 401/403
   behavior.
+- `app.middleware.http_metrics` and `app.middleware.quota` now own runtime
+  middleware registration. Quota middleware remains thin over `QuotaService`,
+  `UsageService`, and `RequestMetricsService`, preserving the hot chat-message
+  request path behavior.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

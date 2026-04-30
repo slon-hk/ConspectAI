@@ -1,10 +1,9 @@
 import os
 from contextlib import asynccontextmanager
 import re
-import uuid
 
 import google.generativeai as genai
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +18,7 @@ from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import router as catalog_router
 from app.api.routes.chats import create_chat_router
 from app.api.routes.files import create_file_router
+from app.api.routes.mindmaps import create_mindmap_router
 from app.api.routes.users import create_user_router
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
@@ -326,13 +326,6 @@ async def pricing_page(request: Request):
     return jinja.TemplateResponse("pricing.html", {"request": request, "plans": plans})
 
 
-def _validate_chat_id(chat_id: str) -> str:
-    try:
-        return str(uuid.UUID(str(chat_id)))
-    except Exception:
-        raise HTTPException(400, "Invalid chat_id")
-
-
 @app.get("/admin/metrics")
 async def get_admin_metrics_public(_=Depends(admin.require_admin)):
     return await admin_metrics_service.admin_metrics()
@@ -371,27 +364,11 @@ app.include_router(
         default_model="gemini-3.1-flash-lite-preview",
     )
 )
-
-
-@app.get("/api/chats/{chat_id}/mindmap")
-async def fetch_mindmap(chat_id: str, uid: int = Depends(current_user_id)):
-    chat_id = _validate_chat_id(chat_id)
-    mindmap = await mindmap_service.get_for_user_chat(chat_id=chat_id, user_id=uid)
-    if mindmap is None:
-        raise HTTPException(404, "Chat not found")
-    analytics_tracking_service.track("mindmap_opened", uid, chat_id=str(chat_id), has_content=bool(mindmap["markdown"]))
-    return mindmap
-
-
-@app.post("/api/chats/{chat_id}/mindmap/regenerate")
-async def force_regenerate_mindmap(
-    chat_id: str,
-    bg:      BackgroundTasks,
-    uid:     int = Depends(current_user_id),
-):
-    chat_id = _validate_chat_id(chat_id)
-    if not await mindmap_service.user_can_access_chat(chat_id=chat_id, user_id=uid):
-        raise HTTPException(404, "Chat not found")
-    bg.add_task(mindmap_generation_service.regenerate_background, chat_id)
-    analytics_tracking_service.track("mindmap_regenerated", uid, chat_id=str(chat_id))
-    return {"ok": True, "queued": True}
+app.include_router(
+    create_mindmap_router(
+        current_user_id=current_user_id,
+        mindmap_service=mindmap_service,
+        mindmap_generation_service=mindmap_generation_service,
+        analytics_tracking_service=analytics_tracking_service,
+    )
+)

@@ -185,6 +185,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   success/failure counters.
 - `app.api.routes.files` now owns upload and raw-file serving endpoints over
   `FileService`, preserving upload analytics tracking and response behavior.
+- `app.api.routes.mindmaps` now owns mindmap fetch/regeneration endpoints over
+  `MindmapService` and `MindmapGenerationService`, preserving background task
+  scheduling and analytics side effects.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

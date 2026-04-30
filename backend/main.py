@@ -1,12 +1,10 @@
 import os
-import io
 import asyncio
 from contextlib import asynccontextmanager
 import re
 import uuid
 
 import google.generativeai as genai
-import PIL.Image
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks, status
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, Response
@@ -24,13 +22,20 @@ import rag_routes
 from app.db.pool import database
 from app.repositories.oltp import (
     ChatRepository,
+    FileRepository,
     MessageRepository,
     MindmapRepository,
     UsageRepository,
     UserRepository,
 )
 from app.services import ChatService, MindmapService, UsageService, UserService
-from billing import calculate_cost_units
+from app.services.ai_chat_service import (
+    AccountBlockedError,
+    AiChatService,
+    ChatNotFoundError,
+    EmptyMessageError,
+    GeminiApiKeyMissingError,
+)
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, public_plans
 
@@ -63,6 +68,16 @@ chat_service = ChatService(chat_repository, message_repository)
 mindmap_service = MindmapService(chat_repository, message_repository, MindmapRepository(database))
 usage_service = UsageService(usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUEST)
 user_service = UserService(UserRepository(database), usage_service)
+ai_chat_service = AiChatService(
+    chat_service=chat_service,
+    user_service=user_service,
+    file_repository=FileRepository(database),
+    system_prompts=SYSTEM_PROMPTS,
+    models=MODELS,
+    default_template="deep",
+    default_model="gemini-3.1-flash-lite-preview",
+    gemini_api_key=GEMINI_API_KEY,
+)
 
 # Static assets (error-page backgrounds, etc.) — served directly without auth
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -507,215 +522,28 @@ async def send_message(
     uid:        int  = Depends(current_user_id),
 ):
     chat_id = _validate_chat_id(chat_id)
-    import json
-
-    if not GEMINI_API_KEY:
-        raise HTTPException(500, "GEMINI_API_KEY not set in .env")
-
-    chat = await chat_service.get_chat(chat_id=chat_id, user_id=uid)
-    if not chat:
-        raise HTTPException(404, "Chat not found")
-
-    user = await db.get_user_by_id(uid)
-    if user.get("is_blocked"):
-        raise HTTPException(403, "Аккаунт заблокирован администратором")
-
-    file_refs = json.loads(files_json)   # [{sha256, original_filename, mime_type, compressed}, ...]
-
-    tpl_key  = chat["template"] or "deep"
-    mdl_key  = chat["model"]    or "gemini-3.1-flash-lite-preview"
-    if mdl_key not in MODELS: mdl_key = "gemini-3.1-flash-lite-preview"
-    sys_p    = SYSTEM_PROMPTS.get(tpl_key, SYSTEM_PROMPTS["deep"])
-
-    # Build Gemini history for memory
-    history_rows = await chat_service.list_messages(chat_id=chat_id)
-    gemini_history = []
-    for r in history_rows:
-        role = "user" if r["role"] == "user" else "model"
-        gemini_history.append({"role": role, "parts": [r["content"] or "…"]})
-
-    # Save user message
-    user_msg = await chat_service.save_message(
-        chat_id=chat_id,
-        role="user",
-        content=content,
-        file_metas=[{"sha256": f["sha256"], "original_filename": f["original_filename"]}
-                    for f in file_refs],
-    )
-
-    # Build parts for current turn
-    parts: list = [content] if content else []
-    for f in file_refs:
-        meta = await db.get_file_meta(f["sha256"])
-        if not meta:
-            continue
-        try:
-            raw = storage.read_file(meta["sha256"], meta["compressed"])
-            if meta["mime_type"].startswith("image/"):
-                parts.append(PIL.Image.open(io.BytesIO(raw)))
-            else:
-                # Upload to Gemini Files API for non-images
-                buf = io.BytesIO(raw)
-                buf.name = f["original_filename"]
-                uploaded = genai.upload_file(buf, mime_type=meta["mime_type"])
-                parts.append(uploaded)
-        except Exception as e:
-            print(f"File attach error: {e}")
-
-    if not parts:
-        raise HTTPException(400, "Нет содержимого для отправки")
-
-    # ── RAG path: if chat has a linked course, use retrieval ──────────────
-    course_id: str | None = chat.get("course_id")
-    rag_images: list[dict] = []
-    rag_result = {}
-    if file_refs:
-        try:
-            import rag as rag_engine
-            auto_course = await rag_engine.ensure_chat_course_and_ingest_uploads(
-                chat_id=chat_id,
-                user_id=uid,
-                file_refs=file_refs,
-            )
-            if auto_course and not course_id:
-                course_id = auto_course
-        except Exception as e:
-            print(f"[rag] auto-ingest failed: {e}")
-
-    if course_id:
-        import rag as rag_engine
-        rag_result = await rag_engine.rag_query(
-            query=content or " ".join(str(p) for p in parts if isinstance(p, str)),
-            course_id=str(course_id),
-            system_prompt=sys_p,
-            model_name=mdl_key,
-            conversation_history=gemini_history,
+    try:
+        result = await ai_chat_service.send_message(
+            chat_id=chat_id,
+            user_id=uid,
+            content=content,
+            files_json=files_json,
         )
-        asst_txt   = rag_result["answer"]
-        rag_images = rag_result["images"]
-        cache_hit = bool(rag_result.get("from_cache"))
+    except GeminiApiKeyMissingError as exc:
+        raise HTTPException(500, str(exc)) from exc
+    except ChatNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except AccountBlockedError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except EmptyMessageError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
-        # For billing: RAG adds ~5K input tokens worth of context.
-        # We surface this as the minimum multiplier being at least 1,
-        # but the flat-rate logic below will still apply.
-        api_tokens_override = rag_result.get("api_tokens", None)
-
-        # Record whether we found sources (for analytics)
-        analytics.track(
-            "rag_query", uid,
-            chat_id=str(chat_id), course_id=str(course_id),
-            sources_found=rag_result["sources_found"],
-            from_cache=rag_result["from_cache"],
-        )
-
-    else:
-        # ── Standard (non-RAG) Gemini path ────────────────────────────────
-        model_obj  = genai.GenerativeModel(model_name=_model_name(mdl_key), system_instruction=sys_p)
-        session    = model_obj.start_chat(history=gemini_history)
-
-        loop       = asyncio.get_event_loop()
-        import time as _t
-        _gem_start = _t.perf_counter()
-        try:
-            response = await loop.run_in_executor(None, lambda: session.send_message(parts))
-            analytics.metrics.record_gemini(mdl_key, (_t.perf_counter() - _gem_start) * 1000, ok=True)
-        except Exception as e:
-            analytics.metrics.record_gemini(mdl_key, (_t.perf_counter() - _gem_start) * 1000, ok=False)
-            analytics.track("gemini_error", uid, model=mdl_key, error=str(e)[:200])
-            raise
-
-        asst_txt = response.text
-        api_tokens_override = None
-        cache_hit = False
-
-        try:    api_tokens_raw = response.usage_metadata.total_token_count
-        except: api_tokens_raw = max(1, len(asst_txt) // 4)
-
-    # ── Billing: flat rate per model ───────────────────────────────────────
-    if not course_id:
-        api_tokens = api_tokens_raw  # type: ignore[name-defined]
-    else:
-        # RAG: estimate tokens = context (3000) + answer length
-        api_tokens = 3000 + max(1, len(asst_txt) // 4)
-    if api_tokens_override is not None:
-        api_tokens = api_tokens_override
-
-    # Internal cost accounting (user does not see token billing).
-    input_tokens = max(1, len(content or "") // 4)
-    context_tokens = rag_result.get("context_tokens", 0) if course_id else 0
-    output_tokens = max(1, len(asst_txt or "") // 4)
-    total_tokens = input_tokens + context_tokens + output_tokens
-    estimated_without_rag = rag_result.get("estimated_without_rag_tokens", total_tokens) if course_id else total_tokens
-    actual_with_rag = rag_result.get("actual_with_rag_tokens", total_tokens) if course_id else total_tokens
-    savings_pct = 0.0
-    if estimated_without_rag > 0:
-        savings_pct = round(max((estimated_without_rag - actual_with_rag) / estimated_without_rag, 0) * 100, 3)
-    cost_usd = calculate_cost_units(mdl_key, input_tokens, output_tokens, context_tokens)
-    if cache_hit:
-        cost_usd = round(cost_usd * 0.01, 8)
-
-    # Save assistant message
-    asst_msg = await chat_service.save_message(
-        chat_id=chat_id,
-        role="assistant",
-        content=asst_txt,
-        tokens=total_tokens,
-        model=mdl_key,
-        cost_usd=cost_usd,
-    )
-    asst_msg = dict(asst_msg)
-    if rag_images:
-        # Surface retrieved images to the frontend (served via /api/rag/images/{id})
-        asst_msg["rag_images"] = [
-            {
-                "id":       img["id"],
-                "caption":  img["caption"],
-                "url":      f"/api/rag/images/{img['id']}",
-                "mime":     img["mime_type"],
-            }
-            for img in rag_images
-        ]
-
-    # Track for analytics — keep internal usage figures
-    analytics.track(
-        "message_sent", uid,
-        chat_id=str(chat_id), template=tpl_key, model=mdl_key,
-        tokens=total_tokens, api_tokens=api_tokens,
-        cost_usd=cost_usd,
-        files=len(file_refs),
-    )
-    request.state.billing_usage = {
-        "model_name": mdl_key,
-        "cache_hit": cache_hit,
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "context_tokens": context_tokens,
-        "total_tokens": total_tokens,
-        "estimated_no_rag": estimated_without_rag,
-        "actual_with_rag": actual_with_rag,
-        "savings_pct": savings_pct,
-        "cost_units": cost_usd,
-        "status": "completed",
-        "rag_metrics": {
-            "query": content or "",
-            "chunks_used": rag_result.get("chunks_used", 0) if course_id else 0,
-            "context_tokens": context_tokens,
-            "estimated_tokens_no_rag": estimated_without_rag,
-            "latency_ms": rag_result.get("latency_ms", 0) if course_id else 0,
-        } if course_id else None,
-    }
-
-    await chat_service.update_title_after_message(
-        chat_id=chat_id,
-        user_id=uid,
-        current_title=chat["title"],
-        content=content,
-    )
+    request.state.billing_usage = result["billing_usage"]
 
     # Schedule background mindmap refresh — doesn't block the response
     bg.add_task(regenerate_mindmap, chat_id)
 
-    return _serialize_msg(asst_msg)
+    return _serialize_msg(result["assistant_message"])
 
 
 # ── File upload ────────────────────────────────────────────────────────────────

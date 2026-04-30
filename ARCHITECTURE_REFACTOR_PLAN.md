@@ -121,6 +121,11 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   task scheduling for the mindmap feature.
 - `app.services.UserService` now owns the safe user profile payload and usage
   snapshot composition used by auth responses and `/api/user`.
+- `app.services.ai_chat_service.AiChatService` now owns the core chat turn
+  orchestration for `send_message`: file attachment preparation, Gemini/RAG
+  branching, assistant persistence, billing usage payload construction, and chat
+  title refresh. `main.py` keeps HTTP error mapping, `request.state` assignment,
+  and background mindmap scheduling.
 
 ## Next Stages
 

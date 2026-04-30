@@ -68,6 +68,9 @@ class ChatService:
     async def get_chat(self, *, chat_id: str, user_id: int) -> dict | None:
         return await self._chat_repository.get(chat_id, user_id)
 
+    async def list_messages(self, *, chat_id: str) -> list[dict]:
+        return await self._message_repository.list_by_chat(chat_id)
+
     async def list_messages_for_user_chat(
         self,
         *,
@@ -78,6 +81,27 @@ class ChatService:
         if not chat:
             return None
         return await self._message_repository.list_by_chat(chat_id)
+
+    async def save_message(
+        self,
+        *,
+        chat_id: str,
+        role: str,
+        content: str,
+        tokens: int = 0,
+        model: str = "",
+        cost_usd: float = 0,
+        file_metas: list[dict] | None = None,
+    ) -> dict:
+        return await self._message_repository.create(
+            chat_id,
+            role,
+            content,
+            tokens=tokens,
+            model=model,
+            cost_usd=cost_usd,
+            file_metas=file_metas,
+        )
 
     async def update_title_after_message(
         self,

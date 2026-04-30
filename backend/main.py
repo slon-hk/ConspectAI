@@ -2,7 +2,6 @@ import os
 import io
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
 import re
 import uuid
 
@@ -513,7 +512,7 @@ async def send_message(
     if not GEMINI_API_KEY:
         raise HTTPException(500, "GEMINI_API_KEY not set in .env")
 
-    chat = await db.get_chat(chat_id, uid)
+    chat = await chat_service.get_chat(chat_id=chat_id, user_id=uid)
     if not chat:
         raise HTTPException(404, "Chat not found")
 
@@ -529,15 +528,17 @@ async def send_message(
     sys_p    = SYSTEM_PROMPTS.get(tpl_key, SYSTEM_PROMPTS["deep"])
 
     # Build Gemini history for memory
-    history_rows = await db.get_messages(chat_id)
+    history_rows = await chat_service.list_messages(chat_id=chat_id)
     gemini_history = []
     for r in history_rows:
         role = "user" if r["role"] == "user" else "model"
         gemini_history.append({"role": role, "parts": [r["content"] or "…"]})
 
     # Save user message
-    user_msg = await db.save_message(
-        chat_id, "user", content,
+    user_msg = await chat_service.save_message(
+        chat_id=chat_id,
+        role="user",
+        content=content,
         file_metas=[{"sha256": f["sha256"], "original_filename": f["original_filename"]}
                     for f in file_refs],
     )
@@ -654,9 +655,13 @@ async def send_message(
         cost_usd = round(cost_usd * 0.01, 8)
 
     # Save assistant message
-    asst_msg = await db.save_message(
-        chat_id, "assistant", asst_txt,
-        tokens=total_tokens, model=mdl_key, cost_usd=cost_usd,
+    asst_msg = await chat_service.save_message(
+        chat_id=chat_id,
+        role="assistant",
+        content=asst_txt,
+        tokens=total_tokens,
+        model=mdl_key,
+        cost_usd=cost_usd,
     )
     asst_msg = dict(asst_msg)
     if rag_images:
@@ -700,11 +705,12 @@ async def send_message(
         } if course_id else None,
     }
 
-    title_updates = {}
-    if chat["title"] in ("Новый чат", "New Chat") and content:
-        title_updates["title"] = content[:55] + ("…" if len(content) > 55 else "")
-    title_updates["updated_at"] = datetime.utcnow()
-    await db.update_chat_settings(chat_id, uid, **title_updates)
+    await chat_service.update_title_after_message(
+        chat_id=chat_id,
+        user_id=uid,
+        current_title=chat["title"],
+        content=content,
+    )
 
     # Schedule background mindmap refresh — doesn't block the response
     bg.add_task(regenerate_mindmap, chat_id)

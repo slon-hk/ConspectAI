@@ -111,6 +111,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   for non-send chat endpoints in `main.py`. The hot `send_message` path remains
   a separate migration block because it combines quota context, file handling,
   Gemini/RAG orchestration, billing, analytics, and mindmap refresh scheduling.
+- `send_message` now uses `ChatService` for chat ownership lookup, history
+  loading, user/assistant message persistence, and title refresh. The route still
+  owns Gemini/RAG orchestration, file attachment preparation, billing math, and
+  request-state usage metadata until the next hot-path service extraction.
 
 ## Next Stages
 

@@ -1,5 +1,4 @@
 import os
-from contextlib import asynccontextmanager
 
 import google.generativeai as genai
 from fastapi import FastAPI
@@ -21,6 +20,7 @@ from app.api.routes.mindmaps import create_mindmap_router
 from app.api.routes.pages import create_pages_router
 from app.api.routes.users import create_user_router
 from app.core.exceptions import register_exception_handlers
+from app.core.lifecycle import create_lifespan
 from app.db.pool import database
 from app.middleware import (
     register_http_metrics_middleware,
@@ -68,17 +68,10 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 
-# ── Lifespan ──────────────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await database.create_pool()
-    # Periodic cleanup of old analytics events (older than 90 days)
-    cleanup_task = start_analytics_cleanup_task()
-    yield
-    cleanup_task.cancel()
-    await database.close_pool()
-
-
+lifespan = create_lifespan(
+    database=database,
+    start_analytics_cleanup_task=start_analytics_cleanup_task,
+)
 app = FastAPI(title="ConspectAI", lifespan=lifespan)
 jinja = Jinja2Templates(directory="templates")
 app.include_router(admin.router)

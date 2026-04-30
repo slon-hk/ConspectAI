@@ -103,6 +103,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   upsert, chunk-image links, and ready finalization now lives behind
   `app.repositories.oltp.RagIngestionRepository`. `rag.py` still owns extraction,
   embedding, captioning, and ingestion orchestration.
+- `app.services.RagService` now owns course/document/image/chat-course
+  orchestration for the RAG API. `rag_routes.py` still owns HTTP parsing,
+  response serialization, upload handling, and HTTP error mapping.
 
 ## Next Stages
 

@@ -27,9 +27,11 @@ from pydantic import BaseModel
 import db
 import rag as rag_engine
 from app.repositories.oltp import RagRouteRepository
+from app.services import RagService
 
 router = APIRouter(prefix="/api", tags=["rag"])
 rag_routes_repository = RagRouteRepository()
+rag_service = RagService(rag_routes_repository)
 
 # ── Auth dependency (same pattern as main.py) ─────────────────────────────────
 
@@ -96,23 +98,22 @@ MAX_FILE_MB = 50
 
 @router.get("/courses")
 async def list_courses(uid: int = Depends(current_uid)):
-    rows = await rag_engine.get_user_courses(uid)
+    rows = await rag_service.list_courses(uid)
     return [_serialize(r) for r in rows]
 
 
 @router.post("/courses", status_code=201)
 async def create_course(body: CourseCreate, uid: int = Depends(current_uid)):
-    if body.scope not in ("private", "public"):
-        raise HTTPException(400, "scope must be 'private' or 'public'")
-    if not body.title.strip():
-        raise HTTPException(400, "title is required")
+    try:
+        course = await rag_service.create_course(
+            user_id=uid,
+            title=body.title,
+            description=body.description,
+            scope=body.scope,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
-    course = await rag_routes_repository.create_course(
-        user_id=uid,
-        title=body.title.strip(),
-        description=body.description.strip(),
-        scope=body.scope,
-    )
     return _serialize(course)
 
 
@@ -122,21 +123,21 @@ async def update_course(
     body: CoursePatch,
     uid: int = Depends(current_uid),
 ):
-    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
-        raise HTTPException(404, "Course not found")
-
-    await rag_routes_repository.update_course(
+    updated = await rag_service.update_course(
         course_id=course_id,
-        title=body.title.strip() if body.title is not None else None,
-        description=body.description.strip() if body.description is not None else None,
+        user_id=uid,
+        title=body.title,
+        description=body.description,
     )
+    if not updated:
+        raise HTTPException(404, "Course not found")
 
     return {"ok": True}
 
 
 @router.delete("/courses/{course_id}")
 async def delete_course(course_id: str, uid: int = Depends(current_uid)):
-    deleted = await rag_engine.delete_course(course_id, uid)
+    deleted = await rag_service.delete_course(course_id=course_id, user_id=uid)
     if not deleted:
         raise HTTPException(404, "Course not found")
     return {"ok": True}
@@ -146,10 +147,9 @@ async def delete_course(course_id: str, uid: int = Depends(current_uid)):
 
 @router.get("/courses/{course_id}/documents")
 async def list_documents(course_id: str, uid: int = Depends(current_uid)):
-    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
+    docs = await rag_service.list_course_documents(course_id=course_id, user_id=uid)
+    if docs is None:
         raise HTTPException(404, "Course not found")
-
-    docs = await rag_engine.get_course_documents(course_id, uid)
     return [_serialize(d) for d in docs]
 
 
@@ -278,7 +278,7 @@ async def delete_document(
     doc_id: str,
     uid: int = Depends(current_uid),
 ):
-    deleted = await rag_routes_repository.delete_document_for_user(
+    deleted = await rag_service.delete_document(
         document_id=doc_id,
         course_id=course_id,
         user_id=uid,
@@ -296,7 +296,7 @@ async def serve_image(image_id: str, uid: int = Depends(current_uid)):
     Serve an extracted image from a document the user has access to.
     Checks that the image belongs to a course the user owns.
     """
-    row = await rag_routes_repository.get_image_for_user(image_id=image_id, user_id=uid)
+    row = await rag_service.get_image_for_user(image_id=image_id, user_id=uid)
     if not row:
         raise HTTPException(404, "Image not found or access denied")
 
@@ -315,7 +315,7 @@ async def serve_image(image_id: str, uid: int = Depends(current_uid)):
 
 @router.get("/chats/{chat_id}/course")
 async def get_chat_course(chat_id: str, uid: int = Depends(current_uid)):
-    row = await rag_routes_repository.get_chat_course(chat_id=chat_id, user_id=uid)
+    row = await rag_service.get_chat_course(chat_id=chat_id, user_id=uid)
     if not row:
         return {"course": None}
     return {"course": _serialize(row)}
@@ -328,20 +328,14 @@ async def link_chat_course(
     uid: int = Depends(current_uid),
 ):
     """Link a course to a chat. Pass course_id=null to unlink."""
-    if body.course_id is not None:
-        # Verify the course belongs to this user (or is public)
-        if not await rag_routes_repository.user_can_access_course(
-            course_id=body.course_id,
-            user_id=uid,
-        ):
-            raise HTTPException(404, "Course not found")
-
-    updated = await rag_routes_repository.link_chat_course(
+    result = await rag_service.link_chat_course(
         chat_id=chat_id,
         course_id=body.course_id,
         user_id=uid,
     )
-    if not updated:
+    if result == "course_not_found":
+        raise HTTPException(404, "Course not found")
+    if result == "chat_not_found":
         raise HTTPException(404, "Chat not found")
 
     return {"ok": True, "course_id": body.course_id}

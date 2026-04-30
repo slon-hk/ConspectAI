@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 import auth
 import admin
 import rag_routes
+from app.api.routes.catalog import router as catalog_router
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
 from app.repositories.olap import (
@@ -85,6 +86,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ConspectAI", lifespan=lifespan)
 jinja = Jinja2Templates(directory="templates")
 app.include_router(admin.router)
+app.include_router(catalog_router)
 app.include_router(rag_routes.router)
 chat_repository = ChatRepository(database)
 message_repository = MessageRepository(database)
@@ -422,30 +424,6 @@ async def get_admin_metrics_usage_public(_=Depends(admin.require_admin)):
 @app.get("/admin/metrics/marketing")
 async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
     return await admin_metrics_service.marketing()
-
-
-# ── Static data ────────────────────────────────────────────────────────────────
-@app.get("/api/models")
-async def get_models():
-    return {
-        key: {
-            "name": info["name"],
-            "desc": info["desc"],
-            "speed": info["speed"],
-            "recommended": bool(info.get("recommended", False)),
-        }
-        for key, info in MODELS.items()
-    }
-
-
-@app.get("/api/templates")
-async def get_templates():
-    return TEMPLATE_META
-
-
-@app.get("/api/subscription-plans")
-async def get_subscription_plans():
-    return public_plans()
 
 
 # ── Chats ──────────────────────────────────────────────────────────────────────

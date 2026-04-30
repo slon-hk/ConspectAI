@@ -166,6 +166,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.services.AnalyticsMaintenanceService` now owns analytics event cleanup
   orchestration. Worker startup uses this service directly; legacy
   `analytics.cleanup_*` functions remain thin compatibility wrappers.
+- `app.api.routes.catalog` now owns the first thin API route module for public
+  catalog/static data (`/api/models`, `/api/templates`,
+  `/api/subscription-plans`), preserving endpoint contracts while shrinking
+  `main.py`.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

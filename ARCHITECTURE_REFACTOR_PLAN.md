@@ -91,6 +91,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   OLAP repositories while existing `db.py` metric functions remain compatible.
 - An in-process event bus now provides the first `publish`/`subscribe` boundary;
   `analytics.track()` publishes an analytics event handled by an OLAP handler.
+- Route-level RAG SQL for courses, document records, image access, and chat
+  course linking now lives behind `app.repositories.oltp.RagRouteRepository`.
+  Deep ingestion/retrieval SQL in `rag.py` remains a separate migration block.
 
 ## Next Stages
 

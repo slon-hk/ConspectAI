@@ -26,8 +26,10 @@ from pydantic import BaseModel
 
 import db
 import rag as rag_engine
+from app.repositories.oltp import RagRouteRepository
 
 router = APIRouter(prefix="/api", tags=["rag"])
+rag_routes_repository = RagRouteRepository()
 
 # ── Auth dependency (same pattern as main.py) ─────────────────────────────────
 
@@ -105,13 +107,13 @@ async def create_course(body: CourseCreate, uid: int = Depends(current_uid)):
     if not body.title.strip():
         raise HTTPException(400, "title is required")
 
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO courses (user_id, title, description, scope)
-               VALUES ($1, $2, $3, $4) RETURNING *""",
-            uid, body.title.strip(), body.description.strip(), body.scope,
-        )
-    return _serialize(dict(row))
+    course = await rag_routes_repository.create_course(
+        user_id=uid,
+        title=body.title.strip(),
+        description=body.description.strip(),
+        scope=body.scope,
+    )
+    return _serialize(course)
 
 
 @router.patch("/courses/{course_id}")
@@ -120,27 +122,14 @@ async def update_course(
     body: CoursePatch,
     uid: int = Depends(current_uid),
 ):
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT id FROM courses WHERE id = $1 AND user_id = $2",
-            course_id, uid,
-        )
-        if not row:
-            raise HTTPException(404, "Course not found")
+    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
+        raise HTTPException(404, "Course not found")
 
-        updates = {}
-        if body.title is not None:
-            updates["title"] = body.title.strip()
-        if body.description is not None:
-            updates["description"] = body.description.strip()
-
-        if updates:
-            sets = ", ".join(f"{k} = ${i+2}" for i, k in enumerate(updates))
-            vals = list(updates.values())
-            await conn.execute(
-                f"UPDATE courses SET {sets}, updated_at = now() WHERE id = $1",
-                course_id, *vals,
-            )
+    await rag_routes_repository.update_course(
+        course_id=course_id,
+        title=body.title.strip() if body.title is not None else None,
+        description=body.description.strip() if body.description is not None else None,
+    )
 
     return {"ok": True}
 
@@ -157,13 +146,7 @@ async def delete_course(course_id: str, uid: int = Depends(current_uid)):
 
 @router.get("/courses/{course_id}/documents")
 async def list_documents(course_id: str, uid: int = Depends(current_uid)):
-    # Verify ownership
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT id FROM courses WHERE id = $1 AND user_id = $2",
-            course_id, uid,
-        )
-    if not row:
+    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
         raise HTTPException(404, "Course not found")
 
     docs = await rag_engine.get_course_documents(course_id, uid)
@@ -180,13 +163,7 @@ async def ingest_file(
     """Upload and ingest a file (PDF, TXT, MD, DOCX). Returns immediately;
     indexing runs in the background."""
 
-    # Verify course ownership
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT id FROM courses WHERE id = $1 AND user_id = $2",
-            course_id, uid,
-        )
-    if not row:
+    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
         raise HTTPException(404, "Course not found")
 
     # Validate file
@@ -211,25 +188,23 @@ async def ingest_file(
 
     # SHA256 of raw bytes — skip if same doc already in this course
     doc_sha = rag_engine._sha256(raw)
-    async with db.pool().acquire() as conn:
-        dup = await conn.fetchrow(
-            """SELECT id, status FROM rag_documents
-               WHERE course_id = $1 AND sha256 = $2""",
-            course_id, doc_sha,
-        )
+    dup = await rag_routes_repository.find_document_duplicate(
+        course_id=course_id,
+        sha256=doc_sha,
+    )
     if dup and dup["status"] == "ready":
         return {"status": "already_indexed", "document_id": str(dup["id"])}
 
     # Create document record
-    async with db.pool().acquire() as conn:
-        doc_row = await conn.fetchrow(
-            """INSERT INTO rag_documents
-                   (course_id, user_id, filename, source_type, source_ref, sha256, status, is_public)
-               VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
-               RETURNING id""",
-            course_id, uid, fname, source_type, fname, doc_sha, is_public,
-        )
-    document_id = str(doc_row["id"])
+    document_id = await rag_routes_repository.create_file_document(
+        course_id=course_id,
+        user_id=uid,
+        filename=fname,
+        source_type=source_type,
+        source_ref=fname,
+        sha256=doc_sha,
+        is_public=is_public,
+    )
 
     # Fire ingestion in background (non-blocking)
     asyncio.create_task(
@@ -263,33 +238,25 @@ async def ingest_url(
     if "youtube.com" not in url and "youtu.be" not in url:
         raise HTTPException(400, "Only YouTube URLs are supported currently")
 
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT id FROM courses WHERE id = $1 AND user_id = $2",
-            course_id, uid,
-        )
-    if not row:
+    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
         raise HTTPException(404, "Course not found")
 
     url_hash = rag_engine._sha256(url)
-    async with db.pool().acquire() as conn:
-        dup = await conn.fetchrow(
-            """SELECT id, status FROM rag_documents
-               WHERE course_id = $1 AND sha256 = $2""",
-            course_id, url_hash,
-        )
+    dup = await rag_routes_repository.find_document_duplicate(
+        course_id=course_id,
+        sha256=url_hash,
+    )
     if dup and dup["status"] == "ready":
         return {"status": "already_indexed", "document_id": str(dup["id"])}
 
     fname = body.title or url
-    async with db.pool().acquire() as conn:
-        doc_row = await conn.fetchrow(
-            """INSERT INTO rag_documents
-                   (course_id, user_id, filename, source_type, source_ref, sha256)
-               VALUES ($1, $2, $3, 'youtube', $4, $5) RETURNING id""",
-            course_id, uid, fname, url, url_hash,
-        )
-    document_id = str(doc_row["id"])
+    document_id = await rag_routes_repository.create_url_document(
+        course_id=course_id,
+        user_id=uid,
+        filename=fname,
+        source_ref=url,
+        sha256=url_hash,
+    )
 
     asyncio.create_task(
         rag_engine.ingest_document(
@@ -311,15 +278,13 @@ async def delete_document(
     doc_id: str,
     uid: int = Depends(current_uid),
 ):
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """SELECT id FROM rag_documents
-               WHERE id = $1 AND course_id = $2 AND user_id = $3""",
-            doc_id, course_id, uid,
-        )
-        if not row:
-            raise HTTPException(404, "Document not found")
-        await conn.execute("DELETE FROM rag_documents WHERE id = $1", doc_id)
+    deleted = await rag_routes_repository.delete_document_for_user(
+        document_id=doc_id,
+        course_id=course_id,
+        user_id=uid,
+    )
+    if not deleted:
+        raise HTTPException(404, "Document not found")
     return {"ok": True}
 
 
@@ -331,17 +296,7 @@ async def serve_image(image_id: str, uid: int = Depends(current_uid)):
     Serve an extracted image from a document the user has access to.
     Checks that the image belongs to a course the user owns.
     """
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """
-            SELECT ri.file_path, ri.mime_type
-            FROM rag_images ri
-            JOIN rag_documents rd ON rd.id = ri.document_id
-            JOIN courses c ON c.id = rd.course_id
-            WHERE ri.id = $1 AND c.user_id = $2
-            """,
-            image_id, uid,
-        )
+    row = await rag_routes_repository.get_image_for_user(image_id=image_id, user_id=uid)
     if not row:
         raise HTTPException(404, "Image not found or access denied")
 
@@ -360,19 +315,10 @@ async def serve_image(image_id: str, uid: int = Depends(current_uid)):
 
 @router.get("/chats/{chat_id}/course")
 async def get_chat_course(chat_id: str, uid: int = Depends(current_uid)):
-    async with db.pool().acquire() as conn:
-        row = await conn.fetchrow(
-            """SELECT c.id, c.title, c.description, c.scope,
-                      (SELECT COUNT(*) FROM rag_documents d
-                       WHERE d.course_id = c.id AND d.status = 'ready') AS doc_count
-               FROM chats ch
-               JOIN courses c ON c.id = ch.course_id
-               WHERE ch.id = $1 AND ch.user_id = $2""",
-            chat_id, uid,
-        )
+    row = await rag_routes_repository.get_chat_course(chat_id=chat_id, user_id=uid)
     if not row:
         return {"course": None}
-    return {"course": _serialize(dict(row))}
+    return {"course": _serialize(row)}
 
 
 @router.patch("/chats/{chat_id}/course")
@@ -384,20 +330,18 @@ async def link_chat_course(
     """Link a course to a chat. Pass course_id=null to unlink."""
     if body.course_id is not None:
         # Verify the course belongs to this user (or is public)
-        async with db.pool().acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT id FROM courses WHERE id = $1 AND (user_id = $2 OR scope = 'public')",
-                body.course_id, uid,
-            )
-        if not row:
+        if not await rag_routes_repository.user_can_access_course(
+            course_id=body.course_id,
+            user_id=uid,
+        ):
             raise HTTPException(404, "Course not found")
 
-    async with db.pool().acquire() as conn:
-        result = await conn.execute(
-            "UPDATE chats SET course_id = $1 WHERE id = $2 AND user_id = $3",
-            body.course_id, chat_id, uid,
-        )
-    if result == "UPDATE 0":
+    updated = await rag_routes_repository.link_chat_course(
+        chat_id=chat_id,
+        course_id=body.course_id,
+        user_id=uid,
+    )
+    if not updated:
         raise HTTPException(404, "Chat not found")
 
     return {"ok": True, "course_id": body.course_id}

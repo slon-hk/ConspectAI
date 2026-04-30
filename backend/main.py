@@ -4,7 +4,7 @@ import re
 import uuid
 
 import google.generativeai as genai
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks, status
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, BackgroundTasks
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +17,7 @@ import admin
 import rag_routes
 from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import router as catalog_router
+from app.api.routes.chats import create_chat_router
 from app.api.routes.users import create_user_router
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
@@ -47,15 +48,9 @@ from app.services import (
     UserService,
 )
 from app.services.auth_service import AuthService
-from app.services.ai_chat_service import (
-    AccountBlockedError,
-    AiChatService,
-    ChatNotFoundError,
-    EmptyMessageError,
-    GeminiApiKeyMissingError,
-)
+from app.services.ai_chat_service import AiChatService
 from app.services.billing_service import BillingService
-from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
+from promts import SYSTEM_PROMPTS, MODELS, MINDMAP_PROMPT
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, public_plans
 
 load_dotenv()
@@ -347,112 +342,6 @@ async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
     return await admin_metrics_service.marketing()
 
 
-# ── Chats ──────────────────────────────────────────────────────────────────────
-@app.get("/api/chats")
-async def get_chats(uid: int = Depends(current_user_id)):
-    rows = await chat_service.list_chats(uid)
-    return [_serialize(r) for r in rows]
-
-
-@app.post("/api/chats")
-async def create_chat(
-    template: str = Form("deep"),
-    model:    str = Form("gemini-3.1-flash-lite-preview"),
-    uid:      int = Depends(current_user_id),
-):
-    row, tpl, mdl = await chat_service.create_chat(
-        user_id=uid,
-        template=template,
-        model=model,
-        allowed_templates=SYSTEM_PROMPTS,
-        allowed_models=MODELS,
-        default_template="deep",
-        default_model="gemini-3.1-flash-lite-preview",
-    )
-    analytics_tracking_service.track("chat_created", uid, template=tpl, model=mdl)
-    return _serialize(row)
-
-
-@app.patch("/api/chats/{chat_id}/settings")
-async def update_settings(
-    chat_id:  str,
-    template: str = Form(None),
-    model:    str = Form(None),
-    uid:      int = Depends(current_user_id),
-):
-    chat_id = _validate_chat_id(chat_id)
-    try:
-        chat, updates = await chat_service.update_chat_settings(
-            chat_id=chat_id,
-            user_id=uid,
-            template=template,
-            model=model,
-            allowed_templates=SYSTEM_PROMPTS,
-            allowed_models=MODELS,
-        )
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-    if not chat:
-        raise HTTPException(404, "Chat not found")
-    if "template" in updates:
-        analytics_tracking_service.track("template_switched", uid, chat_id=str(chat_id), template=updates["template"])
-    if "model" in updates:
-        analytics_tracking_service.track("model_switched", uid, chat_id=str(chat_id), model=updates["model"])
-    return _serialize(chat)
-
-
-@app.delete("/api/chats/{chat_id}")
-async def delete_chat(chat_id: str, uid: int = Depends(current_user_id)):
-    chat_id = _validate_chat_id(chat_id)
-    await chat_service.delete_chat(chat_id=chat_id, user_id=uid)
-    return {"ok": True}
-
-
-# ── Messages ──────────────────────────────────────────────────────────────────
-@app.get("/api/chats/{chat_id}/messages")
-async def get_messages(chat_id: str, uid: int = Depends(current_user_id)):
-    chat_id = _validate_chat_id(chat_id)
-    msgs = await chat_service.list_messages_for_user_chat(chat_id=chat_id, user_id=uid)
-    if msgs is None:
-        raise HTTPException(404, "Chat not found")
-    return [_serialize_msg(m) for m in msgs]
-
-
-@app.post("/api/chats/{chat_id}/messages")
-async def send_message(
-    chat_id:    str,
-    request:    Request,
-    bg:         BackgroundTasks,
-    content:    str  = Form(""),
-    files_json: str  = Form("[]"),
-    uid:        int  = Depends(current_user_id),
-):
-    chat_id = _validate_chat_id(chat_id)
-    try:
-        result = await ai_chat_service.send_message(
-            chat_id=chat_id,
-            user_id=uid,
-            content=content,
-            files_json=files_json,
-        )
-    except GeminiApiKeyMissingError as exc:
-        raise HTTPException(500, str(exc)) from exc
-    except ChatNotFoundError as exc:
-        raise HTTPException(404, str(exc)) from exc
-    except AccountBlockedError as exc:
-        raise HTTPException(403, str(exc)) from exc
-    except EmptyMessageError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-    request.state.billing_usage = result["billing_usage"]
-
-    # Schedule background mindmap refresh — doesn't block the response
-    bg.add_task(regenerate_mindmap, chat_id)
-
-    return _serialize_msg(result["assistant_message"])
-
-
 # ── File upload ────────────────────────────────────────────────────────────────
 @app.post("/api/upload")
 async def upload_file(
@@ -518,29 +407,6 @@ async def client_track(
     return {"ok": True}
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
-def _serialize(row: dict) -> dict:
-    """Convert asyncpg row (with UUID, datetime) to JSON-safe dict."""
-    out = {}
-    for k, v in row.items():
-        if hasattr(v, "isoformat"):
-            out[k] = v.isoformat()
-        elif hasattr(v, "__str__") and type(v).__name__ in ("UUID",):
-            out[k] = str(v)
-        else:
-            out[k] = v
-    return out
-
-
-def _serialize_msg(m: dict) -> dict:
-    s = _serialize(m)
-    if "files" in s:
-        s["files"] = [_serialize(f) for f in (s["files"] or [])]
-    if "cost_usd" in s and s["cost_usd"] is not None:
-        s["cost_usd"] = float(s["cost_usd"])
-    return s
-
-
 # ── Mindmap auto-generation ────────────────────────────────────────────────────
 MINDMAP_MODEL = "gemini-2.5-flash-lite"   # cheapest model — platform-paid feature
 
@@ -564,6 +430,21 @@ async def regenerate_mindmap(chat_id: str):
     except Exception as e:
         analytics_tracking_service.increment_mindmap_failures()
         print(f"[mindmap] error for chat {chat_id}: {e}")
+
+
+app.include_router(
+    create_chat_router(
+        current_user_id=current_user_id,
+        chat_service=chat_service,
+        ai_chat_service=ai_chat_service,
+        analytics_tracking_service=analytics_tracking_service,
+        regenerate_mindmap=regenerate_mindmap,
+        system_prompts=SYSTEM_PROMPTS,
+        models=MODELS,
+        default_template="deep",
+        default_model="gemini-3.1-flash-lite-preview",
+    )
+)
 
 
 @app.get("/api/chats/{chat_id}/mindmap")

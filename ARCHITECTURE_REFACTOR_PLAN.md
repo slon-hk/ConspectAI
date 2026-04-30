@@ -176,6 +176,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.api.routes.users` now owns `/api/user`, `/api/usage`, and `/usage`
   through a router factory that receives the existing auth dependency and
   user/usage services.
+- `app.api.routes.chats` now owns chat CRUD/settings and chat message routes,
+  including the hot `/api/chats/{chat_id}/messages` path. The router keeps the
+  same quota middleware interaction by setting `request.state.billing_usage` and
+  receives the existing mindmap background callback from `main.py`.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

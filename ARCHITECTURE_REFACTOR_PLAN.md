@@ -137,8 +137,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   failed/blocked requests through `UsageService`; OLAP request/RAG metric writes
   remain a separate service extraction block.
 - `app.services.RequestMetricsService` now owns request metric logging and RAG
-  metric logging from middleware usage payloads. The underlying writes still use
-  OLAP repositories on the same Postgres database until worker batching is added.
+  metric logging from middleware usage payloads. It now publishes in-process
+  metric events so the middleware no longer awaits OLAP writes in the
+  user-facing request path. The handlers still persist through OLAP repositories
+  on the same Postgres database until durable outbox/batch workers are added.
 - `app.services.AdminMetricsService` now owns admin metrics endpoint orchestration
   over `AdminReportRepository`, removing live admin metric endpoints in `main.py`
   from the legacy `db.py` wrapper path.

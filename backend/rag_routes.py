@@ -13,21 +13,23 @@ Endpoints:
   PATCH  /api/chats/{chat_id}/course  link/unlink course from chat
 """
 
-import asyncio
-import mimetypes
 from pathlib import Path
-from uuid import uuid4
 
 from fastapi import (
-    APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
+    APIRouter, Depends, HTTPException, UploadFile, File, Form
 )
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import db
-import rag as rag_engine
 from app.repositories.oltp import RagRouteRepository
-from app.services import RagService
+from app.services.rag_service import (
+    RagCourseNotFoundError,
+    RagFileTooLargeError,
+    RagInvalidUrlError,
+    RagService,
+    RagUnsupportedFileError,
+)
 
 router = APIRouter(prefix="/api", tags=["rag"])
 rag_routes_repository = RagRouteRepository()
@@ -82,16 +84,6 @@ def _serialize(d: dict) -> dict:
         else:
             out[k] = v
     return out
-
-
-ALLOWED_MIME = {
-    "application/pdf",
-    "text/plain",
-    "text/markdown",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-}
-MAX_FILE_MB = 50
 
 
 # ── Course CRUD ───────────────────────────────────────────────────────────────
@@ -163,62 +155,22 @@ async def ingest_file(
     """Upload and ingest a file (PDF, TXT, MD, DOCX). Returns immediately;
     indexing runs in the background."""
 
-    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
-        raise HTTPException(404, "Course not found")
-
-    # Validate file
     raw = await file.read()
-    if len(raw) > MAX_FILE_MB * 1024 * 1024:
-        raise HTTPException(413, f"File too large (max {MAX_FILE_MB}MB)")
-
-    mime = file.content_type or mimetypes.guess_type(file.filename or "")[0] or ""
-    if mime not in ALLOWED_MIME:
-        # Be permissive with text files regardless of MIME
-        if not (file.filename or "").endswith((".txt", ".md", ".pdf", ".docx", ".doc")):
-            raise HTTPException(415, f"Unsupported file type: {mime}")
-
-    # Detect source type
-    fname = file.filename or "document"
-    ext = Path(fname).suffix.lower()
-    source_type_map = {
-        ".pdf": "pdf", ".txt": "txt", ".md": "md",
-        ".docx": "docx", ".doc": "docx",
-    }
-    source_type = source_type_map.get(ext, "txt")
-
-    # SHA256 of raw bytes — skip if same doc already in this course
-    doc_sha = rag_engine._sha256(raw)
-    dup = await rag_routes_repository.find_document_duplicate(
-        course_id=course_id,
-        sha256=doc_sha,
-    )
-    if dup and dup["status"] == "ready":
-        return {"status": "already_indexed", "document_id": str(dup["id"])}
-
-    # Create document record
-    document_id = await rag_routes_repository.create_file_document(
-        course_id=course_id,
-        user_id=uid,
-        filename=fname,
-        source_type=source_type,
-        source_ref=fname,
-        sha256=doc_sha,
-        is_public=is_public,
-    )
-
-    # Fire ingestion in background (non-blocking)
-    asyncio.create_task(
-        rag_engine.ingest_document(
-            document_id=document_id,
+    try:
+        return await rag_service.ingest_file(
             course_id=course_id,
             user_id=uid,
-            filename=fname,
-            source_type=source_type,
-            raw_bytes=raw,
+            filename=file.filename or "document",
+            content_type=file.content_type,
+            raw=raw,
+            is_public=is_public,
         )
-    )
-
-    return {"status": "indexing", "document_id": document_id}
+    except RagCourseNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except RagFileTooLargeError as exc:
+        raise HTTPException(413, str(exc)) from exc
+    except RagUnsupportedFileError as exc:
+        raise HTTPException(415, str(exc)) from exc
 
 
 class IngestURLBody(BaseModel):
@@ -233,43 +185,17 @@ async def ingest_url(
     uid: int = Depends(current_uid),
 ):
     """Ingest a YouTube URL (transcript extraction)."""
-    url = body.url.strip()
-
-    if "youtube.com" not in url and "youtu.be" not in url:
-        raise HTTPException(400, "Only YouTube URLs are supported currently")
-
-    if not await rag_routes_repository.user_owns_course(course_id=course_id, user_id=uid):
-        raise HTTPException(404, "Course not found")
-
-    url_hash = rag_engine._sha256(url)
-    dup = await rag_routes_repository.find_document_duplicate(
-        course_id=course_id,
-        sha256=url_hash,
-    )
-    if dup and dup["status"] == "ready":
-        return {"status": "already_indexed", "document_id": str(dup["id"])}
-
-    fname = body.title or url
-    document_id = await rag_routes_repository.create_url_document(
-        course_id=course_id,
-        user_id=uid,
-        filename=fname,
-        source_ref=url,
-        sha256=url_hash,
-    )
-
-    asyncio.create_task(
-        rag_engine.ingest_document(
-            document_id=document_id,
+    try:
+        return await rag_service.ingest_url(
             course_id=course_id,
             user_id=uid,
-            filename=fname,
-            source_type="youtube",
-            source_url=url,
+            url=body.url,
+            title=body.title,
         )
-    )
-
-    return {"status": "indexing", "document_id": document_id}
+    except RagInvalidUrlError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except RagCourseNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @router.delete("/courses/{course_id}/documents/{doc_id}")

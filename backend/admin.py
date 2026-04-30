@@ -14,11 +14,13 @@ import db
 import auth
 from app.db.pool import database
 from app.repositories.olap import AdminReportRepository
-from app.services import AdminMetricsService
+from app.repositories.oltp import AdminUserRepository
+from app.services import AdminMetricsService, AdminUserService
 from billing_plans import PLAN_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
+admin_user_service = AdminUserService(AdminUserRepository(database))
 
 
 # ── Dependency ────────────────────────────────────────────────────────────────
@@ -58,21 +60,16 @@ async def admin_users(
     offset: int = 0,
     _=Depends(require_admin),
 ):
-    rows  = await db.list_users(search, limit, offset)
-    total = await db.count_users(search)
-    return {
-        "total":  total,
-        "limit":  limit,
-        "offset": offset,
-        "items":  [_serialize(r) for r in rows],
-    }
+    result = await admin_user_service.list_users(search=search, limit=limit, offset=offset)
+    result["items"] = [_serialize(r) for r in result["items"]]
+    return result
 
 
 @router.post("/users/{uid}/plan")
 async def admin_set_plan(uid: int, body: SetPlanIn, _=Depends(require_admin)):
     if body.plan_key not in PLAN_KEYS:
         raise HTTPException(400, "Unknown plan")
-    updated = await db.admin_set_user_plan(uid, body.plan_key)
+    updated = await admin_user_service.set_plan(user_id=uid, plan_key=body.plan_key)
     if not updated:
         raise HTTPException(404, "User or plan not found")
     return {"ok": True, "plan_key": body.plan_key}
@@ -80,7 +77,7 @@ async def admin_set_plan(uid: int, body: SetPlanIn, _=Depends(require_admin)):
 
 @router.post("/users/{uid}/block")
 async def admin_block(uid: int, body: SetFieldIn, _=Depends(require_admin)):
-    await db.admin_set_user_field(uid, "is_blocked", body.value)
+    await admin_user_service.set_blocked(user_id=uid, is_blocked=body.value)
     return {"ok": True, "is_blocked": body.value}
 
 
@@ -88,7 +85,7 @@ async def admin_block(uid: int, body: SetFieldIn, _=Depends(require_admin)):
 async def admin_make_admin(uid: int, body: SetFieldIn, admin: dict = Depends(require_admin)):
     if uid == admin["id"] and not body.value:
         raise HTTPException(400, "Cannot revoke your own admin rights")
-    await db.admin_set_user_field(uid, "is_admin", body.value)
+    await admin_user_service.set_admin(user_id=uid, is_admin=body.value)
     return {"ok": True, "is_admin": body.value}
 
 
@@ -96,7 +93,7 @@ async def admin_make_admin(uid: int, body: SetFieldIn, admin: dict = Depends(req
 async def admin_delete_user(uid: int, admin: dict = Depends(require_admin)):
     if uid == admin["id"]:
         raise HTTPException(400, "Cannot delete your own account here")
-    await db.admin_delete_user(uid)
+    await admin_user_service.delete_user(user_id=uid)
     return {"ok": True}
 
 

@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-import admin
 import auth
 from app.api.dependencies import create_current_user_id_dependency
+from app.api.routes.admin import require_admin, router as admin_router
 from app.api.routes.rag import router as rag_router
 from app.api.router import register_routes
 from app.core.config import configure_gemini, load_settings
@@ -54,8 +54,8 @@ def create_app() -> FastAPI:
         templates=jinja,
         token_dependency=auth.oauth2,
         decode_token=auth.decode_token,
-        admin_router=admin.router,
-        require_admin=admin.require_admin,
+        admin_router=admin_router,
+        require_admin=require_admin,
         rag_router=rag_router,
     )
     return app

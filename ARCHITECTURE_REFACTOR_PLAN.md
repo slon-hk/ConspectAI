@@ -192,6 +192,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   rendering, preserving landing funnel tracking and pricing labels.
 - `app.api.routes.admin_metrics` now owns legacy `/admin/metrics*` aliases over
   `AdminMetricsService`, leaving `main.py` with no direct business endpoints.
+- `app.api.routes.admin` now owns `/api/admin/*` routes and admin auth
+  dependency. The top-level `admin.py` remains a compatibility wrapper.
 - `app.api.routes.rag` now owns RAG/course API routes. The top-level
   `rag_routes.py` remains a compatibility wrapper for old imports.
 - `app.api.dependencies` now owns the current-user dependency factory. `main.py`

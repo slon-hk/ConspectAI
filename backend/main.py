@@ -9,12 +9,12 @@ from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 from dotenv import load_dotenv
 
 import auth
 import admin
 import rag_routes
+from app.api.routes.analytics import create_analytics_router
 from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import router as catalog_router
 from app.api.routes.chats import create_chat_router
@@ -257,6 +257,13 @@ app.include_router(
         analytics_tracking_service=analytics_tracking_service,
     )
 )
+app.include_router(
+    create_analytics_router(
+        token_dependency=auth.oauth2,
+        decode_token=auth.decode_token,
+        analytics_tracking_service=analytics_tracking_service,
+    )
+)
 
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
@@ -348,41 +355,6 @@ async def get_admin_metrics_usage_public(_=Depends(admin.require_admin)):
 @app.get("/admin/metrics/marketing")
 async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
     return await admin_metrics_service.marketing()
-
-
-# ── Client-side analytics endpoint ─────────────────────────────────────────────
-# Only events on this allowlist can be reported by the browser. This blocks
-# arbitrary clients from injecting fake events into the analytics table.
-CLIENT_EVENT_ALLOWLIST = {
-    "landing_cta_click",      # which CTA on the landing page was clicked
-    "buy_modal_opened",       # user opened the pricing/plan modal
-    "export_md",              # user downloaded a chat as Markdown
-    "export_pdf",             # user opened the PDF export view
-    "settings_opened",        # user opened the settings modal
-}
-
-
-class TrackIn(BaseModel):
-    event: str
-    props: dict = {}
-
-
-@app.post("/api/track")
-async def client_track(
-    body:  TrackIn,
-    token: str = Depends(auth.oauth2),
-):
-    if body.event not in CLIENT_EVENT_ALLOWLIST:
-        raise HTTPException(400, f"Unknown event: {body.event}")
-    # User is optional — landing page events come from anonymous visitors
-    uid = auth.decode_token(token) if token else None
-    # Sanitize props: strip nested structures, limit size
-    safe_props = {}
-    for k, v in (body.props or {}).items():
-        if isinstance(v, (str, int, float, bool)) or v is None:
-            safe_props[str(k)[:40]] = v if not isinstance(v, str) else v[:200]
-    analytics_tracking_service.track(body.event, uid, **safe_props)
-    return {"ok": True}
 
 
 # ── Mindmap auto-generation ────────────────────────────────────────────────────

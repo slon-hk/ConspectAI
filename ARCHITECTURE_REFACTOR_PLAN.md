@@ -182,6 +182,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   receives the existing mindmap background callback from `main.py`.
 - `app.api.routes.files` now owns upload and raw-file serving endpoints over
   `FileService`, preserving upload analytics tracking and response behavior.
+- `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
+  including event allowlisting, token decoding, prop sanitization, and tracking
+  service publication.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import auth
 import admin
 import rag_routes
+from app.api.routes.admin_metrics import create_admin_metrics_router
 from app.api.routes.analytics import create_analytics_router
 from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import router as catalog_router
@@ -274,33 +275,12 @@ app.include_router(
     )
 )
 app.include_router(create_pages_router(templates=jinja, funnel_service=funnel_service))
-
-
-@app.get("/admin/metrics")
-async def get_admin_metrics_public(_=Depends(admin.require_admin)):
-    return await admin_metrics_service.admin_metrics()
-
-
-@app.get("/admin/metrics/overview")
-async def get_admin_metrics_overview_public(_=Depends(admin.require_admin)):
-    return await admin_metrics_service.overview()
-
-
-@app.get("/admin/metrics/rag")
-async def get_admin_metrics_rag_public(_=Depends(admin.require_admin)):
-    return await admin_metrics_service.rag()
-
-
-@app.get("/admin/metrics/usage")
-async def get_admin_metrics_usage_public(_=Depends(admin.require_admin)):
-    return await admin_metrics_service.usage()
-
-
-@app.get("/admin/metrics/marketing")
-async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
-    return await admin_metrics_service.marketing()
-
-
+app.include_router(
+    create_admin_metrics_router(
+        require_admin=admin.require_admin,
+        admin_metrics_service=admin_metrics_service,
+    )
+)
 app.include_router(
     create_chat_router(
         current_user_id=current_user_id,

@@ -190,6 +190,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   scheduling and analytics side effects.
 - `app.api.routes.pages` now owns server-rendered public pages and pricing page
   rendering, preserving landing funnel tracking and pricing labels.
+- `app.api.routes.admin_metrics` now owns legacy `/admin/metrics*` aliases over
+  `AdminMetricsService`, leaving `main.py` with no direct business endpoints.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

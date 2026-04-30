@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import analytics
 from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
 

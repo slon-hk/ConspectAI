@@ -146,7 +146,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   from the legacy `db.py` wrapper path.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
-  legacy `db.py` wrapper path.
+  legacy `db.py` wrapper path. It now publishes funnel events in the background
+  so landing/register routes no longer wait on OLAP inserts.
 - `app.workers` now provides the first background-worker boundary:
   `analytics_worker` owns analytics cleanup task startup, and `worker_app` can
   run that maintenance loop as a standalone process without changing the current

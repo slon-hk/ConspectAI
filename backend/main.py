@@ -4,7 +4,7 @@ import re
 import uuid
 
 import google.generativeai as genai
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +18,7 @@ import rag_routes
 from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import router as catalog_router
 from app.api.routes.chats import create_chat_router
+from app.api.routes.files import create_file_router
 from app.api.routes.users import create_user_router
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
@@ -249,6 +250,13 @@ app.include_router(
         usage_service=usage_service,
     )
 )
+app.include_router(
+    create_file_router(
+        current_user_id=current_user_id,
+        file_service=file_service,
+        analytics_tracking_service=analytics_tracking_service,
+    )
+)
 
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
@@ -340,36 +348,6 @@ async def get_admin_metrics_usage_public(_=Depends(admin.require_admin)):
 @app.get("/admin/metrics/marketing")
 async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
     return await admin_metrics_service.marketing()
-
-
-# ── File upload ────────────────────────────────────────────────────────────────
-@app.post("/api/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    uid:  int        = Depends(current_user_id),
-):
-    upload = await file_service.store_upload(
-        raw=await file.read(),
-        filename=file.filename,
-        content_type=file.content_type,
-    )
-
-    analytics_tracking_service.track(
-        "file_uploaded", uid,
-        mime=upload["mime_type"], size=upload["original_size"],
-        compressed=upload["compressed"], saved_kb=upload["saved_kb"],
-    )
-
-    return upload
-
-
-@app.get("/api/files/{sha256}/raw")
-async def serve_file(sha256: str, uid: int = Depends(current_user_id)):
-    result = await file_service.read_raw_file(sha256=sha256)
-    if not result:
-        raise HTTPException(404, "File not found")
-    raw, mime_type = result
-    return Response(content=raw, media_type=mime_type)
 
 
 # ── Client-side analytics endpoint ─────────────────────────────────────────────

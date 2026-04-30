@@ -11,14 +11,13 @@ from __future__ import annotations
 import asyncio
 from contextlib import suppress
 
-import db
-
+from app.db.pool import database
 from app.workers.analytics_worker import start_analytics_cleanup_task
 
 
 async def run_worker() -> None:
     """Run background workers until the process is cancelled."""
-    await db.create_pool()
+    await database.create_pool()
     analytics_cleanup_task = start_analytics_cleanup_task()
     try:
         await asyncio.Event().wait()
@@ -26,7 +25,7 @@ async def run_worker() -> None:
         analytics_cleanup_task.cancel()
         with suppress(asyncio.CancelledError):
             await analytics_cleanup_task
-        await db.close_pool()
+        await database.close_pool()
 
 
 def main() -> None:

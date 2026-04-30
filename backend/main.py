@@ -12,7 +12,6 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-import db
 import auth
 import admin
 import analytics
@@ -74,12 +73,12 @@ if GEMINI_API_KEY:
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await db.create_pool()
+    await database.create_pool()
     # Periodic cleanup of old analytics events (older than 90 days)
     cleanup_task = start_analytics_cleanup_task()
     yield
     cleanup_task.cancel()
-    await db.close_pool()
+    await database.close_pool()
 
 
 app = FastAPI(title="ConspectAI", lifespan=lifespan)

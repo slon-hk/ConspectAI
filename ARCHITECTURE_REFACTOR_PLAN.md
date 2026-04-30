@@ -15,7 +15,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 ## DB Access Pattern
 
 - `db.py` remains the compatibility data access module for existing code.
-- Pool lifecycle is now owned by `app.db.pool.Database`.
+- Pool lifecycle is now owned by `app.db.pool.Database`; runtime entrypoints use
+  it directly, while `db.py` keeps lifecycle wrappers for compatibility.
 - `db.create_pool()`, `db.close_pool()`, and `db.pool()` delegate to the new DB
   infrastructure and keep existing callers working.
 - Schema initialization and most legacy SQL functions still live in `db.py`

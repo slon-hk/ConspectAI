@@ -19,7 +19,12 @@ import admin
 import analytics
 import rag_routes
 from app.db.pool import database
-from app.repositories.olap import AdminReportRepository, RagMetricRepository, RequestMetricRepository
+from app.repositories.olap import (
+    AdminReportRepository,
+    FunnelMetricRepository,
+    RagMetricRepository,
+    RequestMetricRepository,
+)
 from app.repositories.oltp import (
     ChatRepository,
     FileRepository,
@@ -32,6 +37,7 @@ from app.services import (
     AdminMetricsService,
     ChatService,
     FileService,
+    FunnelService,
     MindmapService,
     RequestMetricsService,
     UsageService,
@@ -91,6 +97,7 @@ user_repository = UserRepository(database)
 user_service = UserService(user_repository, usage_service)
 auth_service = AuthService(user_repository, user_service, DEFAULT_PLAN_KEY)
 file_service = FileService(file_repository)
+funnel_service = FunnelService(FunnelMetricRepository(database))
 request_metrics_service = RequestMetricsService(
     RequestMetricRepository(database),
     RagMetricRepository(database),
@@ -257,7 +264,7 @@ class LoginIn(BaseModel):
 # ── Pages ─────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
-    await db.insert_funnel_event(user_id=None, event_name="visit", metadata={"path": "/"})
+    await funnel_service.record_visit(path="/")
     return jinja.TemplateResponse("landing.html", {"request": request})
 
 
@@ -327,7 +334,7 @@ async def register(body: RegisterIn):
     # so this gives a defensible audit trail (timestamp + user id) of when the
     # user accepted the offer and privacy policy.
     analytics.track("signup", user["id"])
-    await db.insert_funnel_event(user_id=user["id"], event_name="signup", metadata={"channel": "auth_register"})
+    await funnel_service.record_signup(user_id=user["id"], channel="auth_register")
     analytics.track("agreement_accepted", user["id"], offer_version="2026-04-26", privacy_version="2026-04-26")
 
     return result

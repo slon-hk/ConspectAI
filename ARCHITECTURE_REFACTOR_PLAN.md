@@ -136,6 +136,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.services.AdminMetricsService` now owns admin metrics endpoint orchestration
   over `AdminReportRepository`, removing live admin metric endpoints in `main.py`
   from the legacy `db.py` wrapper path.
+- `app.services.FunnelService` now owns landing/signup funnel event writes over
+  `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
+  legacy `db.py` wrapper path.
 - `app.services.FileService` now owns file storage/metadata registration and raw
   file lookup. `main.py` keeps HTTP upload reading, response serving, and upload
   analytics side effects.

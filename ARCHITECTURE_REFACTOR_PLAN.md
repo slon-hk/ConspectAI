@@ -115,6 +115,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   loading, user/assistant message persistence, and title refresh. The route still
   owns Gemini/RAG orchestration, file attachment preparation, billing math, and
   request-state usage metadata until the next hot-path service extraction.
+- `app.services.MindmapService` now owns mindmap access checks, conversation
+  digest construction, Gemini mindmap regeneration, and mindmap persistence.
+  `main.py` keeps endpoint error mapping, analytics counters, and background
+  task scheduling for the mindmap feature.
 
 ## Next Stages
 

@@ -22,8 +22,8 @@ import admin
 import analytics
 import rag_routes
 from app.db.pool import database
-from app.repositories.oltp import ChatRepository, MessageRepository
-from app.services import ChatService
+from app.repositories.oltp import ChatRepository, MessageRepository, MindmapRepository
+from app.services import ChatService, MindmapService
 from billing import calculate_cost_units
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
 from billing_plans import public_plans
@@ -50,7 +50,10 @@ app = FastAPI(title="ConspectAI", lifespan=lifespan)
 jinja = Jinja2Templates(directory="templates")
 app.include_router(admin.router)
 app.include_router(rag_routes.router)
-chat_service = ChatService(ChatRepository(database), MessageRepository(database))
+chat_repository = ChatRepository(database)
+message_repository = MessageRepository(database)
+chat_service = ChatService(chat_repository, message_repository)
+mindmap_service = MindmapService(chat_repository, message_repository, MindmapRepository(database))
 
 # Static assets (error-page backgrounds, etc.) — served directly without auth
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -835,39 +838,13 @@ async def regenerate_mindmap(chat_id: str):
     if not GEMINI_API_KEY:
         return
     try:
-        msgs = await db.get_messages(chat_id)
-        if len(msgs) < 2:                   # need at least one full exchange
-            return
-
-        existing = await db.get_mindmap(chat_id)
-        existing_md = existing["markdown"] if existing else ""
-
-        # Build conversation digest (last ~12 messages, truncated)
-        convo_parts = []
-        for m in msgs[-12:]:
-            role = "User" if m["role"] == "user" else "Tutor"
-            content = (m["content"] or "")[:1500]
-            convo_parts.append(f"--- {role} ---\n{content}")
-        convo = "\n\n".join(convo_parts)
-
-        prompt = (
-            f"EXISTING MINDMAP:\n{existing_md or '(empty — first generation)'}\n\n"
-            f"=== CONVERSATION ===\n{convo}\n\n"
-            f"Now produce the updated mindmap."
+        generated = await mindmap_service.regenerate(
+            chat_id=chat_id,
+            model_name=_model_name(MINDMAP_MODEL),
+            system_prompt=MINDMAP_PROMPT,
+            enabled=bool(GEMINI_API_KEY),
         )
-
-        model = genai.GenerativeModel(model_name=_model_name(MINDMAP_MODEL), system_instruction=MINDMAP_PROMPT)
-        loop  = asyncio.get_event_loop()
-        resp  = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
-        text  = (resp.text or "").strip()
-
-        # Strip code fences if the model wrapped output despite instructions
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
-
-        if text:
-            await db.save_mindmap(chat_id, text)
+        if generated:
             analytics.metrics.bg_mindmap_runs += 1
     except Exception as e:
         analytics.metrics.bg_mindmap_failed += 1
@@ -877,17 +854,11 @@ async def regenerate_mindmap(chat_id: str):
 @app.get("/api/chats/{chat_id}/mindmap")
 async def fetch_mindmap(chat_id: str, uid: int = Depends(current_user_id)):
     chat_id = _validate_chat_id(chat_id)
-    chat = await db.get_chat(chat_id, uid)
-    if not chat:
+    mindmap = await mindmap_service.get_for_user_chat(chat_id=chat_id, user_id=uid)
+    if mindmap is None:
         raise HTTPException(404, "Chat not found")
-    mm = await db.get_mindmap(chat_id)
-    analytics.track("mindmap_opened", uid, chat_id=str(chat_id), has_content=bool(mm))
-    if not mm:
-        return {"markdown": "", "updated_at": None}
-    return {
-        "markdown":   mm["markdown"],
-        "updated_at": mm["updated_at"].isoformat() if mm["updated_at"] else None,
-    }
+    analytics.track("mindmap_opened", uid, chat_id=str(chat_id), has_content=bool(mindmap["markdown"]))
+    return mindmap
 
 
 @app.post("/api/chats/{chat_id}/mindmap/regenerate")
@@ -897,8 +868,7 @@ async def force_regenerate_mindmap(
     uid:     int = Depends(current_user_id),
 ):
     chat_id = _validate_chat_id(chat_id)
-    chat = await db.get_chat(chat_id, uid)
-    if not chat:
+    if not await mindmap_service.user_can_access_chat(chat_id=chat_id, user_id=uid):
         raise HTTPException(404, "Chat not found")
     bg.add_task(regenerate_mindmap, chat_id)
     analytics.track("mindmap_regenerated", uid, chat_id=str(chat_id))

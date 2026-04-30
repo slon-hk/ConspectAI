@@ -7,6 +7,7 @@ from .admin_user_service import AdminUserService
 from .analytics_maintenance_service import AnalyticsMaintenanceService
 from .analytics_tracking_service import AnalyticsTrackingService
 from .auth_service import AuthService
+from .catalog_service import CatalogService
 from .file_service import FileService
 from .funnel_service import FunnelService
 from .quota_service import QuotaService
@@ -21,6 +22,7 @@ __all__ = [
     "AdminAccessService",
     "AdminAnalyticsService",
     "AuthService",
+    "CatalogService",
     "AnalyticsTrackingService",
     "AdminMetricsService",
     "AdminUserService",

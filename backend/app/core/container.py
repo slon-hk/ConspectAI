@@ -30,6 +30,7 @@ from app.services import (
     AdminMetricsService,
     AdminUserService,
     AnalyticsTrackingService,
+    CatalogService,
     ChatService,
     FileService,
     FunnelService,
@@ -44,8 +45,8 @@ from app.services.auth_service import AuthService
 from app.services.ai_chat_service import AiChatService
 from app.services.rag_service import RagService
 from app.services.billing_service import BillingService
-from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY
-from promts import MINDMAP_PROMPT, MODELS, SYSTEM_PROMPTS
+from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, public_plans
+from promts import MINDMAP_PROMPT, MODELS, SYSTEM_PROMPTS, TEMPLATE_META
 
 DEFAULT_TEMPLATE = "deep"
 DEFAULT_MODEL = "gemini-3.1-flash-lite-preview"
@@ -61,6 +62,7 @@ class AppContainer:
     ai_chat_service: AiChatService
     analytics_tracking_service: AnalyticsTrackingService
     auth_service: AuthService
+    catalog_service: CatalogService
     chat_service: ChatService
     file_service: FileService
     funnel_service: FunnelService
@@ -90,6 +92,11 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
     quota_service = QuotaService(usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUEST)
     user_service = UserService(user_repository, usage_service)
     auth_service = AuthService(user_repository, user_service, DEFAULT_PLAN_KEY)
+    catalog_service = CatalogService(
+        models=MODELS,
+        template_meta=TEMPLATE_META,
+        public_plans=public_plans,
+    )
     file_service = FileService(file_repository)
     rag_service = RagService(RagRouteRepository(database))
     funnel_service = FunnelService(FunnelMetricRepository(database))
@@ -129,6 +136,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         ai_chat_service=ai_chat_service,
         analytics_tracking_service=analytics_tracking_service,
         auth_service=auth_service,
+        catalog_service=catalog_service,
         chat_service=chat_service,
         file_service=file_service,
         funnel_service=funnel_service,

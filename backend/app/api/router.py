@@ -11,7 +11,7 @@ from app.api.routes.admin import create_admin_router, create_require_admin_depen
 from app.api.routes.admin_metrics import create_admin_metrics_router
 from app.api.routes.analytics import create_analytics_router
 from app.api.routes.auth import create_auth_router
-from app.api.routes.catalog import router as catalog_router
+from app.api.routes.catalog import create_catalog_router
 from app.api.routes.chats import create_chat_router
 from app.api.routes.files import create_file_router
 from app.api.routes.mindmaps import create_mindmap_router
@@ -39,7 +39,7 @@ def register_routes(
             admin_user_service=container.admin_user_service,
         )
     )
-    app.include_router(catalog_router)
+    app.include_router(create_catalog_router(container.catalog_service))
     app.include_router(
         create_rag_router(
             current_user_id=current_user_id,

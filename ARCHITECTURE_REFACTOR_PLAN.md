@@ -93,7 +93,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `analytics.track()` publishes an analytics event handled by an OLAP handler.
 - Route-level RAG SQL for courses, document records, image access, and chat
   course linking now lives behind `app.repositories.oltp.RagRouteRepository`.
-  Deep ingestion/retrieval SQL in `rag.py` remains a separate migration block.
+  RAG helper SQL for course listing, document listing, course deletion, and
+  chat-file auto-course creation uses the same repository. Deep ingestion,
+  retrieval, image, and cache SQL in `rag.py` remains a separate migration block.
 
 ## Next Stages
 

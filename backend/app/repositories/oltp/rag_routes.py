@@ -8,6 +8,58 @@ from app.repositories.base import BaseRepository
 
 
 class RagRouteRepository(BaseRepository):
+    async def list_user_courses(
+        self,
+        *,
+        user_id: int,
+        conn: asyncpg.Connection | None = None,
+    ) -> list[dict]:
+        async with self.connection(conn) as db_conn:
+            rows = await db_conn.fetch(
+                """SELECT id, title, description, scope, created_at,
+                          (SELECT COUNT(*) FROM rag_documents d
+                           WHERE d.course_id = courses.id AND d.status = 'ready') AS doc_count,
+                          (SELECT COALESCE(SUM(chunk_count),0) FROM rag_documents d
+                           WHERE d.course_id = courses.id AND d.status = 'ready') AS chunk_count
+                   FROM courses WHERE user_id = $1 ORDER BY updated_at DESC""",
+                user_id,
+            )
+            return [dict(row) for row in rows]
+
+    async def list_course_documents(
+        self,
+        *,
+        course_id: str,
+        user_id: int,
+        conn: asyncpg.Connection | None = None,
+    ) -> list[dict]:
+        async with self.connection(conn) as db_conn:
+            rows = await db_conn.fetch(
+                """SELECT id, filename, source_type, source_ref,
+                          status, error_msg, chunk_count, is_public, created_at
+                   FROM rag_documents
+                   WHERE course_id = $1 AND user_id = $2
+                   ORDER BY created_at DESC""",
+                course_id,
+                user_id,
+            )
+            return [dict(row) for row in rows]
+
+    async def delete_course(
+        self,
+        *,
+        course_id: str,
+        user_id: int,
+        conn: asyncpg.Connection | None = None,
+    ) -> bool:
+        async with self.connection(conn) as db_conn:
+            result = await db_conn.execute(
+                "DELETE FROM courses WHERE id = $1 AND user_id = $2",
+                course_id,
+                user_id,
+            )
+            return result != "DELETE 0"
+
     async def create_course(
         self,
         *,
@@ -228,4 +280,3 @@ class RagRouteRepository(BaseRepository):
                 user_id,
             )
             return result != "UPDATE 0"
-

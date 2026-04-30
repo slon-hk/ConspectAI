@@ -36,6 +36,9 @@ import tiktoken
 
 import db
 import storage
+from app.repositories.oltp import RagRouteRepository
+
+_rag_routes_repository = RagRouteRepository()
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -928,40 +931,16 @@ async def _resolve_images(image_ids: list[str]) -> list[dict]:
 # ── Course helpers (used by API layer) ────────────────────────────────────────
 
 async def get_user_courses(user_id: int) -> list[dict]:
-    async with db.pool().acquire() as conn:
-        rows = await conn.fetch(
-            """SELECT id, title, description, scope, created_at,
-                      (SELECT COUNT(*) FROM rag_documents d
-                       WHERE d.course_id = courses.id AND d.status = 'ready') AS doc_count,
-                      (SELECT COALESCE(SUM(chunk_count),0) FROM rag_documents d
-                       WHERE d.course_id = courses.id AND d.status = 'ready') AS chunk_count
-               FROM courses WHERE user_id = $1 ORDER BY updated_at DESC""",
-            user_id,
-        )
-    return [dict(r) for r in rows]
+    return await _rag_routes_repository.list_user_courses(user_id=user_id)
 
 
 async def get_course_documents(course_id: str, user_id: int) -> list[dict]:
-    async with db.pool().acquire() as conn:
-        rows = await conn.fetch(
-            """SELECT id, filename, source_type, source_ref,
-                      status, error_msg, chunk_count, is_public, created_at
-               FROM rag_documents
-               WHERE course_id = $1 AND user_id = $2
-               ORDER BY created_at DESC""",
-            course_id, user_id,
-        )
-    return [dict(r) for r in rows]
+    return await _rag_routes_repository.list_course_documents(course_id=course_id, user_id=user_id)
 
 
 async def delete_course(course_id: str, user_id: int) -> bool:
     """Cascade deletes documents, chunks (if orphaned), images."""
-    async with db.pool().acquire() as conn:
-        result = await conn.execute(
-            "DELETE FROM courses WHERE id = $1 AND user_id = $2",
-            course_id, user_id,
-        )
-    return result != "DELETE 0"
+    return await _rag_routes_repository.delete_course(course_id=course_id, user_id=user_id)
 
 
 async def cleanup_answer_cache(max_age_days: int = 7) -> None:
@@ -992,27 +971,20 @@ async def ensure_chat_course_and_ingest_uploads(
         return None
     course_id = chat.get("course_id")
     if not course_id:
-        async with db.pool().acquire() as conn:
-            row = await conn.fetchrow(
-                """
-                INSERT INTO courses (user_id, title, description, scope)
-                VALUES ($1, $2, $3, 'private')
-                RETURNING id
-                """,
-                user_id, f"Chat files {chat_id[:8]}", "Auto-generated course for chat file RAG",
-            )
-            course_id = str(row["id"])
+        course = await _rag_routes_repository.create_course(
+            user_id=user_id,
+            title=f"Chat files {chat_id[:8]}",
+            description="Auto-generated course for chat file RAG",
+            scope="private",
+        )
+        course_id = str(course["id"])
         await db.update_chat_settings(chat_id, user_id, course_id=course_id)
 
     for f in file_refs:
         sha = f.get("sha256")
         if not sha:
             continue
-        async with db.pool().acquire() as conn:
-            dup = await conn.fetchrow(
-                "SELECT id, status FROM rag_documents WHERE course_id=$1 AND sha256=$2",
-                course_id, sha,
-            )
+        dup = await _rag_routes_repository.find_document_duplicate(course_id=course_id, sha256=sha)
         if dup and dup["status"] == "ready":
             continue
         meta = await db.get_file_meta(sha)
@@ -1028,22 +1000,21 @@ async def ensure_chat_course_and_ingest_uploads(
         else:
             source_type = "txt"
         raw = storage.read_file(meta["sha256"], meta["compressed"])
-        async with db.pool().acquire() as conn:
-            doc = await conn.fetchrow(
-                """
-                INSERT INTO rag_documents
-                    (course_id, user_id, filename, source_type, source_ref, sha256, status, is_public)
-                VALUES ($1, $2, $3, $4, $5, $6, 'pending', FALSE)
-                RETURNING id
-                """,
-                course_id, user_id, f.get("original_filename") or "uploaded_file", source_type,
-                f.get("original_filename") or "uploaded_file", sha,
-            )
-        await ingest_document(
-            document_id=str(doc["id"]),
+        filename = f.get("original_filename") or "uploaded_file"
+        document_id = await _rag_routes_repository.create_file_document(
             course_id=str(course_id),
             user_id=user_id,
-            filename=f.get("original_filename") or "uploaded_file",
+            filename=filename,
+            source_type=source_type,
+            source_ref=filename,
+            sha256=sha,
+            is_public=False,
+        )
+        await ingest_document(
+            document_id=document_id,
+            course_id=str(course_id),
+            user_id=user_id,
+            filename=filename,
             source_type=source_type,
             raw_bytes=raw,
         )

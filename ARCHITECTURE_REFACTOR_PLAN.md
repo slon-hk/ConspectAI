@@ -103,10 +103,14 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   upsert, chunk-image links, and ready finalization now lives behind
   `app.repositories.oltp.RagIngestionRepository`. `rag.py` still owns extraction,
   embedding, captioning, and ingestion orchestration.
+- RAG chat-file auto-ingestion now uses `ChatRepository` and `FileRepository`
+  directly instead of the legacy `db.py` compatibility wrappers.
 - `app.services.RagService` now owns course/document/image/chat-course
   orchestration for the RAG API, including upload/Youtube ingestion setup.
   `rag_routes.py` still owns HTTP parsing, response serialization, file read,
   and HTTP error mapping.
+- `rag_routes.py` auth dependency now verifies users through `UserRepository`
+  instead of the legacy `db.py` wrapper.
 - `app.services.ChatService` now owns chat CRUD and message-list orchestration
   for non-send chat endpoints in `main.py`. The hot `send_message` path remains
   a separate migration block because it combines quota context, file handling,

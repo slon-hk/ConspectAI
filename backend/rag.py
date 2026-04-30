@@ -34,15 +34,18 @@ import asyncpg
 import google.generativeai as genai
 import tiktoken
 
-import db
 import storage
 from app.repositories.oltp import (
+    ChatRepository,
+    FileRepository,
     RagCacheRepository,
     RagIngestionRepository,
     RagRetrievalRepository,
     RagRouteRepository,
 )
 
+_chat_repository = ChatRepository()
+_file_repository = FileRepository()
 _rag_cache_repository = RagCacheRepository()
 _rag_ingestion_repository = RagIngestionRepository()
 _rag_retrieval_repository = RagRetrievalRepository()
@@ -818,7 +821,7 @@ async def ensure_chat_course_and_ingest_uploads(
     """
     if not file_refs:
         return None
-    chat = await db.get_chat(chat_id, user_id)
+    chat = await _chat_repository.get(chat_id, user_id)
     if not chat:
         return None
     course_id = chat.get("course_id")
@@ -830,7 +833,7 @@ async def ensure_chat_course_and_ingest_uploads(
             scope="private",
         )
         course_id = str(course["id"])
-        await db.update_chat_settings(chat_id, user_id, course_id=course_id)
+        await _chat_repository.update_settings(chat_id, user_id, course_id=course_id)
 
     for f in file_refs:
         sha = f.get("sha256")
@@ -839,7 +842,7 @@ async def ensure_chat_course_and_ingest_uploads(
         dup = await _rag_routes_repository.find_document_duplicate(course_id=course_id, sha256=sha)
         if dup and dup["status"] == "ready":
             continue
-        meta = await db.get_file_meta(sha)
+        meta = await _file_repository.get(sha)
         if not meta:
             continue
         ext = (f.get("original_filename", "") or "").lower()

@@ -21,8 +21,7 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-import db
-from app.repositories.oltp import RagRouteRepository
+from app.repositories.oltp import RagRouteRepository, UserRepository
 from app.services.rag_service import (
     RagCourseNotFoundError,
     RagFileTooLargeError,
@@ -33,6 +32,7 @@ from app.services.rag_service import (
 
 router = APIRouter(prefix="/api", tags=["rag"])
 rag_routes_repository = RagRouteRepository()
+user_repository = UserRepository()
 rag_service = RagService(rag_routes_repository)
 
 # ── Auth dependency (same pattern as main.py) ─────────────────────────────────
@@ -46,7 +46,7 @@ async def current_uid(token: str = Depends(_auth.oauth2)) -> int:
     uid = _auth.decode_token(token)
     if not uid:
         raise HTTPException(401, "Invalid token")
-    user = await db.get_user_by_id(uid)
+    user = await user_repository.get_by_id(uid)
     if not user:
         raise HTTPException(401, "User not found")
     if user.get("is_blocked"):

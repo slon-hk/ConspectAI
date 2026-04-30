@@ -1,7 +1,3 @@
-import os
-
-import google.generativeai as genai
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -11,6 +7,7 @@ import auth
 import rag_routes
 from app.api.dependencies import create_current_user_id_dependency
 from app.api.router import register_routes
+from app.core.config import configure_gemini, load_settings
 from app.core.container import create_container
 from app.core.exceptions import register_exception_handlers
 from app.core.lifecycle import create_lifespan
@@ -21,11 +18,8 @@ from app.middleware import (
 )
 from app.workers import start_analytics_cleanup_task
 
-load_dotenv()
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+settings = load_settings()
+configure_gemini(settings)
 
 
 lifespan = create_lifespan(
@@ -34,7 +28,7 @@ lifespan = create_lifespan(
 )
 app = FastAPI(title="ConspectAI", lifespan=lifespan)
 jinja = Jinja2Templates(directory="templates")
-container = create_container(database=database, gemini_api_key=GEMINI_API_KEY)
+container = create_container(database=database, gemini_api_key=settings.gemini_api_key)
 register_http_metrics_middleware(app, container.analytics_tracking_service)
 register_subscription_quota_middleware(
     app,

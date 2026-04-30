@@ -210,6 +210,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   container and legacy router dependencies into a single registration function.
 - `app.main` now owns FastAPI app assembly. The top-level `main.py` remains a
   compatibility wrapper for the existing `uvicorn main:app` Docker entrypoint.
+- `app.core.config` now owns process settings loading and Gemini SDK
+  configuration used during app assembly.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

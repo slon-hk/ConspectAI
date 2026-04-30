@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 
 import auth
 import admin
-import analytics
 import rag_routes
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
@@ -34,6 +33,7 @@ from app.repositories.oltp import (
 )
 from app.services import (
     AdminMetricsService,
+    AnalyticsTrackingService,
     ChatService,
     FileService,
     FunnelService,
@@ -102,6 +102,7 @@ request_metrics_service = RequestMetricsService(
     RagMetricRepository(database),
 )
 admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
+analytics_tracking_service = AnalyticsTrackingService()
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
@@ -151,7 +152,7 @@ async def http_metrics_middleware(request: Request, call_next):
         raise
     finally:
         elapsed_ms = (_t.perf_counter() - start) * 1000
-        analytics.metrics.record_http(request.url.path, status, elapsed_ms)
+        analytics_tracking_service.record_http(request.url.path, status, elapsed_ms)
 
 
 def _needs_quota_check(path: str, method: str) -> bool:
@@ -332,9 +333,14 @@ async def register(body: RegisterIn):
     # Record consent as an analytics event. The events table is append-only,
     # so this gives a defensible audit trail (timestamp + user id) of when the
     # user accepted the offer and privacy policy.
-    analytics.track("signup", user["id"])
+    analytics_tracking_service.track("signup", user["id"])
     await funnel_service.record_signup(user_id=user["id"], channel="auth_register")
-    analytics.track("agreement_accepted", user["id"], offer_version="2026-04-26", privacy_version="2026-04-26")
+    analytics_tracking_service.track(
+        "agreement_accepted",
+        user["id"],
+        offer_version="2026-04-26",
+        privacy_version="2026-04-26",
+    )
 
     return result
 
@@ -349,7 +355,7 @@ async def login(body: LoginIn):
         raise HTTPException(403, str(exc)) from exc
 
     user = result.pop("raw_user")
-    analytics.track("login", user["id"])
+    analytics_tracking_service.track("login", user["id"])
     return result
 
 
@@ -462,7 +468,7 @@ async def create_chat(
         default_template="deep",
         default_model="gemini-3.1-flash-lite-preview",
     )
-    analytics.track("chat_created", uid, template=tpl, model=mdl)
+    analytics_tracking_service.track("chat_created", uid, template=tpl, model=mdl)
     return _serialize(row)
 
 
@@ -489,9 +495,9 @@ async def update_settings(
     if not chat:
         raise HTTPException(404, "Chat not found")
     if "template" in updates:
-        analytics.track("template_switched", uid, chat_id=str(chat_id), template=updates["template"])
+        analytics_tracking_service.track("template_switched", uid, chat_id=str(chat_id), template=updates["template"])
     if "model" in updates:
-        analytics.track("model_switched", uid, chat_id=str(chat_id), model=updates["model"])
+        analytics_tracking_service.track("model_switched", uid, chat_id=str(chat_id), model=updates["model"])
     return _serialize(chat)
 
 
@@ -558,7 +564,7 @@ async def upload_file(
         content_type=file.content_type,
     )
 
-    analytics.track(
+    analytics_tracking_service.track(
         "file_uploaded", uid,
         mime=upload["mime_type"], size=upload["original_size"],
         compressed=upload["compressed"], saved_kb=upload["saved_kb"],
@@ -607,7 +613,7 @@ async def client_track(
     for k, v in (body.props or {}).items():
         if isinstance(v, (str, int, float, bool)) or v is None:
             safe_props[str(k)[:40]] = v if not isinstance(v, str) else v[:200]
-    analytics.track(body.event, uid, **safe_props)
+    analytics_tracking_service.track(body.event, uid, **safe_props)
     return {"ok": True}
 
 
@@ -653,9 +659,9 @@ async def regenerate_mindmap(chat_id: str):
             enabled=bool(GEMINI_API_KEY),
         )
         if generated:
-            analytics.metrics.bg_mindmap_runs += 1
+            analytics_tracking_service.increment_mindmap_runs()
     except Exception as e:
-        analytics.metrics.bg_mindmap_failed += 1
+        analytics_tracking_service.increment_mindmap_failures()
         print(f"[mindmap] error for chat {chat_id}: {e}")
 
 
@@ -665,7 +671,7 @@ async def fetch_mindmap(chat_id: str, uid: int = Depends(current_user_id)):
     mindmap = await mindmap_service.get_for_user_chat(chat_id=chat_id, user_id=uid)
     if mindmap is None:
         raise HTTPException(404, "Chat not found")
-    analytics.track("mindmap_opened", uid, chat_id=str(chat_id), has_content=bool(mindmap["markdown"]))
+    analytics_tracking_service.track("mindmap_opened", uid, chat_id=str(chat_id), has_content=bool(mindmap["markdown"]))
     return mindmap
 
 
@@ -679,5 +685,5 @@ async def force_regenerate_mindmap(
     if not await mindmap_service.user_can_access_chat(chat_id=chat_id, user_id=uid):
         raise HTTPException(404, "Chat not found")
     bg.add_task(regenerate_mindmap, chat_id)
-    analytics.track("mindmap_regenerated", uid, chat_id=str(chat_id))
+    analytics_tracking_service.track("mindmap_regenerated", uid, chat_id=str(chat_id))
     return {"ok": True, "queued": True}

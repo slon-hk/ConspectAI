@@ -4,6 +4,7 @@ from .admin_access_service import AdminAccessService
 from .admin_analytics_service import AdminAnalyticsService
 from .admin_metrics_service import AdminMetricsService
 from .admin_user_service import AdminUserService
+from .analytics_tracking_service import AnalyticsTrackingService
 from .auth_service import AuthService
 from .file_service import FileService
 from .funnel_service import FunnelService
@@ -18,6 +19,7 @@ __all__ = [
     "AdminAccessService",
     "AdminAnalyticsService",
     "AuthService",
+    "AnalyticsTrackingService",
     "AdminMetricsService",
     "AdminUserService",
     "ChatService",

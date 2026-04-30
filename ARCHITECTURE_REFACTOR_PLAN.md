@@ -107,6 +107,10 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   orchestration for the RAG API, including upload/Youtube ingestion setup.
   `rag_routes.py` still owns HTTP parsing, response serialization, file read,
   and HTTP error mapping.
+- `app.services.ChatService` now owns chat CRUD and message-list orchestration
+  for non-send chat endpoints in `main.py`. The hot `send_message` path remains
+  a separate migration block because it combines quota context, file handling,
+  Gemini/RAG orchestration, billing, analytics, and mindmap refresh scheduling.
 
 ## Next Stages
 

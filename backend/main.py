@@ -22,6 +22,9 @@ import storage
 import admin
 import analytics
 import rag_routes
+from app.db.pool import database
+from app.repositories.oltp import ChatRepository, MessageRepository
+from app.services import ChatService
 from billing import calculate_cost_units
 from promts import SYSTEM_PROMPTS, TEMPLATE_META, MODELS, MINDMAP_PROMPT
 from billing_plans import public_plans
@@ -48,6 +51,7 @@ app = FastAPI(title="ConspectAI", lifespan=lifespan)
 jinja = Jinja2Templates(directory="templates")
 app.include_router(admin.router)
 app.include_router(rag_routes.router)
+chat_service = ChatService(ChatRepository(database), MessageRepository(database))
 
 # Static assets (error-page backgrounds, etc.) — served directly without auth
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -425,7 +429,7 @@ async def get_subscription_plans():
 # ── Chats ──────────────────────────────────────────────────────────────────────
 @app.get("/api/chats")
 async def get_chats(uid: int = Depends(current_user_id)):
-    rows = await db.get_chats(uid)
+    rows = await chat_service.list_chats(uid)
     return [_serialize(r) for r in rows]
 
 
@@ -435,9 +439,15 @@ async def create_chat(
     model:    str = Form("gemini-3.1-flash-lite-preview"),
     uid:      int = Depends(current_user_id),
 ):
-    tpl = template if template in SYSTEM_PROMPTS else "deep"
-    mdl = model    if model    in MODELS          else "gemini-3.1-flash-lite-preview"
-    row = await db.create_chat(uid, tpl, mdl)
+    row, tpl, mdl = await chat_service.create_chat(
+        user_id=uid,
+        template=template,
+        model=model,
+        allowed_templates=SYSTEM_PROMPTS,
+        allowed_models=MODELS,
+        default_template="deep",
+        default_model="gemini-3.1-flash-lite-preview",
+    )
     analytics.track("chat_created", uid, template=tpl, model=mdl)
     return _serialize(row)
 
@@ -450,24 +460,31 @@ async def update_settings(
     uid:      int = Depends(current_user_id),
 ):
     chat_id = _validate_chat_id(chat_id)
-    kwargs = {}
-    if template and template in SYSTEM_PROMPTS: kwargs["template"] = template
-    if model    and model    in MODELS:          kwargs["model"]    = model
-    if not kwargs:
-        raise HTTPException(400, "Nothing to update")
-    await db.update_chat_settings(chat_id, uid, **kwargs)
-    if "template" in kwargs:
-        analytics.track("template_switched", uid, chat_id=str(chat_id), template=kwargs["template"])
-    if "model" in kwargs:
-        analytics.track("model_switched", uid, chat_id=str(chat_id), model=kwargs["model"])
-    chat = await db.get_chat(chat_id, uid)
+    try:
+        chat, updates = await chat_service.update_chat_settings(
+            chat_id=chat_id,
+            user_id=uid,
+            template=template,
+            model=model,
+            allowed_templates=SYSTEM_PROMPTS,
+            allowed_models=MODELS,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    if not chat:
+        raise HTTPException(404, "Chat not found")
+    if "template" in updates:
+        analytics.track("template_switched", uid, chat_id=str(chat_id), template=updates["template"])
+    if "model" in updates:
+        analytics.track("model_switched", uid, chat_id=str(chat_id), model=updates["model"])
     return _serialize(chat)
 
 
 @app.delete("/api/chats/{chat_id}")
 async def delete_chat(chat_id: str, uid: int = Depends(current_user_id)):
     chat_id = _validate_chat_id(chat_id)
-    await db.delete_chat(chat_id, uid)
+    await chat_service.delete_chat(chat_id=chat_id, user_id=uid)
     return {"ok": True}
 
 
@@ -475,10 +492,9 @@ async def delete_chat(chat_id: str, uid: int = Depends(current_user_id)):
 @app.get("/api/chats/{chat_id}/messages")
 async def get_messages(chat_id: str, uid: int = Depends(current_user_id)):
     chat_id = _validate_chat_id(chat_id)
-    chat = await db.get_chat(chat_id, uid)
-    if not chat:
+    msgs = await chat_service.list_messages_for_user_chat(chat_id=chat_id, user_id=uid)
+    if msgs is None:
         raise HTTPException(404, "Chat not found")
-    msgs = await db.get_messages(chat_id)
     return [_serialize_msg(m) for m in msgs]
 
 

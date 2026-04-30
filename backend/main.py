@@ -17,6 +17,7 @@ import admin
 import rag_routes
 from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import router as catalog_router
+from app.api.routes.users import create_user_router
 from app.db.pool import database
 from app.workers import start_analytics_cleanup_task
 from app.repositories.olap import (
@@ -117,7 +118,6 @@ app.include_router(
         funnel_service=funnel_service,
     )
 )
-
 # Static assets (error-page backgrounds, etc.) — served directly without auth
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -247,6 +247,15 @@ async def current_user_id(token: str = Depends(auth.oauth2)) -> int:
     return uid
 
 
+app.include_router(
+    create_user_router(
+        current_user_id=current_user_id,
+        user_service=user_service,
+        usage_service=usage_service,
+    )
+)
+
+
 # ── Pages ─────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
@@ -299,10 +308,6 @@ async def pricing_page(request: Request):
     return jinja.TemplateResponse("pricing.html", {"request": request, "plans": plans})
 
 
-async def _safe_user(u: dict) -> dict:
-    return await user_service.to_safe_user(u)
-
-
 def _model_name(key: str) -> str:
     """Ensure model name has the required 'models/' prefix for Gemini API."""
     if key.startswith("models/"):
@@ -315,26 +320,6 @@ def _validate_chat_id(chat_id: str) -> str:
         return str(uuid.UUID(str(chat_id)))
     except Exception:
         raise HTTPException(400, "Invalid chat_id")
-
-
-# ── User ──────────────────────────────────────────────────────────────────────
-@app.get("/api/user")
-async def get_user(uid: int = Depends(current_user_id)):
-    user = await user_service.get_safe_user_by_id(uid)
-    if not user:
-        raise HTTPException(404, "User not found")
-    return user
-
-
-@app.get("/api/usage")
-async def get_usage(uid: int = Depends(current_user_id)):
-    remaining = await usage_service.get_usage_snapshot(uid)
-    return remaining
-
-
-@app.get("/usage")
-async def get_usage_public(uid: int = Depends(current_user_id)):
-    return await usage_service.get_usage_snapshot(uid)
 
 
 @app.get("/admin/metrics")

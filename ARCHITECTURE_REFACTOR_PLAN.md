@@ -173,6 +173,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.api.routes.auth` now owns `/api/auth/register` and `/api/auth/login`
   through a router factory that receives existing services from `main.py`.
   Public auth request/response contracts and side effects are preserved.
+- `app.api.routes.users` now owns `/api/user`, `/api/usage`, and `/usage`
+  through a router factory that receives the existing auth dependency and
+  user/usage services.
 - `app.services.FunnelService` now owns landing/signup funnel event writes over
   `FunnelMetricRepository`, removing those OLAP writes in `main.py` from the
   legacy `db.py` wrapper path. It now publishes funnel events in the background

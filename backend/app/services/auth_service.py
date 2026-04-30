@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import auth
+from app.core import security
 from app.repositories.oltp import UserRepository
 from app.services.user_service import UserService
 
@@ -75,7 +75,7 @@ class AuthService:
         if await self._user_repository.get_by_username(normalized_username):
             raise UsernameAlreadyExistsError("Это имя пользователя уже занято")
 
-        password_hash = auth.hash_password(password)
+        password_hash = security.hash_password(password)
         user = await self._user_repository.create(
             normalized_username,
             normalized_email,
@@ -88,7 +88,7 @@ class AuthService:
         normalized_email = email.strip().lower()
         user = await self._user_repository.get_by_email(normalized_email)
 
-        if not user or not auth.verify_password(password, user["password_hash"]):
+        if not user or not security.verify_password(password, user["password_hash"]):
             raise InvalidCredentialsError("Неверный email или пароль")
         if user.get("is_blocked"):
             raise AuthAccountBlockedError("Аккаунт заблокирован администратором")
@@ -97,7 +97,7 @@ class AuthService:
 
     async def _auth_payload(self, user: dict) -> dict:
         return {
-            "access_token": auth.create_access_token(user["id"]),
+            "access_token": security.create_access_token(user["id"]),
             "token_type": "bearer",
             "user": await self._user_service.to_safe_user(user),
             "raw_user": user,

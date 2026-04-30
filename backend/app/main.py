@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-import auth
 from app.api.dependencies import create_current_user_id_dependency
 from app.api.routes.admin import require_admin, router as admin_router
 from app.api.routes.rag import router as rag_router
@@ -11,6 +10,7 @@ from app.core.config import configure_gemini, load_settings
 from app.core.container import create_container
 from app.core.exceptions import register_exception_handlers
 from app.core.lifecycle import create_lifespan
+from app.core import security
 from app.db.pool import database
 from app.middleware import (
     register_http_metrics_middleware,
@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
     register_http_metrics_middleware(app, container.analytics_tracking_service)
     register_subscription_quota_middleware(
         app,
-        decode_token=auth.decode_token,
+        decode_token=security.decode_token,
         quota_service=container.quota_service,
         usage_service=container.usage_service,
         request_metrics_service=container.request_metrics_service,
@@ -43,8 +43,8 @@ def create_app() -> FastAPI:
     register_exception_handlers(app, jinja)
 
     current_user_id = create_current_user_id_dependency(
-        token_dependency=auth.oauth2,
-        decode_token=auth.decode_token,
+        token_dependency=security.oauth2,
+        decode_token=security.decode_token,
         user_service=container.user_service,
     )
     register_routes(
@@ -52,8 +52,8 @@ def create_app() -> FastAPI:
         container=container,
         current_user_id=current_user_id,
         templates=jinja,
-        token_dependency=auth.oauth2,
-        decode_token=auth.decode_token,
+        token_dependency=security.oauth2,
+        decode_token=security.decode_token,
         admin_router=admin_router,
         require_admin=require_admin,
         rag_router=rag_router,

@@ -37,13 +37,13 @@ rag_service = RagService(rag_routes_repository)
 
 # ── Auth dependency (same pattern as main.py) ─────────────────────────────────
 
-import auth as _auth
+from app.core import security
 
 
-async def current_uid(token: str = Depends(_auth.oauth2)) -> int:
+async def current_uid(token: str = Depends(security.oauth2)) -> int:
     if not token:
         raise HTTPException(401, "Not authenticated")
-    uid = _auth.decode_token(token)
+    uid = security.decode_token(token)
     if not uid:
         raise HTTPException(401, "Invalid token")
     user = await user_repository.get_by_id(uid)

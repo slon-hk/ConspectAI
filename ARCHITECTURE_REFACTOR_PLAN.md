@@ -218,6 +218,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   checks and future tests while preserving the current module-level `app`.
 - `app.core.config` now owns process settings loading and Gemini SDK
   configuration used during app assembly.
+- `app.core.security` now owns JWT, password, OAuth2 bearer, captcha, and email
+  verification helpers. The top-level `auth.py` remains a compatibility wrapper.
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

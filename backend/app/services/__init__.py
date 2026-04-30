@@ -1,5 +1,6 @@
 """Application service layer."""
 
+from .admin_metrics_service import AdminMetricsService
 from .auth_service import AuthService
 from .file_service import FileService
 from .quota_service import QuotaService
@@ -11,6 +12,7 @@ from .request_metrics_service import RequestMetricsService
 
 __all__ = [
     "AuthService",
+    "AdminMetricsService",
     "ChatService",
     "FileService",
     "MindmapService",

@@ -19,7 +19,7 @@ import admin
 import analytics
 import rag_routes
 from app.db.pool import database
-from app.repositories.olap import RagMetricRepository, RequestMetricRepository
+from app.repositories.olap import AdminReportRepository, RagMetricRepository, RequestMetricRepository
 from app.repositories.oltp import (
     ChatRepository,
     FileRepository,
@@ -29,6 +29,7 @@ from app.repositories.oltp import (
     UserRepository,
 )
 from app.services import (
+    AdminMetricsService,
     ChatService,
     FileService,
     MindmapService,
@@ -94,6 +95,7 @@ request_metrics_service = RequestMetricsService(
     RequestMetricRepository(database),
     RagMetricRepository(database),
 )
+admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
@@ -385,27 +387,27 @@ async def get_usage_public(uid: int = Depends(current_user_id)):
 
 @app.get("/admin/metrics")
 async def get_admin_metrics_public(_=Depends(admin.require_admin)):
-    return await db.get_admin_metrics()
+    return await admin_metrics_service.admin_metrics()
 
 
 @app.get("/admin/metrics/overview")
 async def get_admin_metrics_overview_public(_=Depends(admin.require_admin)):
-    return await db.admin_metrics_overview()
+    return await admin_metrics_service.overview()
 
 
 @app.get("/admin/metrics/rag")
 async def get_admin_metrics_rag_public(_=Depends(admin.require_admin)):
-    return await db.admin_metrics_rag()
+    return await admin_metrics_service.rag()
 
 
 @app.get("/admin/metrics/usage")
 async def get_admin_metrics_usage_public(_=Depends(admin.require_admin)):
-    return await db.admin_metrics_usage()
+    return await admin_metrics_service.usage()
 
 
 @app.get("/admin/metrics/marketing")
 async def get_admin_metrics_marketing_public(_=Depends(admin.require_admin)):
-    return await db.admin_metrics_marketing()
+    return await admin_metrics_service.marketing()
 
 
 # ── Static data ────────────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ from typing import Any
 import asyncpg
 import google.generativeai as genai
 
-import storage
+from app.infrastructure.storage import FileStorage
 from app.repositories.oltp import (
     ChatRepository,
     FileRepository,
@@ -49,6 +49,7 @@ _rag_cache_repository = RagCacheRepository()
 _rag_ingestion_repository = RagIngestionRepository()
 _rag_retrieval_repository = RagRetrievalRepository()
 _rag_routes_repository = RagRouteRepository()
+_file_storage = FileStorage()
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -851,7 +852,7 @@ async def ensure_chat_course_and_ingest_uploads(
             source_type = "docx"
         else:
             source_type = "txt"
-        raw = storage.read_file(meta["sha256"], meta["compressed"])
+        raw = _file_storage.read_file(meta["sha256"], meta["compressed"])
         filename = f.get("original_filename") or "uploaded_file"
         document_id = await _rag_routes_repository.create_file_document(
             course_id=str(course_id),

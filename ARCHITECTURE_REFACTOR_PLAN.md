@@ -231,6 +231,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   file storage, and `FileService` receives storage through explicit injection.
 - `AiChatService` now also receives `FileStorage` explicitly for attachments,
   removing direct storage-module access from that active service path.
+- Legacy `rag.py` now reads stored files through `FileStorage`, narrowing direct
+  legacy storage-module access to the infrastructure adapter.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.

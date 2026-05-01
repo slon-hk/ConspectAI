@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-"""Compatibility entrypoint for the current uvicorn/Docker command."""
-
 from app.main import app, create_app
 
 __all__ = ["app", "create_app"]
-=======
 import os
 from contextlib import asynccontextmanager
 import re
@@ -23,7 +19,8 @@ import admin
 import rag_routes
 from app.api.routes.analytics import create_analytics_router
 from app.api.routes.auth import create_auth_router
-from app.api.routes.catalog import router as catalog_router
+from app.api.routes.catalog import create_catalog_router
+from app.services.catalog_service import CatalogService
 from app.api.routes.chats import create_chat_router
 from app.api.routes.files import create_file_router
 from app.api.routes.users import create_user_router
@@ -63,7 +60,11 @@ from app.services import (
 from app.services.auth_service import AuthService
 from app.services.ai_chat_service import AiChatService
 from app.services.billing_service import BillingService
-from promts import SYSTEM_PROMPTS, MODELS, MINDMAP_PROMPT
+from app.services.analytics_maintenance_service import AnalyticsMaintenanceService
+from app.infrastructure.storage import FileStorage
+from app.infrastructure.ai import RagEngine
+from app.events import InProcessEventBus
+from promts import SYSTEM_PROMPTS, MODELS, MINDMAP_PROMPT, TEMPLATE_META
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, public_plans
 
 load_dotenv()
@@ -78,7 +79,9 @@ async def lifespan(app: FastAPI):
     await database.create_pool()
     await init_schema()
     # Periodic cleanup of old analytics events (older than 90 days)
-    cleanup_task = start_analytics_cleanup_task()
+    cleanup_task = start_analytics_cleanup_task(
+        AnalyticsMaintenanceService(AnalyticsEventRepository(database))
+    )
     yield
     cleanup_task.cancel()
     await database.close_pool()
@@ -87,7 +90,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ConspectAI", lifespan=lifespan)
 jinja = Jinja2Templates(directory="templates")
 app.include_router(admin.router)
-app.include_router(catalog_router)
+app.include_router(create_catalog_router(
+    CatalogService(models=MODELS, template_meta=TEMPLATE_META, public_plans=public_plans)
+))
 app.include_router(rag_routes.router)
 chat_repository = ChatRepository(database)
 message_repository = MessageRepository(database)
@@ -100,14 +105,15 @@ quota_service = QuotaService(usage_repository, DEFAULT_INTERNAL_TOKENS_PER_REQUE
 user_repository = UserRepository(database)
 user_service = UserService(user_repository, usage_service)
 auth_service = AuthService(user_repository, user_service, DEFAULT_PLAN_KEY)
-file_service = FileService(file_repository)
-funnel_service = FunnelService(FunnelMetricRepository(database))
+file_service = FileService(file_repository, FileStorage())
+funnel_service = FunnelService(FunnelMetricRepository(database), InProcessEventBus())
 request_metrics_service = RequestMetricsService(
     RequestMetricRepository(database),
     RagMetricRepository(database),
+    InProcessEventBus(),
 )
 admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
-analytics_tracking_service = AnalyticsTrackingService(AnalyticsEventRepository(database))
+analytics_tracking_service = AnalyticsTrackingService(AnalyticsEventRepository(database), InProcessEventBus())
 mindmap_generation_service = MindmapGenerationService(
     mindmap_service=mindmap_service,
     analytics_tracking_service=analytics_tracking_service,
@@ -121,6 +127,8 @@ ai_chat_service = AiChatService(
     billing_service=BillingService(),
     analytics_tracking_service=analytics_tracking_service,
     file_repository=file_repository,
+    file_storage=FileStorage(),
+    rag_engine=RagEngine(),
     system_prompts=SYSTEM_PROMPTS,
     models=MODELS,
     default_template="deep",
@@ -407,4 +415,3 @@ async def force_regenerate_mindmap(
     bg.add_task(mindmap_generation_service.regenerate_background, chat_id)
     analytics_tracking_service.track("mindmap_regenerated", uid, chat_id=str(chat_id))
     return {"ok": True, "queued": True}
->>>>>>> 65d9c6e (fix bag)

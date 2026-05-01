@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
 from typing import Any
 
 
@@ -47,9 +46,6 @@ def calculate_cost_units(
     out_cost = (max(output_tokens, 0) / 1_000_000) * p["output_per_1m"]
     ctx_cost = (max(context_tokens, 0) / 1_000_000) * p["input_per_1m"] * p["context_multiplier"]
     return round(in_cost + out_cost + ctx_cost, 8)
-=======
-from billing import calculate_cost_units
->>>>>>> 65d9c6e (fix bag)
 
 
 class BillingService:
@@ -62,11 +58,7 @@ class BillingService:
         course_id: str | None,
         rag_result: dict,
         cache_hit: bool,
-<<<<<<< HEAD
     ) -> dict[str, Any]:
-=======
-    ) -> dict:
->>>>>>> 65d9c6e (fix bag)
         input_tokens = max(1, len(content or "") // 4)
         context_tokens = rag_result.get("context_tokens", 0) if course_id else 0
         output_tokens = max(1, len(assistant_text or "") // 4)
@@ -106,11 +98,7 @@ class BillingService:
         course_id: str | None,
         rag_result: dict,
         content: str,
-<<<<<<< HEAD
     ) -> dict[str, Any]:
-=======
-    ) -> dict:
->>>>>>> 65d9c6e (fix bag)
         return {
             "model_name": model_key,
             "cache_hit": cache_hit,

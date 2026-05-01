@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
 from app.domain.analytics.events import RAG_METRICS_EVENT_TYPE, REQUEST_METRICS_EVENT_TYPE
 from app.events.base import BaseEvent
 from app.repositories.olap import RagMetricRepository, RequestMetricRepository
@@ -11,18 +10,6 @@ from app.repositories.olap import RagMetricRepository, RequestMetricRepository
 class RequestMetricsEventHandler:
     def __init__(self, repository: RequestMetricRepository) -> None:
         self._repository = repository
-=======
-from app.events.base import BaseEvent
-from app.repositories.olap import RagMetricRepository, RequestMetricRepository
-
-REQUEST_METRICS_EVENT_TYPE = "metrics.request.completed"
-RAG_METRICS_EVENT_TYPE = "metrics.rag.query"
-
-
-class RequestMetricsEventHandler:
-    def __init__(self, repository: RequestMetricRepository | None = None) -> None:
-        self._repository = repository or RequestMetricRepository()
->>>>>>> 65d9c6e (fix bag)
 
     async def __call__(self, event: BaseEvent) -> None:
         payload = event.payload
@@ -44,13 +31,8 @@ class RequestMetricsEventHandler:
 
 
 class RagMetricsEventHandler:
-<<<<<<< HEAD
     def __init__(self, repository: RagMetricRepository) -> None:
         self._repository = repository
-=======
-    def __init__(self, repository: RagMetricRepository | None = None) -> None:
-        self._repository = repository or RagMetricRepository()
->>>>>>> 65d9c6e (fix bag)
 
     async def __call__(self, event: BaseEvent) -> None:
         payload = event.payload

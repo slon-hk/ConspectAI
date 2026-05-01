@@ -6,14 +6,9 @@ import asyncio
 import logging
 from typing import Any
 
-<<<<<<< HEAD
 from app.domain.analytics.events import ANALYTICS_EVENT_TYPE
 from app.events import BaseEvent, EventBus
 from app.events.handlers.analytics_handlers import AnalyticsEventHandler
-=======
-from app.events import BaseEvent, EventBus, event_bus
-from app.events.handlers.analytics_handlers import ANALYTICS_EVENT_TYPE, AnalyticsEventHandler
->>>>>>> 65d9c6e (fix bag)
 from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
 
@@ -23,22 +18,13 @@ logger = logging.getLogger(__name__)
 class AnalyticsTrackingService:
     def __init__(
         self,
-<<<<<<< HEAD
         analytics_repository: AnalyticsEventRepository,
         bus: EventBus,
-=======
-        analytics_repository: AnalyticsEventRepository | None = None,
-        bus: EventBus = event_bus,
->>>>>>> 65d9c6e (fix bag)
     ) -> None:
         self._event_bus = bus
         self._event_bus.subscribe(
             ANALYTICS_EVENT_TYPE,
-<<<<<<< HEAD
             AnalyticsEventHandler(analytics_repository),
-=======
-            AnalyticsEventHandler(analytics_repository or AnalyticsEventRepository()),
->>>>>>> 65d9c6e (fix bag)
         )
 
     def track(self, event: str, user_id: int | None = None, **props: Any) -> None:

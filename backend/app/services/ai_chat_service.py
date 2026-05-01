@@ -12,13 +12,8 @@ from typing import Any
 import google.generativeai as genai
 import PIL.Image
 
-<<<<<<< HEAD
 from app.infrastructure.ai import RagEngine
 from app.infrastructure.storage import FileStorage
-=======
-import rag as rag_engine
-import storage
->>>>>>> 65d9c6e (fix bag)
 from app.repositories.oltp import FileRepository
 from app.services.analytics_tracking_service import AnalyticsTrackingService
 from app.services.billing_service import BillingService
@@ -55,11 +50,8 @@ class AiChatService:
         billing_service: BillingService,
         analytics_tracking_service: AnalyticsTrackingService,
         file_repository: FileRepository,
-<<<<<<< HEAD
         file_storage: FileStorage,
         rag_engine: RagEngine,
-=======
->>>>>>> 65d9c6e (fix bag)
         system_prompts: Mapping[str, str],
         models: Mapping[str, Mapping[str, Any]],
         default_template: str,
@@ -71,11 +63,8 @@ class AiChatService:
         self._billing_service = billing_service
         self._analytics_tracking_service = analytics_tracking_service
         self._file_repository = file_repository
-<<<<<<< HEAD
         self._file_storage = file_storage
         self._rag_engine = rag_engine
-=======
->>>>>>> 65d9c6e (fix bag)
         self._system_prompts = system_prompts
         self._models = models
         self._default_template = default_template
@@ -136,11 +125,7 @@ class AiChatService:
         rag_result: dict = {}
         if file_refs:
             try:
-<<<<<<< HEAD
                 auto_course = await self._rag_engine.ensure_chat_course_and_ingest_uploads(
-=======
-                auto_course = await rag_engine.ensure_chat_course_and_ingest_uploads(
->>>>>>> 65d9c6e (fix bag)
                     chat_id=chat_id,
                     user_id=user_id,
                     file_refs=file_refs,
@@ -151,11 +136,7 @@ class AiChatService:
                 print(f"[rag] auto-ingest failed: {exc}")
 
         if course_id:
-<<<<<<< HEAD
             rag_result = await self._rag_engine.rag_query(
-=======
-            rag_result = await rag_engine.rag_query(
->>>>>>> 65d9c6e (fix bag)
                 query=content or " ".join(str(part) for part in parts if isinstance(part, str)),
                 course_id=str(course_id),
                 system_prompt=system_prompt,
@@ -261,11 +242,7 @@ class AiChatService:
             if not meta:
                 continue
             try:
-<<<<<<< HEAD
                 raw = self._file_storage.read_file(meta["sha256"], meta["compressed"])
-=======
-                raw = storage.read_file(meta["sha256"], meta["compressed"])
->>>>>>> 65d9c6e (fix bag)
                 if meta["mime_type"].startswith("image/"):
                     parts.append(PIL.Image.open(io.BytesIO(raw)))
                 else:

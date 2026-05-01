@@ -5,16 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 
-<<<<<<< HEAD
 from app.domain.analytics.events import RAG_METRICS_EVENT_TYPE, REQUEST_METRICS_EVENT_TYPE
 from app.events import BaseEvent, EventBus
 from app.events.handlers.request_metrics_handlers import (
-=======
-from app.events import BaseEvent, EventBus, event_bus
-from app.events.handlers.request_metrics_handlers import (
-    RAG_METRICS_EVENT_TYPE,
-    REQUEST_METRICS_EVENT_TYPE,
->>>>>>> 65d9c6e (fix bag)
     RagMetricsEventHandler,
     RequestMetricsEventHandler,
 )
@@ -28,11 +21,7 @@ class RequestMetricsService:
         self,
         request_metric_repository: RequestMetricRepository,
         rag_metric_repository: RagMetricRepository,
-<<<<<<< HEAD
         bus: EventBus,
-=======
-        bus: EventBus = event_bus,
->>>>>>> 65d9c6e (fix bag)
     ) -> None:
         self._event_bus = bus
         self._event_bus.subscribe(

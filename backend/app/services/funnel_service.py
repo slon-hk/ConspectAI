@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.domain.analytics.events import FUNNEL_STEP_EVENT_TYPE
 from app.events import BaseEvent, EventBus
-from app.events.handlers.funnel_handlers import FUNNEL_STEP_EVENT_TYPE, FunnelStepEventHandler
+from app.events.handlers.funnel_handlers import FunnelStepEventHandler
 from app.repositories.olap import FunnelMetricRepository
 
 logger = logging.getLogger(__name__)

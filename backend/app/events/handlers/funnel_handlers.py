@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from app.domain.analytics.events import FUNNEL_STEP_EVENT_TYPE
 from app.events.base import BaseEvent
 from app.repositories.olap import FunnelMetricRepository
-
-FUNNEL_STEP_EVENT_TYPE = "funnel.step.recorded"
 
 
 class FunnelStepEventHandler:

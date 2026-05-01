@@ -10,8 +10,9 @@ Analytics layer:
 import asyncio
 from typing import Optional
 
+from app.domain.analytics.events import ANALYTICS_EVENT_TYPE
 from app.events import BaseEvent, event_bus
-from app.events.handlers.analytics_handlers import ANALYTICS_EVENT_TYPE, AnalyticsEventHandler
+from app.events.handlers.analytics_handlers import AnalyticsEventHandler
 from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
 from app.services.analytics_maintenance_service import AnalyticsMaintenanceService

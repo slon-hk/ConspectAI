@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from app.domain.analytics.events import ANALYTICS_EVENT_TYPE
 from app.events.base import BaseEvent
 from app.repositories.olap import AnalyticsEventRepository
-
-ANALYTICS_EVENT_TYPE = "analytics.event"
 
 
 class AnalyticsEventHandler:

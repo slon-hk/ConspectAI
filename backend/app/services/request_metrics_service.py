@@ -5,10 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.domain.analytics.events import RAG_METRICS_EVENT_TYPE, REQUEST_METRICS_EVENT_TYPE
 from app.events import BaseEvent, EventBus
 from app.events.handlers.request_metrics_handlers import (
-    RAG_METRICS_EVENT_TYPE,
-    REQUEST_METRICS_EVENT_TYPE,
     RagMetricsEventHandler,
     RequestMetricsEventHandler,
 )

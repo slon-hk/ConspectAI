@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
+from app.domain.analytics.events import RAG_METRICS_EVENT_TYPE, REQUEST_METRICS_EVENT_TYPE
 from app.events.base import BaseEvent
 from app.repositories.olap import RagMetricRepository, RequestMetricRepository
-
-REQUEST_METRICS_EVENT_TYPE = "metrics.request.completed"
-RAG_METRICS_EVENT_TYPE = "metrics.rag.query"
 
 
 class RequestMetricsEventHandler:

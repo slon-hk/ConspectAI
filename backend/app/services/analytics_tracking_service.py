@@ -6,8 +6,9 @@ import asyncio
 import logging
 from typing import Any
 
+from app.domain.analytics.events import ANALYTICS_EVENT_TYPE
 from app.events import BaseEvent, EventBus
-from app.events.handlers.analytics_handlers import ANALYTICS_EVENT_TYPE, AnalyticsEventHandler
+from app.events.handlers.analytics_handlers import AnalyticsEventHandler
 from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
 

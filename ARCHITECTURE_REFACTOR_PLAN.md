@@ -250,6 +250,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   next event-delivery migration step. No DB schema change has been introduced.
 - `app.workers.outbox_dispatcher` now marks the future durable event dispatcher
   worker boundary without enabling outbox processing yet.
+- `app.domain.analytics.events` now owns analytics/funnel/request/RAG metric
+  event type names. Services no longer import event constants from handlers.
 - Analytics, funnel, and request-metrics services now receive the event bus
   explicitly from the app container instead of defaulting to the global bus.
 - Analytics cleanup worker startup now receives `AnalyticsMaintenanceService`

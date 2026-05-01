@@ -12,7 +12,7 @@ from typing import Any
 import google.generativeai as genai
 import PIL.Image
 
-import rag as rag_engine
+from app.infrastructure.ai import RagEngine
 from app.infrastructure.storage import FileStorage
 from app.repositories.oltp import FileRepository
 from app.services.analytics_tracking_service import AnalyticsTrackingService
@@ -51,6 +51,7 @@ class AiChatService:
         analytics_tracking_service: AnalyticsTrackingService,
         file_repository: FileRepository,
         file_storage: FileStorage,
+        rag_engine: RagEngine,
         system_prompts: Mapping[str, str],
         models: Mapping[str, Mapping[str, Any]],
         default_template: str,
@@ -63,6 +64,7 @@ class AiChatService:
         self._analytics_tracking_service = analytics_tracking_service
         self._file_repository = file_repository
         self._file_storage = file_storage
+        self._rag_engine = rag_engine
         self._system_prompts = system_prompts
         self._models = models
         self._default_template = default_template
@@ -123,7 +125,7 @@ class AiChatService:
         rag_result: dict = {}
         if file_refs:
             try:
-                auto_course = await rag_engine.ensure_chat_course_and_ingest_uploads(
+                auto_course = await self._rag_engine.ensure_chat_course_and_ingest_uploads(
                     chat_id=chat_id,
                     user_id=user_id,
                     file_refs=file_refs,
@@ -134,7 +136,7 @@ class AiChatService:
                 print(f"[rag] auto-ingest failed: {exc}")
 
         if course_id:
-            rag_result = await rag_engine.rag_query(
+            rag_result = await self._rag_engine.rag_query(
                 query=content or " ".join(str(part) for part in parts if isinstance(part, str)),
                 course_id=str(course_id),
                 system_prompt=system_prompt,

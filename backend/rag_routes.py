@@ -4,6 +4,7 @@ from app.api.dependencies import create_current_user_id_dependency
 from app.api.routes.rag import create_rag_router
 from app.core import security
 from app.db.pool import database
+from app.infrastructure.ai import RagEngine
 from app.repositories.oltp import RagRouteRepository, UsageRepository, UserRepository
 from app.services import UserService
 from app.services.rag_service import RagService
@@ -21,7 +22,7 @@ _current_user_id = create_current_user_id_dependency(
 )
 router = create_rag_router(
     current_user_id=_current_user_id,
-    rag_service=RagService(RagRouteRepository(database)),
+    rag_service=RagService(RagRouteRepository(database), RagEngine()),
 )
 
 __all__ = ["router"]

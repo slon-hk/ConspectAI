@@ -233,6 +233,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   removing direct storage-module access from that active service path.
 - Legacy `rag.py` now reads stored files through `FileStorage`, narrowing direct
   legacy storage-module access to the infrastructure adapter.
+- `app.infrastructure.ai.RagEngine` now wraps legacy `rag.py` access. Active
+  services receive it explicitly instead of importing the legacy module.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.

@@ -21,8 +21,15 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+<<<<<<< HEAD
 import json
 import os
+=======
+import hashlib
+import json
+import os
+import re
+>>>>>>> 65d9c6e (fix bag)
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -30,6 +37,7 @@ from typing import Any
 
 import asyncpg
 import google.generativeai as genai
+<<<<<<< HEAD
 
 from app.infrastructure.storage import FileStorage
 from app.domain.rag import (
@@ -39,6 +47,11 @@ from app.domain.rag import (
     split_text,
     to_pgvector,
 )
+=======
+import tiktoken
+
+import storage
+>>>>>>> 65d9c6e (fix bag)
 from app.repositories.oltp import (
     ChatRepository,
     FileRepository,
@@ -54,7 +67,10 @@ _rag_cache_repository = RagCacheRepository()
 _rag_ingestion_repository = RagIngestionRepository()
 _rag_retrieval_repository = RagRetrievalRepository()
 _rag_routes_repository = RagRouteRepository()
+<<<<<<< HEAD
 _file_storage = FileStorage()
+=======
+>>>>>>> 65d9c6e (fix bag)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -73,9 +89,170 @@ IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 _executor = ThreadPoolExecutor(max_workers=2)  # for blocking PDF/file ops
 
+<<<<<<< HEAD
 # Compatibility aliases for legacy imports.
 _rough_token_count = rough_token_count
 _sha256 = sha256_digest
+=======
+# ── Schema additions (called from db.init_schema) ─────────────────────────────
+
+RAG_SCHEMA = """
+-- pgvector extension (must be enabled once per DB)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Courses: user-created knowledge collections
+CREATE TABLE IF NOT EXISTS courses (
+    id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title       TEXT    NOT NULL,
+    description TEXT    NOT NULL DEFAULT '',
+    scope       TEXT    NOT NULL DEFAULT 'private',  -- 'private' | 'public'
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS courses_user_idx ON courses(user_id);
+
+-- Source documents tracked per course
+CREATE TABLE IF NOT EXISTS rag_documents (
+    id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id   UUID    NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    filename    TEXT    NOT NULL,
+    source_type TEXT    NOT NULL,  -- 'pdf' | 'txt' | 'md' | 'docx' | 'youtube' | 'url'
+    source_ref  TEXT    NOT NULL,  -- original path or URL
+    sha256      TEXT    NOT NULL,  -- hash of raw source for dedup at doc level
+    status      TEXT    NOT NULL DEFAULT 'pending',  -- pending|indexing|ready|error
+    error_msg   TEXT,
+    chunk_count INTEGER DEFAULT 0,
+    is_public   BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rag_doc_course_idx ON rag_documents(course_id);
+CREATE INDEX IF NOT EXISTS rag_doc_sha256_idx ON rag_documents(sha256);
+CREATE INDEX IF NOT EXISTS rag_doc_public_idx ON rag_documents(is_public, status, created_at DESC);
+
+ALTER TABLE rag_documents ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Text chunks with embeddings (shared across users via content_hash)
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    id           UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id  UUID    REFERENCES rag_documents(id) ON DELETE CASCADE,
+    content      TEXT    NOT NULL,
+    content_hash TEXT    NOT NULL,       -- SHA-256 of content: dedup key
+    embedding    vector(1536),            -- Reduced embedding dimension to 1536 due to pgvector index limit
+    tsv          tsvector,               -- for BM25 full-text search
+    chunk_index  INTEGER NOT NULL,       -- position within document
+    char_start   INTEGER,                -- character offset in source
+    char_end     INTEGER,
+    source_count INTEGER NOT NULL DEFAULT 1,  -- how many docs reference this content
+    created_at   TIMESTAMPTZ DEFAULT now()
+);
+-- Unique on content so duplicates are merged, not inserted
+CREATE UNIQUE INDEX IF NOT EXISTS rag_chunks_hash_idx ON rag_chunks(content_hash);
+CREATE INDEX IF NOT EXISTS rag_chunks_doc_idx   ON rag_chunks(document_id);
+CREATE INDEX IF NOT EXISTS rag_chunks_tsv_idx   ON rag_chunks USING GIN(tsv);
+CREATE INDEX IF NOT EXISTS rag_chunks_emb_idx   ON rag_chunks
+    USING hnsw (embedding vector_cosine_ops);
+
+-- Images extracted from documents
+CREATE TABLE IF NOT EXISTS rag_images (
+    id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID    NOT NULL REFERENCES rag_documents(id) ON DELETE CASCADE,
+    sha256      TEXT    NOT NULL UNIQUE,  -- dedup raw image bytes
+    file_path   TEXT    NOT NULL,
+    mime_type   TEXT    NOT NULL DEFAULT 'image/png',
+    caption     TEXT    NOT NULL DEFAULT '',
+    embedding   vector(1536),
+    page_num    INTEGER,
+    created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rag_img_doc_idx  ON rag_images(document_id);
+CREATE INDEX IF NOT EXISTS rag_img_hash_idx ON rag_images(sha256);
+
+-- Many-to-many: which images belong to which chunk (by proximity in document)
+CREATE TABLE IF NOT EXISTS rag_chunk_images (
+    chunk_id  UUID REFERENCES rag_chunks(id) ON DELETE CASCADE,
+    image_id  UUID REFERENCES rag_images(id) ON DELETE CASCADE,
+    PRIMARY KEY (chunk_id, image_id)
+);
+
+-- Embedding cache: avoid re-calling Gemini embed for seen query strings
+CREATE TABLE IF NOT EXISTS rag_query_cache (
+    query_hash TEXT    PRIMARY KEY,  -- SHA-256 of query text
+    embedding  vector(1536),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Answer cache: same query against same context → instant return
+CREATE TABLE IF NOT EXISTS rag_answer_cache (
+    cache_key   TEXT PRIMARY KEY,   -- SHA-256 of (query_hash + sorted chunk ids)
+    answer      TEXT NOT NULL,
+    image_ids   TEXT NOT NULL DEFAULT '[]',  -- JSON array of rag_image UUIDs
+    hit_count   INTEGER NOT NULL DEFAULT 1,
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    last_used   TIMESTAMPTZ DEFAULT now()
+);
+
+-- Chats can optionally be linked to a course
+ALTER TABLE chats ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES courses(id) ON DELETE SET NULL;
+"""
+
+
+# ── Text splitting ─────────────────────────────────────────────────────────────
+
+def _rough_token_count(text: str) -> int:
+    """Fast approximation: 1 token ≈ 4 chars for mixed RU/EN text."""
+    return max(1, len(text) // 4)
+
+_tokenizer = tiktoken.get_encoding("cl100k_base")
+
+def split_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """
+    Split text into overlapping chunks without breaking sentences mid-way.
+    Strategy: accumulate sentences until we hit `size` tokens, then backtrack
+    `overlap` tokens for the next chunk.
+    """
+    # Split on sentence boundaries (., !, ?, newline sequences)
+    sentences = re.split(r'(?<=[.!?\n])\s+', text.strip())
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    chunks: list[str] = []
+    current: list[str] = []
+    current_tokens = 0
+
+    for sent in sentences:
+        sent_tokens = _rough_token_count(sent)
+        if current_tokens + sent_tokens > size and current:
+            chunks.append(" ".join(current))
+            # keep tail for overlap
+            tail_tokens = 0
+            tail: list[str] = []
+            for s in reversed(current):
+                t = _rough_token_count(s)
+                if tail_tokens + t <= overlap:
+                    tail.insert(0, s)
+                    tail_tokens += t
+                else:
+                    break
+            current = tail
+            current_tokens = tail_tokens
+        current.append(sent)
+        current_tokens += sent_tokens
+
+    if current:
+        chunks.append(" ".join(current))
+
+    return chunks
+
+
+# ── Hashing ────────────────────────────────────────────────────────────────────
+
+def _sha256(data: bytes | str) -> str:
+    if isinstance(data, str):
+        data = data.encode()
+    return hashlib.sha256(data).hexdigest()
+
+>>>>>>> 65d9c6e (fix bag)
 
 
 # ── Embedding ─────────────────────────────────────────────────────────────────
@@ -465,7 +642,11 @@ def build_context(chunks: list[dict], images: list[dict]) -> str:
 
     for i, chunk in enumerate(chunks, 1):
         chunk_text = chunk["content"]
+<<<<<<< HEAD
         chunk_tokens = rough_token_count(chunk_text)
+=======
+        chunk_tokens = _rough_token_count(chunk_text)
+>>>>>>> 65d9c6e (fix bag)
 
         if total_tokens + chunk_tokens > MAX_CTX_TOKENS:
             # Truncate last chunk to fit
@@ -539,7 +720,11 @@ async def rag_query(
     started = time.perf_counter()
     # ── 1. Retrieve relevant chunks ────────────────────────────────────────
     chunks, images = await retrieve(query, course_id)
+<<<<<<< HEAD
     query_tokens = rough_token_count(query)
+=======
+    query_tokens = _rough_token_count(query)
+>>>>>>> 65d9c6e (fix bag)
 
     # ── 2. Check answer cache ──────────────────────────────────────────────
     cache_key = _answer_cache_key(query, chunks)
@@ -547,8 +732,13 @@ async def rag_query(
     if cached:
         # Resolve image objects from cached IDs
         cached_images = await _resolve_images(cached["image_ids"])
+<<<<<<< HEAD
         context_tokens = rough_token_count(build_context(chunks, cached_images)) if chunks else 0
         output_tokens = rough_token_count(cached["answer"])
+=======
+        context_tokens = _rough_token_count(build_context(chunks, cached_images)) if chunks else 0
+        output_tokens = _rough_token_count(cached["answer"])
+>>>>>>> 65d9c6e (fix bag)
         actual_with_rag = query_tokens + context_tokens + output_tokens
         estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
         latency_ms = int((time.perf_counter() - started) * 1000)
@@ -607,8 +797,13 @@ async def rag_query(
         lambda: chat.send_message(query),
     )
     answer = response.text
+<<<<<<< HEAD
     context_tokens = rough_token_count(context) if sources_found else 0
     output_tokens = rough_token_count(answer)
+=======
+    context_tokens = _rough_token_count(context) if sources_found else 0
+    output_tokens = _rough_token_count(answer)
+>>>>>>> 65d9c6e (fix bag)
     actual_with_rag = query_tokens + context_tokens + output_tokens
     estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
     latency_ms = int((time.perf_counter() - started) * 1000)
@@ -704,7 +899,11 @@ async def ensure_chat_course_and_ingest_uploads(
             source_type = "docx"
         else:
             source_type = "txt"
+<<<<<<< HEAD
         raw = _file_storage.read_file(meta["sha256"], meta["compressed"])
+=======
+        raw = storage.read_file(meta["sha256"], meta["compressed"])
+>>>>>>> 65d9c6e (fix bag)
         filename = f.get("original_filename") or "uploaded_file"
         document_id = await _rag_routes_repository.create_file_document(
             course_id=str(course_id),
@@ -724,3 +923,11 @@ async def ensure_chat_course_and_ingest_uploads(
             raw_bytes=raw,
         )
     return str(course_id)
+<<<<<<< HEAD
+=======
+
+def to_pgvector(vec: list[float]) -> str:
+    if len(vec) != EMBED_DIM:
+        raise ValueError(f"Embedding dimension mismatch: expected {EMBED_DIM}, got {len(vec)}")
+    return "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
+>>>>>>> 65d9c6e (fix bag)

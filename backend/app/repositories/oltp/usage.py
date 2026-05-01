@@ -83,14 +83,20 @@ class UsageRepository(BaseRepository):
                         user_id, day_start, week_start, month_start,
                         daily_used, weekly_used, monthly_used
                     )
+<<<<<<< HEAD
                     SELECT $1, CURRENT_DATE, {_week_start_expr()}, {_month_start_expr()}, $5, $5, $5
                     WHERE $5 <= $2 AND $5 <= $3 AND $5 <= $4
+=======
+                    SELECT $1, CURRENT_DATE, {_week_start_expr()}, {_month_start_expr()}, $5::int, $5::int, $5::int
+                    WHERE $5::int <= $2 AND $5::int <= $3 AND $5::int <= $4
+>>>>>>> 65d9c6e (fix bag)
                     ON CONFLICT (user_id) DO UPDATE
                     SET
                         day_start = CASE WHEN user_usage.day_start <> CURRENT_DATE THEN CURRENT_DATE ELSE user_usage.day_start END,
                         week_start = CASE WHEN user_usage.week_start <> {_week_start_expr()} THEN {_week_start_expr()} ELSE user_usage.week_start END,
                         month_start = CASE WHEN user_usage.month_start <> {_month_start_expr()} THEN {_month_start_expr()} ELSE user_usage.month_start END,
                         daily_used = CASE
+<<<<<<< HEAD
                             WHEN user_usage.day_start <> CURRENT_DATE THEN $5
                             WHEN user_usage.daily_used + $5 <= $2 THEN user_usage.daily_used + $5
                             ELSE user_usage.daily_used
@@ -103,13 +109,33 @@ class UsageRepository(BaseRepository):
                         monthly_used = CASE
                             WHEN user_usage.month_start <> {_month_start_expr()} THEN $5
                             WHEN user_usage.monthly_used + $5 <= $4 THEN user_usage.monthly_used + $5
+=======
+                            WHEN user_usage.day_start <> CURRENT_DATE THEN $5::int
+                            WHEN user_usage.daily_used + $5::int <= $2 THEN user_usage.daily_used + $5::int
+                            ELSE user_usage.daily_used
+                        END,
+                        weekly_used = CASE
+                            WHEN user_usage.week_start <> {_week_start_expr()} THEN $5::int
+                            WHEN user_usage.weekly_used + $5::int <= $3 THEN user_usage.weekly_used + $5::int
+                            ELSE user_usage.weekly_used
+                        END,
+                        monthly_used = CASE
+                            WHEN user_usage.month_start <> {_month_start_expr()} THEN $5::int
+                            WHEN user_usage.monthly_used + $5::int <= $4 THEN user_usage.monthly_used + $5::int
+>>>>>>> 65d9c6e (fix bag)
                             ELSE user_usage.monthly_used
                         END,
                         updated_at = now()
                     WHERE
+<<<<<<< HEAD
                         (CASE WHEN user_usage.day_start <> CURRENT_DATE THEN 0 ELSE user_usage.daily_used END) + $5 <= $2
                         AND (CASE WHEN user_usage.week_start <> {_week_start_expr()} THEN 0 ELSE user_usage.weekly_used END) + $5 <= $3
                         AND (CASE WHEN user_usage.month_start <> {_month_start_expr()} THEN 0 ELSE user_usage.monthly_used END) + $5 <= $4
+=======
+                        (CASE WHEN user_usage.day_start <> CURRENT_DATE THEN 0 ELSE user_usage.daily_used END) + $5::int <= $2
+                        AND (CASE WHEN user_usage.week_start <> {_week_start_expr()} THEN 0 ELSE user_usage.weekly_used END) + $5::int <= $3
+                        AND (CASE WHEN user_usage.month_start <> {_month_start_expr()} THEN 0 ELSE user_usage.monthly_used END) + $5::int <= $4
+>>>>>>> 65d9c6e (fix bag)
                     RETURNING user_id, day_start, week_start, month_start, daily_used, weekly_used, monthly_used
                     """,
                     user_id, plan["daily_limit"], plan["weekly_limit"], plan["monthly_limit"], units,

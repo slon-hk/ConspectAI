@@ -7,7 +7,11 @@ import mimetypes
 from pathlib import Path
 from typing import Literal
 
+<<<<<<< HEAD
 from app.infrastructure.ai import RagEngine
+=======
+import rag as rag_engine
+>>>>>>> 65d9c6e (fix bag)
 from app.repositories.oltp import RagRouteRepository
 
 ChatCourseLinkResult = Literal["ok", "course_not_found", "chat_not_found"]
@@ -43,9 +47,14 @@ class RagService:
     }
     MAX_FILE_MB = 50
 
+<<<<<<< HEAD
     def __init__(self, rag_repository: RagRouteRepository, rag_engine: RagEngine) -> None:
         self._rag_repository = rag_repository
         self._rag_engine = rag_engine
+=======
+    def __init__(self, rag_repository: RagRouteRepository) -> None:
+        self._rag_repository = rag_repository
+>>>>>>> 65d9c6e (fix bag)
 
     async def list_courses(self, user_id: int) -> list[dict]:
         return await self._rag_repository.list_user_courses(user_id=user_id)
@@ -142,7 +151,11 @@ class RagService:
         }
         source_type = source_type_map.get(ext, "txt")
 
+<<<<<<< HEAD
         doc_sha = self._rag_engine.sha256(raw)
+=======
+        doc_sha = rag_engine._sha256(raw)
+>>>>>>> 65d9c6e (fix bag)
         duplicate = await self._rag_repository.find_document_duplicate(
             course_id=course_id,
             sha256=doc_sha,
@@ -161,7 +174,11 @@ class RagService:
         )
 
         asyncio.create_task(
+<<<<<<< HEAD
             self._rag_engine.ingest_document(
+=======
+            rag_engine.ingest_document(
+>>>>>>> 65d9c6e (fix bag)
                 document_id=document_id,
                 course_id=course_id,
                 user_id=user_id,
@@ -188,7 +205,11 @@ class RagService:
         if not await self._rag_repository.user_owns_course(course_id=course_id, user_id=user_id):
             raise RagCourseNotFoundError("Course not found")
 
+<<<<<<< HEAD
         url_hash = self._rag_engine.sha256(normalized_url)
+=======
+        url_hash = rag_engine._sha256(normalized_url)
+>>>>>>> 65d9c6e (fix bag)
         duplicate = await self._rag_repository.find_document_duplicate(
             course_id=course_id,
             sha256=url_hash,
@@ -206,7 +227,11 @@ class RagService:
         )
 
         asyncio.create_task(
+<<<<<<< HEAD
             self._rag_engine.ingest_document(
+=======
+            rag_engine.ingest_document(
+>>>>>>> 65d9c6e (fix bag)
                 document_id=document_id,
                 course_id=course_id,
                 user_id=user_id,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 from collections.abc import Container
 
 from app.repositories.oltp import AdminUserRepository
@@ -15,6 +16,14 @@ class AdminUserService:
     def __init__(self, admin_user_repository: AdminUserRepository, plan_keys: Container[str]) -> None:
         self._admin_user_repository = admin_user_repository
         self._plan_keys = plan_keys
+=======
+from app.repositories.oltp import AdminUserRepository
+
+
+class AdminUserService:
+    def __init__(self, admin_user_repository: AdminUserRepository) -> None:
+        self._admin_user_repository = admin_user_repository
+>>>>>>> 65d9c6e (fix bag)
 
     async def list_users(self, *, search: str, limit: int, offset: int) -> dict:
         rows = await self._admin_user_repository.list_users(search, limit, offset)
@@ -27,8 +36,11 @@ class AdminUserService:
         }
 
     async def set_plan(self, *, user_id: int, plan_key: str) -> bool:
+<<<<<<< HEAD
         if plan_key not in self._plan_keys:
             raise UnknownPlanError("Unknown plan")
+=======
+>>>>>>> 65d9c6e (fix bag)
         return await self._admin_user_repository.set_user_plan(user_id, plan_key)
 
     async def set_blocked(self, *, user_id: int, is_blocked: bool) -> None:

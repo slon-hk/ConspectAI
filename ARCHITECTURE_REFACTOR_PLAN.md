@@ -185,6 +185,7 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   success/failure counters.
 - `app.api.routes.files` now owns upload and raw-file serving endpoints over
   `FileService`, preserving upload analytics tracking and response behavior.
+<<<<<<< HEAD
 - `app.api.routes.mindmaps` now owns mindmap fetch/regeneration endpoints over
   `MindmapService` and `MindmapGenerationService`, preserving background task
   scheduling and analytics side effects.
@@ -275,6 +276,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   configuration used during app assembly.
 - `app.core.security` now owns JWT, password, OAuth2 bearer, captcha, and email
   verification helpers. The top-level `auth.py` remains a compatibility wrapper.
+=======
+>>>>>>> 65d9c6e (fix bag)
 - `app.api.routes.analytics` now owns the browser-facing `/api/track` endpoint,
   including event allowlisting, token decoding, prop sanitization, and tracking
   service publication.

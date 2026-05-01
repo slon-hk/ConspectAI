@@ -8,6 +8,7 @@ from typing import Any
 
 from app.db.pool import Database
 from app.events import event_bus
+from app.infrastructure.cache import CacheClient, NullCache
 from app.infrastructure.ai import (
     MINDMAP_PROMPT,
     MODELS,
@@ -77,6 +78,7 @@ class AppContainer:
     ai_chat_service: AiChatService
     analytics_tracking_service: AnalyticsTrackingService
     auth_service: AuthService
+    cache_client: CacheClient
     catalog_service: CatalogService
     chat_service: ChatService
     file_service: FileService
@@ -100,6 +102,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
     usage_repository = UsageRepository(database)
     file_repository = FileRepository(database)
     user_repository = UserRepository(database)
+    cache_client = NullCache()
 
     chat_service = ChatService(chat_repository, message_repository)
     mindmap_service = MindmapService(chat_repository, message_repository, MindmapRepository(database))
@@ -161,6 +164,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         ai_chat_service=ai_chat_service,
         analytics_tracking_service=analytics_tracking_service,
         auth_service=auth_service,
+        cache_client=cache_client,
         catalog_service=catalog_service,
         chat_service=chat_service,
         file_service=file_service,

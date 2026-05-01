@@ -20,14 +20,16 @@ from app.workers import start_analytics_cleanup_task
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_gemini(settings)
+    container = create_container(database=database, gemini_api_key=settings.gemini_api_key)
 
     lifespan = create_lifespan(
         database=database,
-        start_analytics_cleanup_task=start_analytics_cleanup_task,
+        start_analytics_cleanup_task=lambda: start_analytics_cleanup_task(
+            container.analytics_maintenance_service
+        ),
     )
     app = FastAPI(title="ConspectAI", lifespan=lifespan)
     jinja = Jinja2Templates(directory="templates")
-    container = create_container(database=database, gemini_api_key=settings.gemini_api_key)
     register_http_metrics_middleware(app, container.analytics_tracking_service)
     register_subscription_quota_middleware(
         app,

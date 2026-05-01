@@ -12,13 +12,17 @@ import asyncio
 from contextlib import suppress
 
 from app.db.pool import database
+from app.repositories.olap import AnalyticsEventRepository
+from app.services.analytics_maintenance_service import AnalyticsMaintenanceService
 from app.workers.analytics_worker import start_analytics_cleanup_task
 
 
 async def run_worker() -> None:
     """Run background workers until the process is cancelled."""
     await database.create_pool()
-    analytics_cleanup_task = start_analytics_cleanup_task()
+    analytics_cleanup_task = start_analytics_cleanup_task(
+        AnalyticsMaintenanceService(AnalyticsEventRepository(database))
+    )
     try:
         await asyncio.Event().wait()
     finally:

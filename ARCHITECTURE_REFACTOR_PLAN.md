@@ -237,6 +237,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   services receive it explicitly instead of importing the legacy module.
 - Analytics, funnel, and request-metrics services now receive the event bus
   explicitly from the app container instead of defaulting to the global bus.
+- Analytics cleanup worker startup now receives `AnalyticsMaintenanceService`
+  explicitly; API lifespan gets that service from the app container.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.

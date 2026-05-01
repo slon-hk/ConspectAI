@@ -32,6 +32,7 @@ from app.services import (
     AdminAnalyticsService,
     AdminMetricsService,
     AdminUserService,
+    AnalyticsMaintenanceService,
     AnalyticsTrackingService,
     CatalogService,
     ChatService,
@@ -62,6 +63,7 @@ class AppContainer:
     admin_analytics_service: AdminAnalyticsService
     admin_metrics_service: AdminMetricsService
     admin_user_service: AdminUserService
+    analytics_maintenance_service: AnalyticsMaintenanceService
     ai_chat_service: AiChatService
     analytics_tracking_service: AnalyticsTrackingService
     auth_service: AuthService
@@ -114,6 +116,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
     admin_analytics_service = AdminAnalyticsService(AnalyticsEventRepository(database))
     admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
     admin_user_service = AdminUserService(AdminUserRepository(database))
+    analytics_maintenance_service = AnalyticsMaintenanceService(AnalyticsEventRepository(database))
     analytics_tracking_service = AnalyticsTrackingService(
         AnalyticsEventRepository(database),
         bus=event_bus,
@@ -144,6 +147,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         admin_analytics_service=admin_analytics_service,
         admin_metrics_service=admin_metrics_service,
         admin_user_service=admin_user_service,
+        analytics_maintenance_service=analytics_maintenance_service,
         ai_chat_service=ai_chat_service,
         analytics_tracking_service=analytics_tracking_service,
         auth_service=auth_service,

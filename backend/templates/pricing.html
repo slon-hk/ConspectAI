@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Тарифы · ConspectAI</title>
-<meta name="description" content="Прозрачные тарифы ConspectAI: ориентировочное количество AI-запросов для STEM-ассистента.">
+<meta name="description" content="Прозрачные тарифы ConspectAI: ориентировочное количество AI-генераций в день для STEM-ассистента.">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="canonical" href="https://conspectai.tech/pricing">
 <meta property="og:type"  content="website">
 <meta property="og:url"   content="https://conspectai.tech/pricing">
 <meta property="og:title" content="Тарифы · ConspectAI">
-<meta property="og:description" content="Тарифы ConspectAI с ориентиром по количеству AI-запросов под учебную нагрузку.">
+<meta property="og:description" content="Тарифы ConspectAI с ориентиром по количеству AI-генераций в день под учебную нагрузку.">
 <meta property="og:image" content="https://conspectai.tech/static/og-image.svg">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;450;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -45,26 +45,75 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
 .hero{text-align:center;padding:32px 0 56px}
 .hero h1{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:56px;line-height:1.05;margin-bottom:12px}
 .hero h1 .gold{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-hi) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero p{font-size:17px;color:var(--text-2);max-width:600px;margin:0 auto 6px}
+.hero p{font-size:17px;color:var(--text-2);max-width:620px;margin:0 auto 6px}
 
 .section-h{display:flex;align-items:center;gap:14px;margin-bottom:20px}
 .section-h h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:32px;color:var(--text-1)}
 .section-h .line{flex:1;height:1px;background:var(--border)}
 
 /* Packs grid */
-.packs{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:64px}
-@media(min-width:780px){.packs{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:1120px){.packs{grid-template-columns:repeat(5,1fr)}}
+.packs{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:18px;
+  margin:0 auto 64px;
+  justify-content:center;
+  align-items:stretch;
+  max-width:980px;
+}
+@media(min-width:780px){.packs{grid-template-columns:repeat(2,minmax(260px,1fr))}}
+@media(min-width:1120px){.packs{grid-template-columns:repeat(4,minmax(190px,1fr))}}
 
-.pack{background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);border:1px solid var(--border);border-radius:18px;padding:22px;position:relative;display:flex;flex-direction:column;transition:transform .25s,border-color .25s,box-shadow .25s}
+.pack{
+  background:linear-gradient(180deg,var(--surface) 0%,rgba(23,21,18,.6) 100%);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:22px;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  transition:transform .25s,border-color .25s,box-shadow .25s,background .25s;
+}
 .pack:hover{transform:translateY(-3px);border-color:var(--border-2);box-shadow:0 12px 36px rgba(0,0,0,.4)}
-.pack.featured{border-color:var(--accent);box-shadow:0 0 0 1px rgba(200,145,58,.4),0 12px 36px rgba(0,0,0,.4)}
-.pack.featured::before{content:'Популярный';position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0c0b09;font-size:11px;font-weight:600;padding:3px 11px;border-radius:99px;letter-spacing:.04em;text-transform:uppercase}
+.pack.featured{
+  z-index:2;
+  transform:scale(1.02);
+  border-color:var(--accent);
+  background:radial-gradient(circle at 50% 0%,rgba(221,167,77,.2) 0%,transparent 55%),linear-gradient(180deg,#211c13 0%,rgba(23,21,18,.86) 100%);
+  box-shadow:0 0 0 1px rgba(200,145,58,.6),0 22px 58px rgba(0,0,0,.58),0 0 46px rgba(200,145,58,.2);
+}
+.pack.featured:hover{transform:scale(1.04) translateY(-3px);border-color:var(--accent-hi);box-shadow:0 0 0 1px rgba(221,167,77,.75),0 28px 68px rgba(0,0,0,.64),0 0 60px rgba(200,145,58,.28)}
+.pack.featured::before{content:'Лучший выбор';position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0c0b09;font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.pack-proof{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 16px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:600;
+  line-height:1;
+  white-space:nowrap;
+  color:var(--accent-hi);
+  background:rgba(200,145,58,.13);
+  border:1px solid rgba(200,145,58,.28);
+  margin:0;
+  transform:translate(3px,-3px);
+  
+}
+.pack-head{
+  display:flex;
+  align-items:baseline; /* важно — выравнивает по тексту */
+  gap:10px;
+  margin-bottom:12px;
+}
+.pack.featured .pack-name{font-size:30px}
+.pack.featured .pack-price{font-size:52px}
 .pack-name{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:24px;margin-bottom:4px}
-.pack-tokens{font-size:13px;color:var(--text-3);margin-bottom:18px}
+.pack-tokens{font-size:13px;color:var(--text-3);margin-bottom:18px;min-height:42px}
 .pack-tokens .num{color:var(--accent);font-family:'DM Mono',monospace;font-size:14px}
 .pack-price{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:42px;line-height:1;margin-bottom:4px}
-.pack-price-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
+.pack-price-sub{font-size:12px;color:var(--text-3);margin-bottom:20px}
 .pack ul{list-style:none;margin-bottom:24px;flex:1}
 .pack li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;padding:5px 0;color:var(--text-2)}
 .pack li::before{content:'';width:14px;height:14px;border-radius:50%;background:rgba(200,145,58,.15);flex-shrink:0;margin-top:4px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23c8913a' stroke-width='3'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");background-position:center;background-repeat:no-repeat}
@@ -133,14 +182,12 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
 
 <main>
 
-  <!-- ── HERO ────────────────────────────────────────────────────────────── -->
   <section class="hero">
     <div class="badge-trial mb-5">🎁 5 генераций в день при регистрации</div>
     <h1>Прозрачные тарифы.<br><span class="gold">Без сюрпризов.</span></h1>
-    <p>Показываем примерное количество ответов для Gemini 2.5 Flash Lite. Фактический расход зависит от задачи и выбранной модели.</p>
+    <p>Показываем примерное количество генераций в день для Gemini 2.5 Flash Lite. Фактический расход зависит от задачи и выбранной модели.</p>
   </section>
 
-  <!-- ── PACKS ───────────────────────────────────────────────────────────── -->
   <section>
     <div class="section-h">
       <h2>Тарифы</h2>
@@ -150,26 +197,58 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
     <div class="packs">
 
       {% for plan in plans %}
+      {% set daily_generations = ((plan.estimated_monthly_requests | int) / 30) | round | int %}
       <div class="pack{% if plan.featured %} featured{% endif %}">
-        <div class="pack-name">{{ plan.display_name }}</div>
-        <p class="pack-tokens"><span class="num">{{ plan.estimated_requests_label }}</span></p>
+
+    <div class="pack-head">
+      <div class="pack-name">{{ plan.display_name }}</div>
+      {% if plan.plan_key == 'plus' %}
+        <div class="pack-proof">80% выбирают</div>
+        {% endif %}
+    </div>
+
+
         <div class="pack-price">{{ plan.price_label }}</div>
-        <p class="pack-price-sub">ориентир для {{ plan.reference_model_name }}</p>
+
         <ul>
-          <li>{% if plan.plan_key == 'free' %}Для знакомства с интерфейсом{% else %}Для регулярной работы с AI-ассистентом{% endif %}</li>
-          <li>Все модели из каталога</li>
-          <li>Gemini 2.5 Flash Lite как базовый ориентир</li>
-          <li>Все шаблоны и карта тем</li>
-          <li>Экспорт в Markdown и PDF</li>
+          {% if plan.plan_key == 'starter' %}
+            <li>Для регулярных учебных вопросов</li>
+            <li>Подходит для конспектов и коротких объяснений</li>
+            <li>Хороший старт для ежедневной практики</li>
+          {% elif plan.plan_key == 'plus' %}
+            <li>Лучший баланс цены и объёма</li>
+            <li>Подходит для ежедневной работы с задачами</li>
+            <li>Оптимальный выбор для большинства студентов</li>
+          {% elif plan.plan_key == 'pro' %}
+            <li>Для интенсивной учёбы и длинных разборов</li>
+            <li>Удобно для подготовки к экзаменам</li>
+            <li>Больше свободы для сложных тем</li>
+          {% elif plan.plan_key == 'max' %}
+            <li>Для максимальной учебной нагрузки</li>
+            <li>Подходит для активной работы каждый день</li>
+            <li>Большой запас генераций на месяц</li>
+          {% else %}
+            <li>Для регулярной работы с AI-ассистентом</li>
+            <li>Гибкий объём генераций</li>
+            <li>Все основные возможности ConspectAI</li>
+          {% endif %}
         </ul>
-        <a href="/app?auth=register" class="pack-cta {% if plan.featured %}primary{% else %}secondary{% endif %}">{{ plan.cta_label }}</a>
+
+        <a href="/app?auth=register" class="pack-cta {% if plan.featured %}primary{% else %}secondary{% endif %}">
+          {% if plan.plan_key == 'plus' %}
+            Попробовать Plus
+          {% elif plan.price_rub|int > 0 %}
+            Начать за {{ plan.price_label }}
+          {% else %}
+            {{ plan.cta_label }}
+          {% endif %}
+        </a>
       </div>
       {% endfor %}
 
     </div>
   </section>
 
-  <!-- ── MODELS / RATES ──────────────────────────────────────────────────── -->
   <section>
     <div class="section-h">
       <h2>Как читать цифры</h2>
@@ -177,7 +256,7 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
     </div>
 
     <p style="color:var(--text-2);margin-bottom:20px;font-size:15px">
-      Количество ответов на странице — ориентир для коротких и средних запросов к Gemini 2.5 Flash Lite.
+      Количество генераций на странице — дневной ориентир для коротких и средних запросов к Gemini 2.5 Flash Lite.
     </p>
 
     <div class="models-table">
@@ -203,7 +282,7 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
               <div class="model-name">⚡ Gemini 2.0 Flash</div>
               <div class="model-sub">Лучший баланс качества и скорости · рекомендуется</div>
             </td>
-            <td><span class="price">меньше ответов</span></td>
+            <td><span class="price">меньше генераций</span></td>
             <td class="examples">Баланс скорости и качества для обычной учёбы</td>
           </tr>
           <tr>
@@ -211,7 +290,7 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
               <div class="model-name">🧠 Gemini 1.5 Pro</div>
               <div class="model-sub">Максимальное качество для сложных задач</div>
             </td>
-            <td><span class="price">меньше ответов</span></td>
+            <td><span class="price">меньше генераций</span></td>
             <td class="examples">Сложные доказательства, длинные рассуждения, аккуратная проверка</td>
           </tr>
         </tbody>
@@ -219,7 +298,6 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
     </div>
   </section>
 
-  <!-- ── HOW IT WORKS ─────────────────────────────────────────────────────── -->
   <section>
     <div class="section-h">
       <h2>Как это работает</h2>
@@ -230,22 +308,21 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
       <div class="how-card">
         <div class="how-num">01</div>
         <div class="how-title">Зарегистрируйтесь</div>
-        <p class="how-desc">Получите тариф Free сразу — без карты. Этого хватит, чтобы попробовать все шаблоны и карту тем.</p>
+        <p class="how-desc">Free-тариф начисляется автоматически после регистрации. Его не нужно выбирать в списке платных тарифов.</p>
       </div>
       <div class="how-card">
         <div class="how-num">02</div>
         <div class="how-title">Выбирайте модель</div>
-        <p class="how-desc">Вы можете выбирать модель под задачу. Более мощные модели обычно дают меньше ответов за тот же тариф.</p>
+        <p class="how-desc">Более мощные модели лучше подходят для сложных рассуждений, но обычно расходуют доступный объём быстрее.</p>
       </div>
       <div class="how-card">
         <div class="how-num">03</div>
         <div class="how-title">Покупайте при необходимости</div>
-        <p class="how-desc">Когда доступный объём на тарифе закончится, можно дождаться нового периода или перейти на тариф выше.</p>
+        <p class="how-desc">Когда доступный объём закончится, можно дождаться нового периода или перейти на тариф выше.</p>
       </div>
     </div>
   </section>
 
-  <!-- ── FAQ ─────────────────────────────────────────────────────────────── -->
   <section>
     <div class="section-h">
       <h2>Частые вопросы</h2>
@@ -256,7 +333,7 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
 
       <details open>
         <summary>Почему количество примерное?</summary>
-        <div class="a">Ответы отличаются по длине и сложности. Поэтому мы показываем понятный ориентир для Gemini 2.5 Flash Lite, а не обещаем одинаковое число ответов для всех сценариев.</div>
+        <div class="a">Ответы отличаются по длине и сложности. Поэтому мы показываем дневной ориентир для Gemini 2.5 Flash Lite, а не обещаем одинаковое число генераций для всех сценариев.</div>
       </details>
 
       <details>
@@ -292,7 +369,6 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
     </div>
   </section>
 
-  <!-- ── CTA ─────────────────────────────────────────────────────────────── -->
   <section class="cta">
     <h3>Готовы попробовать?</h3>
     <p>Регистрация занимает 30 секунд · Free-тариф доступен сразу</p>

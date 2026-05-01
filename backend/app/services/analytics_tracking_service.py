@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Any
 
-from app.events import BaseEvent, EventBus, event_bus
+from app.events import BaseEvent, EventBus
 from app.events.handlers.analytics_handlers import ANALYTICS_EVENT_TYPE, AnalyticsEventHandler
 from app.infrastructure.observability import system_metrics
 from app.repositories.olap import AnalyticsEventRepository
@@ -18,7 +18,7 @@ class AnalyticsTrackingService:
     def __init__(
         self,
         analytics_repository: AnalyticsEventRepository,
-        bus: EventBus = event_bus,
+        bus: EventBus,
     ) -> None:
         self._event_bus = bus
         self._event_bus.subscribe(

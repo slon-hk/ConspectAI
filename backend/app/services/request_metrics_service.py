@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app.events import BaseEvent, EventBus, event_bus
+from app.events import BaseEvent, EventBus
 from app.events.handlers.request_metrics_handlers import (
     RAG_METRICS_EVENT_TYPE,
     REQUEST_METRICS_EVENT_TYPE,
@@ -22,7 +22,7 @@ class RequestMetricsService:
         self,
         request_metric_repository: RequestMetricRepository,
         rag_metric_repository: RagMetricRepository,
-        bus: EventBus = event_bus,
+        bus: EventBus,
     ) -> None:
         self._event_bus = bus
         self._event_bus.subscribe(

@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.db.pool import Database
+from app.events import event_bus
 from app.infrastructure.ai import RagEngine
 from app.infrastructure.storage import FileStorage
 from app.repositories.olap import (
@@ -103,16 +104,20 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
     file_service = FileService(file_repository, file_storage)
     rag_engine = RagEngine()
     rag_service = RagService(RagRouteRepository(database), rag_engine)
-    funnel_service = FunnelService(FunnelMetricRepository(database))
+    funnel_service = FunnelService(FunnelMetricRepository(database), bus=event_bus)
     request_metrics_service = RequestMetricsService(
         RequestMetricRepository(database),
         RagMetricRepository(database),
+        bus=event_bus,
     )
     admin_access_service = AdminAccessService(user_repository)
     admin_analytics_service = AdminAnalyticsService(AnalyticsEventRepository(database))
     admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
     admin_user_service = AdminUserService(AdminUserRepository(database))
-    analytics_tracking_service = AnalyticsTrackingService(AnalyticsEventRepository(database))
+    analytics_tracking_service = AnalyticsTrackingService(
+        AnalyticsEventRepository(database),
+        bus=event_bus,
+    )
     mindmap_generation_service = MindmapGenerationService(
         mindmap_service=mindmap_service,
         analytics_tracking_service=analytics_tracking_service,

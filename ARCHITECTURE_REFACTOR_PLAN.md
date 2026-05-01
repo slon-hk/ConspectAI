@@ -235,6 +235,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   legacy storage-module access to the infrastructure adapter.
 - `app.infrastructure.ai.RagEngine` now wraps legacy `rag.py` access. Active
   services receive it explicitly instead of importing the legacy module.
+- Analytics, funnel, and request-metrics services now receive the event bus
+  explicitly from the app container instead of defaulting to the global bus.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.

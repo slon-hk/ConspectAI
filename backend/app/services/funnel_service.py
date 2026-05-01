@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app.events import BaseEvent, EventBus, event_bus
+from app.events import BaseEvent, EventBus
 from app.events.handlers.funnel_handlers import FUNNEL_STEP_EVENT_TYPE, FunnelStepEventHandler
 from app.repositories.olap import FunnelMetricRepository
 
@@ -16,7 +16,7 @@ class FunnelService:
     def __init__(
         self,
         funnel_repository: FunnelMetricRepository,
-        bus: EventBus = event_bus,
+        bus: EventBus,
     ) -> None:
         self._event_bus = bus
         self._event_bus.subscribe(FUNNEL_STEP_EVENT_TYPE, FunnelStepEventHandler(funnel_repository))

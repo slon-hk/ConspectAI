@@ -21,10 +21,8 @@ from __future__ import annotations
 
 import asyncio
 import gzip
-import hashlib
 import json
 import os
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -34,7 +32,13 @@ import asyncpg
 import google.generativeai as genai
 
 from app.infrastructure.storage import FileStorage
-from app.domain.rag import RAG_SCHEMA
+from app.domain.rag import (
+    RAG_SCHEMA,
+    rough_token_count,
+    sha256_digest,
+    split_text,
+    to_pgvector,
+)
 from app.repositories.oltp import (
     ChatRepository,
     FileRepository,
@@ -69,58 +73,9 @@ IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 _executor = ThreadPoolExecutor(max_workers=2)  # for blocking PDF/file ops
 
-# ── Text splitting ─────────────────────────────────────────────────────────────
-
-def _rough_token_count(text: str) -> int:
-    """Fast approximation: 1 token ≈ 4 chars for mixed RU/EN text."""
-    return max(1, len(text) // 4)
-
-def split_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
-    """
-    Split text into overlapping chunks without breaking sentences mid-way.
-    Strategy: accumulate sentences until we hit `size` tokens, then backtrack
-    `overlap` tokens for the next chunk.
-    """
-    # Split on sentence boundaries (., !, ?, newline sequences)
-    sentences = re.split(r'(?<=[.!?\n])\s+', text.strip())
-    sentences = [s.strip() for s in sentences if s.strip()]
-
-    chunks: list[str] = []
-    current: list[str] = []
-    current_tokens = 0
-
-    for sent in sentences:
-        sent_tokens = _rough_token_count(sent)
-        if current_tokens + sent_tokens > size and current:
-            chunks.append(" ".join(current))
-            # keep tail for overlap
-            tail_tokens = 0
-            tail: list[str] = []
-            for s in reversed(current):
-                t = _rough_token_count(s)
-                if tail_tokens + t <= overlap:
-                    tail.insert(0, s)
-                    tail_tokens += t
-                else:
-                    break
-            current = tail
-            current_tokens = tail_tokens
-        current.append(sent)
-        current_tokens += sent_tokens
-
-    if current:
-        chunks.append(" ".join(current))
-
-    return chunks
-
-
-# ── Hashing ────────────────────────────────────────────────────────────────────
-
-def _sha256(data: bytes | str) -> str:
-    if isinstance(data, str):
-        data = data.encode()
-    return hashlib.sha256(data).hexdigest()
-
+# Compatibility aliases for legacy imports.
+_rough_token_count = rough_token_count
+_sha256 = sha256_digest
 
 
 # ── Embedding ─────────────────────────────────────────────────────────────────
@@ -510,7 +465,7 @@ def build_context(chunks: list[dict], images: list[dict]) -> str:
 
     for i, chunk in enumerate(chunks, 1):
         chunk_text = chunk["content"]
-        chunk_tokens = _rough_token_count(chunk_text)
+        chunk_tokens = rough_token_count(chunk_text)
 
         if total_tokens + chunk_tokens > MAX_CTX_TOKENS:
             # Truncate last chunk to fit
@@ -584,7 +539,7 @@ async def rag_query(
     started = time.perf_counter()
     # ── 1. Retrieve relevant chunks ────────────────────────────────────────
     chunks, images = await retrieve(query, course_id)
-    query_tokens = _rough_token_count(query)
+    query_tokens = rough_token_count(query)
 
     # ── 2. Check answer cache ──────────────────────────────────────────────
     cache_key = _answer_cache_key(query, chunks)
@@ -592,8 +547,8 @@ async def rag_query(
     if cached:
         # Resolve image objects from cached IDs
         cached_images = await _resolve_images(cached["image_ids"])
-        context_tokens = _rough_token_count(build_context(chunks, cached_images)) if chunks else 0
-        output_tokens = _rough_token_count(cached["answer"])
+        context_tokens = rough_token_count(build_context(chunks, cached_images)) if chunks else 0
+        output_tokens = rough_token_count(cached["answer"])
         actual_with_rag = query_tokens + context_tokens + output_tokens
         estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
         latency_ms = int((time.perf_counter() - started) * 1000)
@@ -652,8 +607,8 @@ async def rag_query(
         lambda: chat.send_message(query),
     )
     answer = response.text
-    context_tokens = _rough_token_count(context) if sources_found else 0
-    output_tokens = _rough_token_count(answer)
+    context_tokens = rough_token_count(context) if sources_found else 0
+    output_tokens = rough_token_count(answer)
     actual_with_rag = query_tokens + context_tokens + output_tokens
     estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
     latency_ms = int((time.perf_counter() - started) * 1000)
@@ -769,8 +724,3 @@ async def ensure_chat_course_and_ingest_uploads(
             raw_bytes=raw,
         )
     return str(course_id)
-
-def to_pgvector(vec: list[float]) -> str:
-    if len(vec) != EMBED_DIM:
-        raise ValueError(f"Embedding dimension mismatch: expected {EMBED_DIM}, got {len(vec)}")
-    return "[" + ",".join(f"{x:.6f}" for x in vec) + "]"

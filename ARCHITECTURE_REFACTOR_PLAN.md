@@ -246,6 +246,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.infrastructure.cache` now defines a `CacheClient` protocol and `NullCache`
   implementation. The app container exposes `cache_client` without making Redis
   mandatory.
+- `app.events.outbox` now defines durable outbox repository contracts for the
+  next event-delivery migration step. No DB schema change has been introduced.
 - Analytics, funnel, and request-metrics services now receive the event bus
   explicitly from the app container instead of defaulting to the global bus.
 - Analytics cleanup worker startup now receives `AnalyticsMaintenanceService`

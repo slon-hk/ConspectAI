@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Container
+
 from app.repositories.oltp import AdminUserRepository
-from billing_plans import PLAN_KEYS
 
 
 class UnknownPlanError(ValueError):
@@ -11,8 +12,9 @@ class UnknownPlanError(ValueError):
 
 
 class AdminUserService:
-    def __init__(self, admin_user_repository: AdminUserRepository) -> None:
+    def __init__(self, admin_user_repository: AdminUserRepository, plan_keys: Container[str]) -> None:
         self._admin_user_repository = admin_user_repository
+        self._plan_keys = plan_keys
 
     async def list_users(self, *, search: str, limit: int, offset: int) -> dict:
         rows = await self._admin_user_repository.list_users(search, limit, offset)
@@ -25,7 +27,7 @@ class AdminUserService:
         }
 
     async def set_plan(self, *, user_id: int, plan_key: str) -> bool:
-        if plan_key not in PLAN_KEYS:
+        if plan_key not in self._plan_keys:
             raise UnknownPlanError("Unknown plan")
         return await self._admin_user_repository.set_user_plan(user_id, plan_key)
 

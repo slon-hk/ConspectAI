@@ -227,6 +227,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   `CatalogService` instead of importing billing config directly in the route.
 - Admin plan validation now lives in `AdminUserService`; admin routes no longer
   import subscription plan config directly.
+- `AdminUserService` now receives allowed plan keys explicitly from container or
+  legacy wrapper instead of importing billing config internally.
 - `app.infrastructure.storage.FileStorage` now wraps legacy content-addressed
   file storage, and `FileService` receives storage through explicit injection.
 - `AiChatService` now also receives `FileStorage` explicitly for attachments,

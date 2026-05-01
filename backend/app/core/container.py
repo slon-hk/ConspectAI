@@ -49,7 +49,7 @@ from app.services.auth_service import AuthService
 from app.services.ai_chat_service import AiChatService
 from app.services.rag_service import RagService
 from app.services.billing_service import BillingService
-from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, public_plans
+from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, PLAN_KEYS, public_plans
 from promts import MINDMAP_PROMPT, MODELS, SYSTEM_PROMPTS, TEMPLATE_META
 
 DEFAULT_TEMPLATE = "deep"
@@ -115,7 +115,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
     admin_access_service = AdminAccessService(user_repository)
     admin_analytics_service = AdminAnalyticsService(AnalyticsEventRepository(database))
     admin_metrics_service = AdminMetricsService(AdminReportRepository(database))
-    admin_user_service = AdminUserService(AdminUserRepository(database))
+    admin_user_service = AdminUserService(AdminUserRepository(database), PLAN_KEYS)
     analytics_maintenance_service = AnalyticsMaintenanceService(AnalyticsEventRepository(database))
     analytics_tracking_service = AnalyticsTrackingService(
         AnalyticsEventRepository(database),

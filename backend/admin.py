@@ -10,6 +10,7 @@ from app.services import (
     AdminMetricsService,
     AdminUserService,
 )
+from billing_plans import PLAN_KEYS
 
 _admin_access_service = AdminAccessService(UserRepository(database))
 require_admin = create_require_admin_dependency(_admin_access_service)
@@ -17,7 +18,7 @@ router = create_admin_router(
     require_admin=require_admin,
     admin_analytics_service=AdminAnalyticsService(AnalyticsEventRepository(database)),
     admin_metrics_service=AdminMetricsService(AdminReportRepository(database)),
-    admin_user_service=AdminUserService(AdminUserRepository(database)),
+    admin_user_service=AdminUserService(AdminUserRepository(database), PLAN_KEYS),
 )
 
 __all__ = ["require_admin", "router"]

@@ -13,7 +13,7 @@ import google.generativeai as genai
 import PIL.Image
 
 import rag as rag_engine
-import storage
+from app.infrastructure.storage import FileStorage
 from app.repositories.oltp import FileRepository
 from app.services.analytics_tracking_service import AnalyticsTrackingService
 from app.services.billing_service import BillingService
@@ -50,6 +50,7 @@ class AiChatService:
         billing_service: BillingService,
         analytics_tracking_service: AnalyticsTrackingService,
         file_repository: FileRepository,
+        file_storage: FileStorage,
         system_prompts: Mapping[str, str],
         models: Mapping[str, Mapping[str, Any]],
         default_template: str,
@@ -61,6 +62,7 @@ class AiChatService:
         self._billing_service = billing_service
         self._analytics_tracking_service = analytics_tracking_service
         self._file_repository = file_repository
+        self._file_storage = file_storage
         self._system_prompts = system_prompts
         self._models = models
         self._default_template = default_template
@@ -238,7 +240,7 @@ class AiChatService:
             if not meta:
                 continue
             try:
-                raw = storage.read_file(meta["sha256"], meta["compressed"])
+                raw = self._file_storage.read_file(meta["sha256"], meta["compressed"])
                 if meta["mime_type"].startswith("image/"):
                     parts.append(PIL.Image.open(io.BytesIO(raw)))
                 else:

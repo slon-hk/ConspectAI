@@ -229,6 +229,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   import subscription plan config directly.
 - `app.infrastructure.storage.FileStorage` now wraps legacy content-addressed
   file storage, and `FileService` receives storage through explicit injection.
+- `AiChatService` now also receives `FileStorage` explicitly for attachments,
+  removing direct storage-module access from that active service path.
 - `AnalyticsTrackingService` and `AnalyticsEventHandler` now require an explicit
   `AnalyticsEventRepository`, removing hidden repository construction from that
   service path.

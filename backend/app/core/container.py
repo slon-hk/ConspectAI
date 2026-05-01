@@ -124,6 +124,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         billing_service=BillingService(),
         analytics_tracking_service=analytics_tracking_service,
         file_repository=file_repository,
+        file_storage=file_storage,
         system_prompts=SYSTEM_PROMPTS,
         models=MODELS,
         default_template=DEFAULT_TEMPLATE,

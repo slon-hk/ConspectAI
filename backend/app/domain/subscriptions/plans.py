@@ -78,5 +78,4 @@ def public_plans() -> list[dict[str, Any]]:
             "reference_model_name": plan["reference_model_name"],
         }
         for plan in SUBSCRIPTION_PLANS
-        if plan["plan_key"] != "free"
     ]

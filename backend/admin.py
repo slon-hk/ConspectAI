@@ -10,7 +10,7 @@ from app.services import (
     AdminMetricsService,
     AdminUserService,
 )
-from billing_plans import PLAN_KEYS
+from app.domain.subscriptions import PLAN_KEYS
 
 _admin_access_service = AdminAccessService(UserRepository(database))
 require_admin = create_require_admin_dependency(_admin_access_service)

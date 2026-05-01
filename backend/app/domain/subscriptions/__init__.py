@@ -1,6 +1,6 @@
-"""Compatibility wrapper for subscription plan configuration."""
+"""Subscription domain helpers."""
 
-from app.domain.subscriptions.plans import (
+from .plans import (
     DEFAULT_INTERNAL_TOKENS_PER_REQUEST,
     DEFAULT_PLAN_KEY,
     PLAN_KEYS,

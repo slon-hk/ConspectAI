@@ -240,6 +240,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.infrastructure.ai.model_catalog` now owns model metadata, prompt
   templates, and the mindmap prompt. Top-level `promts.py` remains a
   compatibility wrapper.
+- `app.domain.subscriptions.plans` now owns subscription plan loading and
+  derived budget values. Top-level `billing_plans.py` remains a compatibility
+  wrapper.
 - Analytics, funnel, and request-metrics services now receive the event bus
   explicitly from the app container instead of defaulting to the global bus.
 - Analytics cleanup worker startup now receives `AnalyticsMaintenanceService`

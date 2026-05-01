@@ -9,7 +9,7 @@ from app.repositories.oltp import RagRouteRepository, UsageRepository, UserRepos
 from app.services import UserService
 from app.services.rag_service import RagService
 from app.services.usage_service import UsageService
-from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST
+from app.domain.subscriptions import DEFAULT_INTERNAL_TOKENS_PER_REQUEST
 
 _user_repository = UserRepository(database)
 _current_user_id = create_current_user_id_dependency(

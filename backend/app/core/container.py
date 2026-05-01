@@ -55,7 +55,12 @@ from app.services.auth_service import AuthService
 from app.services.ai_chat_service import AiChatService
 from app.services.rag_service import RagService
 from app.services.billing_service import BillingService
-from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, PLAN_KEYS, public_plans
+from app.domain.subscriptions import (
+    DEFAULT_INTERNAL_TOKENS_PER_REQUEST,
+    DEFAULT_PLAN_KEY,
+    PLAN_KEYS,
+    public_plans,
+)
 
 DEFAULT_TEMPLATE = "deep"
 DEFAULT_MODEL = "gemini-3.1-flash-lite-preview"

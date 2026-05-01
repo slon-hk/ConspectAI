@@ -272,11 +272,7 @@ async def init_schema():
     advisory lock so that when multiple uvicorn workers start at once,
     only one runs the DDL and the others wait for it to finish.
     """
-    # Import RAG schema here to avoid circular imports at module level
-    try:
-        from rag import RAG_SCHEMA
-    except ImportError:
-        RAG_SCHEMA = ""
+    from app.domain.rag import RAG_SCHEMA
 
     async with pool().acquire() as conn:
         async with conn.transaction():

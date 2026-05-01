@@ -243,6 +243,8 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
 - `app.domain.subscriptions.plans` now owns subscription plan loading and
   derived budget values. Top-level `billing_plans.py` remains a compatibility
   wrapper.
+- `app.domain.rag.schema` now owns RAG DDL. `db.init_schema()` imports the
+  lightweight domain schema instead of loading legacy `rag.py`.
 - `app.infrastructure.cache` now defines a `CacheClient` protocol and `NullCache`
   implementation. The app container exposes `cache_client` without making Redis
   mandatory.

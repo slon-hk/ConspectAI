@@ -14,6 +14,9 @@ import PIL.Image
 
 from app.infrastructure.ai import RagEngine
 from app.infrastructure.storage import FileStorage
+from app.rag.budget import BudgetGate
+from app.rag.history import HistoryManager
+from app.rag.tracer import PipelineTracer
 from app.repositories.oltp import FileRepository
 from app.services.analytics_tracking_service import AnalyticsTrackingService
 from app.services.billing_service import BillingService
@@ -57,6 +60,7 @@ class AiChatService:
         default_template: str,
         default_model: str,
         gemini_api_key: str,
+        budget_gate: BudgetGate | None = None,
     ) -> None:
         self._chat_service = chat_service
         self._user_service = user_service
@@ -70,6 +74,8 @@ class AiChatService:
         self._default_template = default_template
         self._default_model = default_model
         self._gemini_api_key = gemini_api_key
+        self._history_manager = HistoryManager(gemini_api_key=gemini_api_key)
+        self._budget_gate = budget_gate
 
     async def send_message(
         self,
@@ -98,13 +104,20 @@ class AiChatService:
         system_prompt = self._system_prompts.get(template_key, self._system_prompts[self._default_template])
 
         history_rows = await self._chat_service.list_messages(chat_id=chat_id)
-        gemini_history = [
-            {
-                "role": "user" if row["role"] == "user" else "model",
-                "parts": [row["content"] or "…"],
-            }
-            for row in history_rows
-        ]
+        gemini_history, _history_tokens = await self._history_manager.get_trimmed_history(
+            chat_id=str(chat_id),
+            messages=[dict(r) for r in history_rows],
+        )
+
+        # Trigger async summarization after every 10th user message (fire and forget).
+        user_msg_count = sum(1 for r in history_rows if r["role"] == "user")
+        if user_msg_count > 0 and user_msg_count % 10 == 0:
+            asyncio.create_task(
+                self._history_manager.maybe_summarize(
+                    chat_id=str(chat_id),
+                    messages=[dict(r) for r in history_rows],
+                )
+            )
 
         await self._chat_service.save_message(
             chat_id=chat_id,

@@ -47,6 +47,12 @@ from app.repositories.oltp import (
     RagRetrievalRepository,
     RagRouteRepository,
 )
+from app.rag.cache_manager import configure_rag_cache, get_cache_manager
+from app.rag.context import ContextBuilder, HeuristicReranker, ImportanceScorer
+
+_reranker = HeuristicReranker()
+_context_builder = ContextBuilder()
+_importance_scorer = ImportanceScorer()
 
 _chat_repository = ChatRepository()
 _file_repository = FileRepository()
@@ -63,7 +69,8 @@ EMBED_DIM       = 1536  # reduced to fit pgvector index limit (<=2000)
 CAPTION_MODEL   = "gemini-2.0-flash-lite"
 CHUNK_SIZE      = 500   # target tokens per chunk
 CHUNK_OVERLAP   = 80    # overlap tokens between chunks
-TOP_K           = 5     # chunks returned per query
+TOP_K           = 10    # candidates fetched from DB (reranker selects final 5)
+TOP_K_FINAL     = 5     # chunks passed to context builder after reranking
 HYBRID_ALPHA    = 0.70  # weight for cosine vs BM25 (0.7 cosine + 0.3 BM25)
 MAX_CTX_TOKENS  = 3000  # hard limit on context sent to LLM
 IMAGE_CTX_LIMIT = 3     # max images surfaced per answer
@@ -110,14 +117,15 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
 
 
 async def embed_query(query: str) -> list[float]:
-    """Embed a single query string with caching in rag_query_cache."""
+    """Embed a single query string with three-layer caching (L1→L2→L3)."""
     q_hash = _sha256(query)
+    mgr = get_cache_manager()
 
-    cached_embedding = await _rag_cache_repository.get_query_embedding(query_hash=q_hash)
-    if cached_embedding:
-        return cached_embedding
+    cached = await mgr.get_query_embedding(q_hash)
+    if cached is not None:
+        return cached
 
-    # Not cached → embed
+    # Full miss → embed via Gemini
     loop = asyncio.get_event_loop()
     resp = await loop.run_in_executor(
         _executor,
@@ -127,20 +135,20 @@ async def embed_query(query: str) -> list[float]:
             task_type="RETRIEVAL_QUERY",
         ),
     )
-    vec = resp["embedding"]
-    # Truncate embedding to match EMBED_DIM (pgvector limit workaround)
-    vec = vec[:EMBED_DIM]
+    vec = resp["embedding"][:EMBED_DIM]
 
-    # Store in cache (fire and forget — don't block query path)
-    asyncio.create_task(_store_query_cache(q_hash, vec))
+    # Write to L1+L2 (fire and forget), L3 (PG) separately
+    pgvec = to_pgvector(vec)
+    asyncio.create_task(mgr.store_query_embedding(q_hash, vec, pgvec))
+    asyncio.create_task(_store_query_cache(q_hash, pgvec))
     return vec
 
 
-async def _store_query_cache(q_hash: str, embedding: list[float]) -> None:
+async def _store_query_cache(q_hash: str, embedding_pgvector: str) -> None:
     try:
         await _rag_cache_repository.store_query_embedding(
             query_hash=q_hash,
-            embedding_pgvector=to_pgvector(embedding),
+            embedding_pgvector=embedding_pgvector,
         )
     except Exception as e:
         print(f"[rag] query cache write failed: {e}")
@@ -352,7 +360,14 @@ async def ingest_document(
                 await _rag_ingestion_repository.upsert_chunks(
                     document_id=document_id,
                     chunks=[
-                        (idx, content, chash, to_pgvector(emb))
+                        (
+                            idx,
+                            content,
+                            chash,
+                            to_pgvector(emb),
+                            rough_token_count(content),
+                            _importance_scorer.score(content, idx, 1),
+                        )
                         for (idx, content, chash), emb in zip(new_chunks, embeddings)
                     ],
                 )
@@ -439,10 +454,19 @@ async def retrieve(
     """
     Hybrid search: cosine_similarity * HYBRID_ALPHA + BM25 * (1 - HYBRID_ALPHA).
     Returns (chunks, images) where images are linked to top chunks.
+    Retrieval results are cached in Redis for 5 minutes.
     """
-    q_vec = to_pgvector(await embed_query(query))
+    q_vec_list = await embed_query(query)
+    q_hash = _sha256(query)
+    mgr = get_cache_manager()
 
-    return await _rag_retrieval_repository.retrieve_chunks_and_images(
+    # Check retrieval cache (L2 Redis, TTL=5m)
+    cached_ret = await mgr.get_retrieval_result(course_id, q_hash)
+    if cached_ret is not None:
+        return cached_ret
+
+    q_vec = to_pgvector(q_vec_list)
+    chunks, images = await _rag_retrieval_repository.retrieve_chunks_and_images(
         course_id=course_id,
         query=query,
         query_embedding_pgvector=q_vec,
@@ -451,38 +475,10 @@ async def retrieve(
         image_ctx_limit=IMAGE_CTX_LIMIT,
     )
 
+    # Cache result for 5 minutes (fire and forget)
+    asyncio.create_task(mgr.set_retrieval_result(course_id, q_hash, chunks, images))
+    return chunks, images
 
-# ── Context builder ────────────────────────────────────────────────────────────
-
-def build_context(chunks: list[dict], images: list[dict]) -> str:
-    """
-    Construct minimal context string to send to LLM.
-    Keeps total size under MAX_CTX_TOKENS.
-    Images are represented only by their captions (never raw bytes).
-    """
-    parts: list[str] = []
-    total_tokens = 0
-
-    for i, chunk in enumerate(chunks, 1):
-        chunk_text = chunk["content"]
-        chunk_tokens = rough_token_count(chunk_text)
-
-        if total_tokens + chunk_tokens > MAX_CTX_TOKENS:
-            # Truncate last chunk to fit
-            remaining = MAX_CTX_TOKENS - total_tokens
-            chunk_text = chunk_text[: remaining * 4]  # ~4 chars/token
-            if chunk_text:
-                parts.append(f"[Material {i}]\n{chunk_text}")
-            break
-
-        parts.append(f"[Material {i}]\n{chunk_text}")
-        total_tokens += chunk_tokens
-
-    for img in images:
-        caption_line = f"[Figure: {img['caption']}]"
-        parts.append(caption_line)
-
-    return "\n\n".join(parts)
 
 
 # ── Answer cache ───────────────────────────────────────────────────────────────
@@ -495,21 +491,38 @@ def _answer_cache_key(query: str, chunks: list[dict]) -> str:
 
 
 async def _get_answer_cache(key: str) -> dict | None:
+    mgr = get_cache_manager()
+
+    # L1 + L2 check first (fast path, no DB)
+    l1l2 = await mgr.get_answer_l1l2(key)
+    if l1l2:
+        return l1l2
+
+    # L3: PostgreSQL
     row = await _rag_cache_repository.get_answer_cache(cache_key=key)
     if row:
-        # Update usage stats (fire and forget)
         asyncio.create_task(_rag_cache_repository.touch_answer_cache(cache_key=key))
-        return {"answer": row["answer"], "image_ids": json.loads(row["image_ids"])}
+        data = {"answer": row["answer"], "image_ids": json.loads(row["image_ids"])}
+        # Promote to L1+L2 for next request
+        asyncio.create_task(mgr.set_answer_l1l2(key, data))
+        return data
     return None
 
 
 async def _set_answer_cache(key: str, answer: str, images: list[dict]) -> None:
     image_ids = [img["id"] for img in images]
+    data = {"answer": answer, "image_ids": image_ids}
+    mgr = get_cache_manager()
     try:
-        await _rag_cache_repository.set_answer_cache(
-            cache_key=key,
-            answer=answer,
-            image_ids_json=json.dumps(image_ids),
+        # Write L1+L2 and L3 concurrently
+        await asyncio.gather(
+            mgr.set_answer_l1l2(key, data),
+            _rag_cache_repository.set_answer_cache(
+                cache_key=key,
+                answer=answer,
+                image_ids_json=json.dumps(image_ids),
+            ),
+            return_exceptions=True,
         )
     except Exception as e:
         print(f"[rag] answer cache write failed: {e}")
@@ -537,17 +550,19 @@ async def rag_query(
         }
     """
     started = time.perf_counter()
-    # ── 1. Retrieve relevant chunks ────────────────────────────────────────
-    chunks, images = await retrieve(query, course_id)
+    # ── 1. Retrieve candidates (TOP_K=10) ──────────────────────────────────
+    chunks_raw, images = await retrieve(query, course_id)
     query_tokens = rough_token_count(query)
 
-    # ── 2. Check answer cache ──────────────────────────────────────────────
+    # ── 2. Rerank → top TOP_K_FINAL (5) ───────────────────────────────────
+    chunks = _reranker.rerank(query, chunks_raw, top_k=TOP_K_FINAL) if chunks_raw else []
+
+    # ── 3. Check answer cache ──────────────────────────────────────────────
     cache_key = _answer_cache_key(query, chunks)
     cached = await _get_answer_cache(cache_key)
     if cached:
-        # Resolve image objects from cached IDs
         cached_images = await _resolve_images(cached["image_ids"])
-        context_tokens = rough_token_count(build_context(chunks, cached_images)) if chunks else 0
+        context_str, context_tokens, _ = _context_builder.build(chunks, cached_images)
         output_tokens = rough_token_count(cached["answer"])
         actual_with_rag = query_tokens + context_tokens + output_tokens
         estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
@@ -567,9 +582,12 @@ async def rag_query(
             "latency_ms": latency_ms,
         }
 
-    # ── 3. Build minimal context ───────────────────────────────────────────
+    # ── 4. Build dynamic context ───────────────────────────────────────────
     sources_found = len(chunks) > 0
-    context = build_context(chunks, images) if sources_found else ""
+    if sources_found:
+        context, context_tokens, _ctx_stats = _context_builder.build(chunks, images)
+    else:
+        context, context_tokens = "", 0
 
     # ── 4. Build prompt ────────────────────────────────────────────────────
     if sources_found:
@@ -607,7 +625,6 @@ async def rag_query(
         lambda: chat.send_message(query),
     )
     answer = response.text
-    context_tokens = rough_token_count(context) if sources_found else 0
     output_tokens = rough_token_count(answer)
     actual_with_rag = query_tokens + context_tokens + output_tokens
     estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)

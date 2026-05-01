@@ -99,4 +99,59 @@ CREATE TABLE IF NOT EXISTS rag_answer_cache (
 
 -- Chats can optionally be linked to a course
 ALTER TABLE chats ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES courses(id) ON DELETE SET NULL;
+
+-- Chunk metadata for priority scoring (computed at ingestion time)
+ALTER TABLE rag_chunks ADD COLUMN IF NOT EXISTS token_count     INTEGER;
+ALTER TABLE rag_chunks ADD COLUMN IF NOT EXISTS importance_hint FLOAT DEFAULT 0.5;
+
+-- Compressed chat history summaries (one active summary per chat)
+CREATE TABLE IF NOT EXISTS chat_history_summaries (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat_id         UUID        NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    summary_text    TEXT        NOT NULL,
+    covers_up_to_id UUID        NOT NULL,  -- last message_id included in summary
+    message_count   INTEGER     NOT NULL,
+    token_count     INTEGER     NOT NULL,
+    model_used      TEXT        NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS chat_history_summaries_chat_idx
+    ON chat_history_summaries(chat_id);
+
+-- Per-query pipeline traces for cost/latency dashboard
+CREATE TABLE IF NOT EXISTS rag_pipeline_traces (
+    id                    BIGSERIAL   PRIMARY KEY,
+    user_id               INTEGER     NOT NULL,
+    chat_id               UUID,
+    course_id             UUID,
+    model_tier            TEXT,
+    history_tokens_raw    INTEGER,
+    history_tokens_used   INTEGER,
+    context_tokens        INTEGER,
+    output_tokens         INTEGER,
+    total_tokens          INTEGER,
+    l1_hit                BOOLEAN     DEFAULT FALSE,
+    l2_hit                BOOLEAN     DEFAULT FALSE,
+    l3_hit                BOOLEAN     DEFAULT FALSE,
+    retrieval_cache_hit   BOOLEAN     DEFAULT FALSE,
+    latency_embed_ms      INTEGER,
+    latency_retrieve_ms   INTEGER,
+    latency_rerank_ms     INTEGER,
+    latency_context_ms    INTEGER,
+    latency_llm_ms        INTEGER,
+    latency_total_ms      INTEGER,
+    chunks_retrieved      INTEGER,
+    chunks_used           INTEGER,
+    chunks_compressed     INTEGER,
+    context_reduction_pct FLOAT,
+    cost_usd              FLOAT,
+    created_at            TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rag_pipeline_traces_user_created
+    ON rag_pipeline_traces(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS rag_pipeline_traces_created
+    ON rag_pipeline_traces(created_at DESC);
+
+-- Backfill token_count for existing chunks
+UPDATE rag_chunks SET token_count = length(content) / 4 WHERE token_count IS NULL;
 """

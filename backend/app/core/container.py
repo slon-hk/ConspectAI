@@ -8,7 +8,7 @@ from typing import Any
 
 from app.db.pool import Database
 from app.events import event_bus
-from app.infrastructure.cache import CacheClient, NullCache
+from app.infrastructure.cache import CacheClient, NullCache, RedisCache
 from app.infrastructure.ai import (
     MINDMAP_PROMPT,
     MODELS,
@@ -56,6 +56,7 @@ from app.services.auth_service import AuthService
 from app.services.ai_chat_service import AiChatService
 from app.services.rag_service import RagService
 from app.services.billing_service import BillingService
+from app.rag.budget import BudgetGate
 from app.domain.subscriptions import (
     DEFAULT_INTERNAL_TOKENS_PER_REQUEST,
     DEFAULT_PLAN_KEY,
@@ -96,13 +97,19 @@ class AppContainer:
     default_model: str
 
 
-def create_container(*, database: Database, gemini_api_key: str) -> AppContainer:
+def create_container(*, database: Database, gemini_api_key: str, redis_url: str | None = None) -> AppContainer:
+    from app.rag.cache_manager import configure_rag_cache
+    from app.repositories.oltp import RagCacheRepository
+
     chat_repository = ChatRepository(database)
     message_repository = MessageRepository(database)
     usage_repository = UsageRepository(database)
     file_repository = FileRepository(database)
     user_repository = UserRepository(database)
-    cache_client = NullCache()
+    cache_client: CacheClient = RedisCache(url=redis_url) if redis_url else NullCache()
+
+    # Wire three-layer cache manager in rag.py with Redis + PG cache repo.
+    configure_rag_cache(redis=cache_client, pg_cache=RagCacheRepository(database))
 
     chat_service = ChatService(chat_repository, message_repository)
     mindmap_service = MindmapService(chat_repository, message_repository, MindmapRepository(database))
@@ -141,6 +148,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         model_key=MINDMAP_MODEL,
         system_prompt=MINDMAP_PROMPT,
     )
+    budget_gate = BudgetGate(usage_repo=usage_repository, redis=cache_client)
     ai_chat_service = AiChatService(
         chat_service=chat_service,
         user_service=user_service,
@@ -154,6 +162,7 @@ def create_container(*, database: Database, gemini_api_key: str) -> AppContainer
         default_template=DEFAULT_TEMPLATE,
         default_model=DEFAULT_MODEL,
         gemini_api_key=gemini_api_key,
+        budget_gate=budget_gate,
     )
     return AppContainer(
         admin_access_service=admin_access_service,

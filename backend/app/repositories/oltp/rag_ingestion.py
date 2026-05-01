@@ -41,22 +41,23 @@ class RagIngestionRepository(BaseRepository):
         self,
         *,
         document_id: str,
-        chunks: list[tuple[int, str, str, str]],
+        chunks: list[tuple[int, str, str, str, int, float]],
         conn: asyncpg.Connection | None = None,
     ) -> dict[str, str]:
+        """chunks: (chunk_index, content, content_hash, embedding_pgvector, token_count, importance_hint)"""
         chunk_ids: dict[str, str] = {}
         async with self.connection(conn) as db_conn:
             async with db_conn.transaction():
-                for chunk_index, content, content_hash, embedding_pgvector in chunks:
+                for chunk_index, content, content_hash, embedding_pgvector, token_count, importance_hint in chunks:
                     row = await db_conn.fetchrow(
                         """
                         INSERT INTO rag_chunks
                             (document_id, content, content_hash, embedding, tsv,
-                            chunk_index, char_start, char_end)
+                            chunk_index, char_start, char_end, token_count, importance_hint)
                         VALUES (
                             $1, $2, $3, $4::vector,
                             to_tsvector('russian', $2),
-                            $5, NULL, NULL
+                            $5, NULL, NULL, $6, $7
                         )
                         ON CONFLICT (content_hash) DO UPDATE
                             SET source_count = rag_chunks.source_count + 1
@@ -67,6 +68,8 @@ class RagIngestionRepository(BaseRepository):
                         content_hash,
                         embedding_pgvector,
                         chunk_index,
+                        token_count,
+                        importance_hint,
                     )
                     chunk_ids[content_hash] = str(row["id"])
         return chunk_ids

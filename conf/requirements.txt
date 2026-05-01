@@ -28,6 +28,10 @@ youtube-transcript-api==0.6.2 # YouTube transcript
 # ── RAG: utilities ─────────────────────────────────────────────────────────────
 # No LangChain — we own the pipeline, no abstraction overhead
 
+# ── Cache ──────────────────────────────────────────────────────────────────────
+redis[asyncio]>=5.0.0
+msgpack>=1.0.0
+
 # ── Pydantic ───────────────────────────────────────────────────────────────────
 pydantic==2.7.1
 tiktoken==0.7.0

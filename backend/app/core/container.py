@@ -8,7 +8,13 @@ from typing import Any
 
 from app.db.pool import Database
 from app.events import event_bus
-from app.infrastructure.ai import RagEngine
+from app.infrastructure.ai import (
+    MINDMAP_PROMPT,
+    MODELS,
+    SYSTEM_PROMPTS,
+    TEMPLATE_META,
+    RagEngine,
+)
 from app.infrastructure.storage import FileStorage
 from app.repositories.olap import (
     AdminReportRepository,
@@ -50,7 +56,6 @@ from app.services.ai_chat_service import AiChatService
 from app.services.rag_service import RagService
 from app.services.billing_service import BillingService
 from billing_plans import DEFAULT_INTERNAL_TOKENS_PER_REQUEST, DEFAULT_PLAN_KEY, PLAN_KEYS, public_plans
-from promts import MINDMAP_PROMPT, MODELS, SYSTEM_PROMPTS, TEMPLATE_META
 
 DEFAULT_TEMPLATE = "deep"
 DEFAULT_MODEL = "gemini-3.1-flash-lite-preview"

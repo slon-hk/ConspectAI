@@ -237,6 +237,9 @@ database schema, Docker entrypoint, and billing semantics are unchanged.
   legacy storage-module access to the infrastructure adapter.
 - `app.infrastructure.ai.RagEngine` now wraps legacy `rag.py` access. Active
   services receive it explicitly instead of importing the legacy module.
+- `app.infrastructure.ai.model_catalog` now owns model metadata, prompt
+  templates, and the mindmap prompt. Top-level `promts.py` remains a
+  compatibility wrapper.
 - Analytics, funnel, and request-metrics services now receive the event bus
   explicitly from the app container instead of defaulting to the global bus.
 - Analytics cleanup worker startup now receives `AnalyticsMaintenanceService`

@@ -140,6 +140,19 @@ class UsageRepository(BaseRepository):
                 }
                 return {"allowed": True, "request_log_id": int(log_row["id"]), "remaining": usage}
 
+    async def get_plan_key(
+        self,
+        user_id: int,
+        *,
+        conn: asyncpg.Connection | None = None,
+    ) -> str:
+        async with self.connection(conn) as db_conn:
+            row = await db_conn.fetchrow(
+                "SELECT s.plan_key FROM users u JOIN subscriptions s ON s.id = u.subscription_id WHERE u.id = $1",
+                user_id,
+            )
+            return row["plan_key"] if row else "free"
+
     async def get_usage_snapshot(
         self,
         user_id: int,

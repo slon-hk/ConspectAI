@@ -45,6 +45,7 @@ def register_routes(
             current_user_id=current_user_id,
             rag_service=container.rag_service,
             file_service=container.file_service,
+            usage_service=container.usage_service,
         )
     )
     app.include_router(
@@ -66,6 +67,7 @@ def register_routes(
             current_user_id=current_user_id,
             file_service=container.file_service,
             analytics_tracking_service=container.analytics_tracking_service,
+            usage_service=container.usage_service,
         )
     )
     app.include_router(

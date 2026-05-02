@@ -14,6 +14,9 @@ class UsageService:
         self._usage_repository = usage_repository
         self._default_units = default_units
 
+    async def get_plan_key(self, user_id: int) -> str:
+        return await self._usage_repository.get_plan_key(user_id)
+
     async def get_usage_snapshot(
         self,
         user_id: int,

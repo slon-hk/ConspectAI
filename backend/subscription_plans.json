@@ -6,35 +6,40 @@
       "display_name": "Free",
       "price_rub": 0,
       "sort_order": 0,
-      "max_upload_mb": 2
+      "max_upload_mb": 2,
+      "available_models": ["gemini-2.5-flash-lite"]
     },
     {
       "plan_key": "starter",
       "display_name": "Starter",
       "price_rub": 300,
       "sort_order": 1,
-      "max_upload_mb": 5
+      "max_upload_mb": 5,
+      "available_models": ["gemini-2.5-flash-lite", "gemini-2.0-flash"]
     },
     {
       "plan_key": "plus",
       "display_name": "Plus",
       "price_rub": 500,
       "sort_order": 2,
-      "max_upload_mb": 10
+      "max_upload_mb": 10,
+      "available_models": ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-pro"]
     },
     {
       "plan_key": "pro",
       "display_name": "Pro",
       "price_rub": 1500,
       "sort_order": 3,
-      "max_upload_mb": 50
+      "max_upload_mb": 50,
+      "available_models": ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-pro"]
     },
     {
       "plan_key": "max",
       "display_name": "Max",
       "price_rub": 2500,
       "sort_order": 4,
-      "max_upload_mb": 50
+      "max_upload_mb": 50,
+      "available_models": ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-pro"]
     }
   ]
 }

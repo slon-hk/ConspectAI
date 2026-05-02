@@ -91,7 +91,8 @@ app = FastAPI(title="ConspectAI", lifespan=lifespan)
 jinja = Jinja2Templates(directory="templates")
 app.include_router(admin.router)
 app.include_router(create_catalog_router(
-    CatalogService(models=MODELS, template_meta=TEMPLATE_META, public_plans=public_plans)
+    CatalogService(models=MODELS, template_meta=TEMPLATE_META, public_plans=public_plans),
+    rag_service=rag_routes.rag_service,
 ))
 app.include_router(rag_routes.router)
 chat_repository = ChatRepository(database)
@@ -283,6 +284,7 @@ app.include_router(
         current_user_id=current_user_id,
         file_service=file_service,
         analytics_tracking_service=analytics_tracking_service,
+        usage_service=usage_service,
     )
 )
 app.include_router(
@@ -326,12 +328,37 @@ async def contacts_page(request: Request):
     return jinja.TemplateResponse("contacts.html", {"request": request})
 
 
+_MODEL_DISPLAY: dict[str, dict[str, str]] = {
+    "gemini-2.5-flash-lite": {"icon": "⚡⚡", "short": "Flash Lite 2.5"},
+    "gemini-2.0-flash":      {"icon": "⚡",  "short": "Flash 2.0"},
+    "gemini-1.5-pro":        {"icon": "🧠",  "short": "Gemini 1.5 Pro"},
+}
+_RAG_PLANS = frozenset({"plus", "pro", "max"})
+
+
+def _plan_features(plan: dict) -> list[str]:
+    max_mb = plan.get("max_upload_mb", 2)
+    features = [
+        f"Загрузка файлов до {max_mb} МБ",
+        "Все шаблоны и карта тем",
+        "Экспорт в Markdown и PDF",
+    ]
+    if plan["plan_key"] in _RAG_PLANS:
+        features.append("Доступ к общей базе знаний (RAG)")
+    return features
+
+
 @app.get("/pricing", response_class=HTMLResponse)
 async def pricing_page(request: Request):
     plans = []
     for plan in public_plans():
         price = int(plan["price_rub"])
         estimated_requests = int(plan.get("estimated_monthly_requests", 0) or 0)
+        models = plan.get("available_models", ["gemini-2.5-flash-lite"])
+        model_chips = [
+            {"icon": _MODEL_DISPLAY.get(m, {}).get("icon", ""), "label": _MODEL_DISPLAY.get(m, {}).get("short", m)}
+            for m in models
+        ]
         plans.append({
             **plan,
             "price_label": "₽0" if price == 0 else f"₽{price:,}".replace(",", " "),
@@ -342,6 +369,8 @@ async def pricing_page(request: Request):
             ),
             "featured": plan["plan_key"] == "plus",
             "cta_label": "Начать бесплатно" if plan["plan_key"] == "free" else f"Выбрать {plan['display_name']}",
+            "model_chips": model_chips,
+            "features": _plan_features(plan),
         })
     return jinja.TemplateResponse("pricing.html", {"request": request, "plans": plans})
 

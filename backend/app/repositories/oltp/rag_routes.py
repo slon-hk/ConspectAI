@@ -123,23 +123,30 @@ class RagRouteRepository(BaseRepository):
     async def find_document_duplicate(
         self,
         *,
-        course_id: str,
+        course_id: str | None,
         sha256: str,
         conn: asyncpg.Connection | None = None,
     ) -> dict | None:
         async with self.connection(conn) as db_conn:
-            row = await db_conn.fetchrow(
-                """SELECT id, status FROM rag_documents
-                   WHERE course_id = $1 AND sha256 = $2""",
-                course_id,
-                sha256,
-            )
+            if course_id is None:
+                row = await db_conn.fetchrow(
+                    """SELECT id, status FROM rag_documents
+                       WHERE course_id IS NULL AND sha256 = $1 AND is_public = TRUE""",
+                    sha256,
+                )
+            else:
+                row = await db_conn.fetchrow(
+                    """SELECT id, status FROM rag_documents
+                       WHERE course_id = $1 AND sha256 = $2""",
+                    course_id,
+                    sha256,
+                )
             return dict(row) if row else None
 
     async def create_file_document(
         self,
         *,
-        course_id: str,
+        course_id: str | None,
         user_id: int,
         filename: str,
         source_type: str,
@@ -280,3 +287,44 @@ class RagRouteRepository(BaseRepository):
                 user_id,
             )
             return result != "UPDATE 0"
+
+    async def get_public_stats(self, conn=None) -> dict:
+        async with self.connection(conn) as db_conn:
+            row = await db_conn.fetchrow(
+                """
+                SELECT
+                    COUNT(*)                                                                      AS doc_count,
+                    COALESCE(SUM(chunk_count), 0)                                                AS chunk_count,
+                    COUNT(*) FILTER (WHERE filename ~* 'мат|math|алгебр|геом|анализ|числен|calcul|дискрет|логика|стат|вероятн') AS math,
+                    COUNT(*) FILTER (WHERE filename ~* 'физ|phys|механ|термо|квант|оптик|электр|магнет') AS physics,
+                    COUNT(*) FILTER (WHERE filename ~* 'прог|prog|код|python|java|javascript|алгор|software|граф|сорт|компил') AS programming,
+                    COUNT(*) FILTER (WHERE filename ~* 'хим|chem|органич|неорган|реакц|молекул') AS chemistry,
+                    COUNT(*) FILTER (WHERE filename ~* 'эконом|econom|финанс|бухгалт|маркет') AS economics,
+                    COUNT(DISTINCT user_id)                                                       AS contributor_count
+                FROM rag_documents
+                WHERE status = 'ready' AND is_public = TRUE
+                """
+            )
+            total = int(row["doc_count"])
+            counts = {
+                "math":        int(row["math"]),
+                "physics":     int(row["physics"]),
+                "programming": int(row["programming"]),
+                "chemistry":   int(row["chemistry"]),
+                "economics":   int(row["economics"]),
+            }
+            other = max(0, total - sum(counts.values()))
+            subjects = [
+                {"name": "Математика",       "icon": "📐", "count": counts["math"]},
+                {"name": "Физика",           "icon": "⚛️",  "count": counts["physics"]},
+                {"name": "Программирование", "icon": "💻",  "count": counts["programming"]},
+                {"name": "Химия",            "icon": "🧪",  "count": counts["chemistry"]},
+                {"name": "Экономика",        "icon": "📊",  "count": counts["economics"]},
+                {"name": "Другое",           "icon": "📚",  "count": other},
+            ]
+            return {
+                "doc_count":         total,
+                "chunk_count":       int(row["chunk_count"]),
+                "contributor_count": int(row["contributor_count"]),
+                "subjects":          subjects,
+            }

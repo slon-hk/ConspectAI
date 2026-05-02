@@ -154,4 +154,11 @@ CREATE INDEX IF NOT EXISTS rag_pipeline_traces_created
 
 -- Backfill token_count for existing chunks
 UPDATE rag_chunks SET token_count = length(content) / 4 WHERE token_count IS NULL;
+
+-- Global Knowledge Base: allow course_id to be NULL for public documents
+-- that don't belong to any specific course.
+ALTER TABLE rag_documents ALTER COLUMN course_id DROP NOT NULL;
+ALTER TABLE rag_documents DROP CONSTRAINT IF EXISTS rag_documents_course_id_fkey;
+ALTER TABLE rag_documents ADD CONSTRAINT rag_documents_course_id_fkey
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL;
 """

@@ -666,49 +666,123 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
         <div class="flex-shrink-0 px-4 pb-4" style="background:var(--bg)" x-show="currentChatId">
           <div class="max-w-[740px] mx-auto">
 
-            <!-- Template switcher -->
-            <div class="flex items-center gap-1.5 mb-2 px-1 overflow-x-auto">
-              <template x-for="(meta,key) in templateMeta" :key="key">
-                <button class="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-[500] border cursor-pointer transition-all"
-                  :style="currentChat&&currentChat.template===key?'background:var(--accent-dim);border-color:var(--accent);color:var(--accent)':'background:transparent;border-color:var(--border);color:var(--text-3)'"
-                  @click="switchTemplate(key)">
-                  <span x-text="meta.icon"></span><span x-text="meta.name"></span>
+            <!-- Template switcher + Course selector -->
+            <div class="flex items-center gap-2 mb-2 px-1">
+              <div class="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0">
+                <template x-for="(meta,key) in templateMeta" :key="key">
+                  <button class="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-[500] border cursor-pointer transition-all"
+                    :style="currentChat&&currentChat.template===key?'background:var(--accent-dim);border-color:var(--accent);color:var(--accent)':'background:transparent;border-color:var(--border);color:var(--text-3)'"
+                    @click="switchTemplate(key)">
+                    <span x-text="meta.icon"></span><span x-text="meta.name"></span>
+                  </button>
+                </template>
+              </div>
+              <!-- Course quick-bind — outside overflow container to avoid clipping -->
+              <div class="relative flex-shrink-0" x-data="{open:false}" @click.outside="open=false">
+                <button
+                  class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-[600] cursor-pointer transition-all whitespace-nowrap"
+                  :style="currentChat?.course_id
+                    ? 'background:var(--accent-dim);border:1.5px solid var(--accent);color:var(--accent)'
+                    : 'background:rgba(200,145,58,.08);border:1.5px solid rgba(200,145,58,.4);color:rgba(200,145,58,.85)'"
+                  @click="open=!open; if(open) loadCourses()"
+                  :title="currentChat?.course_id ? 'Курс: '+(courses.find(c=>c.id===currentChat.course_id)?.title||'загрузка…') : 'Привязать курс к чату'">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                  <span x-text="currentChat?.course_id ? (courses.find(c=>c.id===currentChat.course_id)?.title||'Курс') : 'RAG курс'"></span>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.7" :style="open?'transform:rotate(180deg)':''"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
-              </template>
+                <div x-show="open" x-transition class="absolute bottom-full mb-1.5 right-0 z-50 rounded-xl py-1 min-w-[210px] max-w-[290px] max-h-[280px] overflow-y-auto shadow-xl" style="background:var(--surface);border:1px solid var(--border)">
+                  <template x-if="cpLoading">
+                    <p class="text-[11px] px-3 py-2.5" style="color:var(--text-3)">Загрузка…</p>
+                  </template>
+                  <template x-if="!cpLoading && courses.length===0">
+                    <p class="text-[11px] px-3 py-2.5" style="color:var(--text-3)">Нет доступных курсов</p>
+                  </template>
+                  <template x-if="currentChat?.course_id">
+                    <button class="w-full text-left flex items-center gap-2 px-3 py-2 text-[11px] hover:bg-[var(--bg)] transition-colors border-b" style="color:#e05555;border-color:var(--border)" @click="toggleChatCourse(currentChat.course_id); open=false">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      Отвязать курс
+                    </button>
+                  </template>
+                  <template x-for="course in courses" :key="course.id">
+                    <button
+                      class="w-full text-left flex items-center gap-2 px-3 py-2.5 text-[11px] hover:bg-[var(--bg)] transition-colors"
+                      :style="currentChat?.course_id===course.id ? 'color:var(--accent);font-weight:600' : 'color:var(--text-1)'"
+                      @click="if(currentChat?.course_id!==course.id) toggleChatCourse(course.id); open=false">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                      <span class="truncate flex-1" x-text="course.title"></span>
+                      <template x-if="currentChat?.course_id===course.id">
+                        <svg class="flex-shrink-0" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--accent)"><polyline points="20 6 9 17 4 12"/></svg>
+                      </template>
+                    </button>
+                  </template>
+                </div>
+              </div>
             </div>
 
             <!-- Pending files -->
             <template x-if="pendingFiles.length">
-              <div class="flex flex-wrap gap-2 mb-2 px-1">
-                <template x-for="(f,i) in pendingFiles" :key="i">
-                  <div class="file-chip">
-                    <template x-if="f.mime_type&&f.mime_type.startsWith('image/')">
-                      <img :src="f.preview_url||''" class="w-5 h-5 rounded object-cover">
-                    </template>
-                    <template x-if="!(f.mime_type&&f.mime_type.startsWith('image/'))">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
-                    </template>
-                    <span x-text="f.original_filename" class="max-w-[110px] truncate"></span>
-                    <template x-if="f.compression_pct>5">
-                      <span class="text-[9px]" style="color:var(--green)" x-text="'-'+f.compression_pct+'%'"></span>
-                    </template>
-                    <button @click="pendingFiles.splice(i,1)" style="color:var(--text-3)" class="hover:opacity-70 text-base leading-none">×</button>
-                  </div>
-                </template>
+              <div class="mb-2 px-1">
+                <div class="flex flex-wrap gap-2 mb-1.5">
+                  <template x-for="(f,i) in pendingFiles" :key="i">
+                    <div class="file-chip">
+                      <template x-if="f.mime_type&&f.mime_type.startsWith('image/')">
+                        <img :src="f.preview_url||''" class="w-5 h-5 rounded object-cover">
+                      </template>
+                      <template x-if="!(f.mime_type&&f.mime_type.startsWith('image/'))">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                      </template>
+                      <span x-text="f.original_filename" class="max-w-[110px] truncate"></span>
+                      <template x-if="f.compression_pct>5">
+                        <span class="text-[9px]" style="color:var(--green)" x-text="'-'+f.compression_pct+'%'"></span>
+                      </template>
+                      <button @click="pendingFiles.splice(i,1)" style="color:var(--text-3)" class="hover:opacity-70 text-base leading-none">×</button>
+                    </div>
+                  </template>
+                </div>
               </div>
             </template>
 
             <div class="input-wrap flex items-end gap-2 px-4 py-2.5">
-              <label class="cursor-pointer flex-shrink-0 mb-0.5 hover:opacity-70 transition-opacity" style="color:var(--text-3)">
-                <input type="file" multiple class="hidden" accept="image/*,.pdf,.txt,.doc,.docx,.csv,.json,.md,.py,.js,.ts,.tex" @change="onFileSelect($event)">
+              <button type="button" class="cursor-pointer flex-shrink-0 mb-0.5 hover:opacity-70 transition-opacity" style="color:var(--text-3);background:none;border:none;padding:0;line-height:0" @click="upModal.open=true" title="Прикрепить файл">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-              </label>
+              </button>
               <textarea class="chat-input flex-1 py-0.5" x-model="inputText" placeholder="Напишите вопрос или перетащите файл…" rows="1" :disabled="loading" @keydown="handleInputKeydown($event)"></textarea>
-              <select class="form-select !w-[170px] !py-1.5 !text-[11px] hidden sm:block" :value="currentChat?.model||''" @change="switchModel($event.target.value)">
-                <template x-for="(info,key) in modelCatalog" :key="key">
-                  <option :value="key" x-text="info.name"></option>
-                </template>
-              </select>
+              <!-- Model picker -->
+              <div class="relative hidden sm:block flex-shrink-0" x-data="{mOpen:false}" @click.outside="mOpen=false">
+                <button
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-[500] cursor-pointer transition-all"
+                  style="background:var(--surface);border:1px solid var(--border);color:var(--text-2)"
+                  @click="mOpen=!mOpen">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                  <span x-text="modelCatalog[currentChat?.model]?.name || 'Модель'"></span>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.5" :style="mOpen?'transform:rotate(180deg)':''"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div x-show="mOpen" x-transition class="absolute bottom-full mb-2 right-0 z-50 rounded-xl py-1.5 w-[280px] shadow-xl overflow-hidden" style="background:var(--surface);border:1px solid var(--border)">
+                  <p class="text-[10px] font-[600] uppercase tracking-wider px-3 py-1.5 mb-0.5" style="color:var(--text-3)">Выберите модель</p>
+                  <template x-for="(info,key) in modelCatalog" :key="key">
+                    <button
+                      class="w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors hover:bg-[var(--bg)]"
+                      :style="currentChat?.model===key ? 'background:var(--accent-dim)' : ''"
+                      @click="switchModel(key); mOpen=false">
+                      <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" :style="currentChat?.model===key ? 'background:var(--accent);color:#fff' : 'background:var(--bg);color:var(--text-3)'">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-[12px] font-[500]" :style="currentChat?.model===key ? 'color:var(--accent)' : 'color:var(--text-1)'" x-text="info.name"></span>
+                          <template x-if="info.recommended">
+                            <span class="text-[9px] px-1.5 py-0.5 rounded-full font-[600]" style="background:rgba(200,145,58,.15);color:var(--accent);border:1px solid rgba(200,145,58,.3)">Топ</span>
+                          </template>
+                        </div>
+                        <p class="text-[10.5px] truncate mt-0.5" style="color:var(--text-3)" x-text="info.desc||info.speed||''"></p>
+                      </div>
+                      <template x-if="currentChat?.model===key">
+                        <svg class="flex-shrink-0 mt-1" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--accent)"><polyline points="20 6 9 17 4 12"/></svg>
+                      </template>
+                    </button>
+                  </template>
+                </div>
+              </div>
               <button class="btn-send" @click="send" :disabled="loading||(!inputText.trim()&&!pendingFiles.length)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
               </button>
@@ -893,24 +967,20 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
               </div>
 
               <!-- Upload zone -->
-              <div class="upload-zone mb-2"
-                   :class="cpDragging?'drag':''"
-                   @click="$refs.fileInput.click()"
+              <div class="mb-2 rounded-xl transition-all"
+                   :class="cpDragging ? 'ring-2 ring-[var(--accent)]' : ''"
+                   :style="cpDragging ? 'background:var(--accent-dim)' : ''"
                    @dragover.prevent="cpDragging=true"
                    @dragleave="cpDragging=false"
-                   @drop.prevent="onCourseFileDrop($event)">
-                <input type="file" class="hidden" x-ref="fileInput"
-                       accept=".pdf,.txt,.md,.docx"
-                       multiple
-                       @change="onCourseFileSelect($event)">
-                <svg class="mx-auto mb-1" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <p class="text-[12px]" style="color:var(--text-2)">Перетащите файлы или нажмите</p>
-                <p class="text-[11px]" style="color:var(--text-3)">PDF, TXT, MD, DOCX · до 50 МБ</p>
+                   @drop.prevent="cpDragging=false; cpUpModal.files=Array.from($event.dataTransfer.files); cpUpModal.open=true">
+                <button type="button"
+                        @click="cpUpModal.open=true"
+                        class="w-full flex items-center justify-center gap-2 py-3 rounded-xl transition-all hover:opacity-80"
+                        style="border:2px dashed var(--border);background:var(--bg);cursor:pointer;color:var(--text-2)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span class="text-[12px] font-[500]">Загрузить файл</span>
+                </button>
               </div>
-              <label class="flex items-center gap-2 text-[11px] mb-2 cursor-pointer" style="color:var(--text-2)">
-                <input type="checkbox" class="accent-amber-500" x-model="cpUploadPublic">
-                <span>Сделать материалы публичными (глобальный RAG)</span>
-              </label>
 
               <!-- YouTube URL -->
               <div class="flex gap-1.5 mb-2">
@@ -1138,6 +1208,205 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
     </div>
   </template>
 
+  <!-- ── Course Upload Modal ──────────────────────────────────────── -->
+  <template x-if="cpUpModal.open">
+    <div class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+         style="background:rgba(0,0,0,.6);backdrop-filter:blur(5px)"
+         @click.self="cpUpModal.open=false"
+         @keydown.escape.window="cpUpModal.open=false">
+      <div class="rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+           style="background:var(--surface);border:1px solid var(--border)">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid var(--border)">
+          <div class="flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span class="font-[600] text-[14px]" style="color:var(--text-1)">Загрузить в курс</span>
+          </div>
+          <button @click="cpUpModal.open=false" style="color:var(--text-3);background:none;border:none;cursor:pointer;line-height:0" class="hover:opacity-60 transition-opacity">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="mx-5 mt-5"
+             :class="cpUpModal.dragging ? 'opacity-80' : ''"
+             @dragover.prevent="cpUpModal.dragging=true"
+             @dragleave="cpUpModal.dragging=false"
+             @drop.prevent="cpUpModal.dragging=false; cpUpModal.files=Array.from($event.dataTransfer.files)">
+          <label class="flex flex-col items-center justify-center gap-3 rounded-xl cursor-pointer transition-all py-8 px-4"
+                 :style="cpUpModal.dragging ? 'border:2px dashed var(--accent);background:var(--accent-dim)' : 'border:2px dashed var(--border);background:var(--bg)'">
+            <input type="file" multiple class="hidden"
+                   accept=".pdf,.txt,.md,.docx,.doc,.csv,.json,.py,.js,.ts,.tex"
+                   @change="cpUpModal.files=Array.from($event.target.files)">
+            <template x-if="!cpUpModal.files.length">
+              <div class="flex flex-col items-center gap-2 pointer-events-none">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-3)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p class="text-[13px] font-[500]" style="color:var(--text-2)">Нажмите или перетащите файлы</p>
+                <p class="text-[11px]" style="color:var(--text-3)">PDF, MD, DOCX, TXT, CSV, код… · до 50 МБ</p>
+              </div>
+            </template>
+            <template x-if="cpUpModal.files.length">
+              <div class="flex flex-col items-center gap-2 w-full pointer-events-none">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--accent)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <template x-for="(f,i) in cpUpModal.files" :key="i">
+                  <div class="flex items-center gap-2 w-full max-w-[280px]">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-3);flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                    <span class="text-[12px] truncate" style="color:var(--text-1)" x-text="f.name"></span>
+                    <span class="text-[11px] flex-shrink-0" style="color:var(--text-3)" x-text="f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB'"></span>
+                  </div>
+                </template>
+                <p class="text-[11px]" style="color:var(--text-3)">Нажмите чтобы изменить</p>
+              </div>
+            </template>
+          </label>
+        </div>
+
+        <!-- Visibility toggle -->
+        <div class="mx-5 mt-4 rounded-xl p-4" style="background:var(--bg);border:1px solid var(--border)">
+          <div class="flex items-start gap-3">
+            <button type="button"
+                    @click="cpUpModal.isPublic=!cpUpModal.isPublic"
+                    class="relative flex-shrink-0 w-10 h-5 rounded-full overflow-hidden transition-colors duration-200 mt-0.5"
+                    :style="cpUpModal.isPublic ? 'background:var(--accent)' : 'background:var(--border)'">
+              <span class="absolute top-0.5 left-0 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    :style="cpUpModal.isPublic ? 'transform:translateX(22px)' : 'transform:translateX(2px)'"></span>
+            </button>
+            <div>
+              <p class="text-[13px] font-[500]" style="color:var(--text-1)">
+                <span x-show="cpUpModal.isPublic">🌐 Также в общую базу знаний</span>
+                <span x-show="!cpUpModal.isPublic">🔒 Только в этот курс</span>
+              </p>
+              <p class="text-[11px] mt-0.5" style="color:var(--text-3)" x-show="cpUpModal.isPublic">Файл будет доступен в RAG для всех пользователей</p>
+              <p class="text-[11px] mt-0.5" style="color:var(--text-3)" x-show="!cpUpModal.isPublic">Файл будет виден только участникам этого курса</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-2.5 px-5 py-4">
+          <button type="button"
+                  @click="cpUpModal.open=false; cpUpModal.files=[]"
+                  class="flex-1 py-2 rounded-xl text-[13px] font-[500] transition-opacity hover:opacity-70"
+                  style="background:var(--bg);border:1px solid var(--border);color:var(--text-2);cursor:pointer"
+                  :disabled="cpUpModal.uploading">
+            Отмена
+          </button>
+          <button type="button"
+                  @click="confirmCourseUploadModal()"
+                  class="flex-1 py-2 rounded-xl text-[13px] font-[500] transition-opacity hover:opacity-80 flex items-center justify-center gap-2"
+                  style="background:var(--accent);color:#fff;border:none;cursor:pointer"
+                  :disabled="!cpUpModal.files.length || cpUpModal.uploading">
+            <template x-if="cpUpModal.uploading">
+              <svg class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            </template>
+            <span x-text="cpUpModal.uploading ? 'Загружаю…' : 'Загрузить'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ── Upload Modal ──────────────────────────────────────────────── -->
+  <template x-if="upModal.open">
+    <div class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+         style="background:rgba(0,0,0,.6);backdrop-filter:blur(5px)"
+         @click.self="upModal.open=false"
+         @keydown.escape.window="upModal.open=false">
+      <div class="rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+           style="background:var(--surface);border:1px solid var(--border)">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid var(--border)">
+          <div class="flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            <span class="font-[600] text-[14px]" style="color:var(--text-1)">Прикрепить файл</span>
+          </div>
+          <button @click="upModal.open=false" class="hover:opacity-60 transition-opacity" style="color:var(--text-3);background:none;border:none;cursor:pointer;line-height:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="mx-5 mt-5"
+             :class="upModal.dragging ? 'opacity-80' : ''"
+             @dragover.prevent="upModal.dragging=true"
+             @dragleave="upModal.dragging=false"
+             @drop.prevent="upModal.dragging=false; upModal.files=Array.from($event.dataTransfer.files)">
+          <label class="flex flex-col items-center justify-center gap-3 rounded-xl cursor-pointer transition-all py-8 px-4"
+                 :style="upModal.dragging ? 'border:2px dashed var(--accent);background:var(--accent-dim)' : 'border:2px dashed var(--border);background:var(--bg)'"
+                 style="border:2px dashed var(--border);background:var(--bg)">
+            <input type="file" multiple class="hidden"
+                   accept="image/*,.pdf,.txt,.doc,.docx,.csv,.json,.md,.py,.js,.ts,.tex"
+                   @change="upModal.files=Array.from($event.target.files)">
+            <template x-if="!upModal.files.length">
+              <div class="flex flex-col items-center gap-2 pointer-events-none">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-3)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p class="text-[13px] font-[500]" style="color:var(--text-2)">Нажмите или перетащите файлы</p>
+                <p class="text-[11px]" style="color:var(--text-3)">PDF, изображения, Word, MD, CSV, код…</p>
+              </div>
+            </template>
+            <template x-if="upModal.files.length">
+              <div class="flex flex-col items-center gap-2 w-full pointer-events-none">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--accent)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <template x-for="(f,i) in upModal.files" :key="i">
+                  <div class="flex items-center gap-2 w-full max-w-[280px]">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-3);flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                    <span class="text-[12px] truncate" style="color:var(--text-1)" x-text="f.name"></span>
+                    <span class="text-[11px] flex-shrink-0" style="color:var(--text-3)" x-text="f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB'"></span>
+                  </div>
+                </template>
+                <p class="text-[11px]" style="color:var(--text-3)">Нажмите чтобы изменить</p>
+              </div>
+            </template>
+          </label>
+        </div>
+
+        <!-- Visibility toggle -->
+        <div class="mx-5 mt-4 rounded-xl p-4" style="background:var(--bg);border:1px solid var(--border)">
+          <div class="flex items-start gap-3">
+            <button type="button"
+                    @click="upModal.isPublic=!upModal.isPublic"
+                    class="relative flex-shrink-0 w-10 h-5 rounded-full overflow-hidden transition-colors duration-200 mt-0.5"
+                    :style="upModal.isPublic ? 'background:var(--accent)' : 'background:var(--border)'">
+              <span class="absolute top-0.5 left-0 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    :style="upModal.isPublic ? 'transform:translateX(22px)' : 'transform:translateX(2px)'"></span>
+            </button>
+            <div>
+              <p class="text-[13px] font-[500]" style="color:var(--text-1)">
+                <span x-show="upModal.isPublic">🌐 Общая база знаний</span>
+                <span x-show="!upModal.isPublic">🔒 Только для меня</span>
+              </p>
+              <p class="text-[11px] mt-0.5" style="color:var(--text-3)" x-show="upModal.isPublic">Файл будет проиндексирован в общую базу — доступен в RAG для всех пользователей</p>
+              <p class="text-[11px] mt-0.5" style="color:var(--text-3)" x-show="!upModal.isPublic">Файл будет виден только в этом чате</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-2.5 px-5 py-4">
+          <button type="button"
+                  @click="upModal.open=false; upModal.files=[]"
+                  class="flex-1 py-2 rounded-xl text-[13px] font-[500] transition-opacity hover:opacity-70"
+                  style="background:var(--bg);border:1px solid var(--border);color:var(--text-2);cursor:pointer"
+                  :disabled="upModal.uploading">
+            Отмена
+          </button>
+          <button type="button"
+                  @click="confirmUploadModal()"
+                  class="flex-1 py-2 rounded-xl text-[13px] font-[500] transition-opacity hover:opacity-80 flex items-center justify-center gap-2"
+                  style="background:var(--accent);color:#fff;border:none;cursor:pointer"
+                  :disabled="!upModal.files.length || upModal.uploading">
+            <template x-if="upModal.uploading">
+              <svg class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            </template>
+            <span x-text="upModal.uploading ? 'Загружаю…' : 'Прикрепить'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
 </div>
 
 <script>
@@ -1157,6 +1426,7 @@ function app() {
     user: { username:'', email:'', plan_key:'free', subscription_name:'Free', usage:{daily_remaining:0,daily_limit:0,daily_used:0} },
     chats: [], messages: [], currentChatId: null,
     loading: false, inputText: '', pendingFiles: [], globalDrag: false,
+    upModal: {open:false, files:[], isPublic:false, uploading:false, dragging:false},
 
     // UI state
     showSettings: false, showBuyModal: false, settingsTab: 'model', selPlan: null,
@@ -1179,6 +1449,7 @@ function app() {
     cpLightboxOpen: false,
     cpLightboxImg: '',
     cpUploadPublic: false,
+    cpUpModal: {open:false, files:[], isPublic:false, uploading:false, dragging:false},
     modelCatalog: {}, templateMeta: {},
 
     // Mindmap state
@@ -1383,17 +1654,27 @@ function app() {
     async handleDrop(e) {
       this.globalDrag=false;
       if (!this.currentChatId) return;
-      await this.processFiles(Array.from(e.dataTransfer.files));
+      this.upModal.files = Array.from(e.dataTransfer.files);
+      this.upModal.open = true;
     },
-    async onFileSelect(e) { await this.processFiles(Array.from(e.target.files)); e.target.value=''; },
-    async processFiles(files) {
+    async processFiles(files, isPublic=false) {
+      const endpoint = isPublic ? '/api/public-kb/ingest' : '/api/upload';
       for (const f of files) {
         const fd = new FormData(); fd.append('file',f);
         try {
-          const info = await this.api('/api/upload',{method:'POST',body:fd}).then(r=>r.json());
+          const info = await this.api(endpoint,{method:'POST',body:fd}).then(r=>r.json());
           this.pendingFiles.push(info);
         } catch(e) { console.error('Upload error:',e); }
       }
+    },
+    async confirmUploadModal() {
+      if (!this.upModal.files.length) return;
+      this.upModal.uploading = true;
+      await this.processFiles(this.upModal.files, this.upModal.isPublic);
+      this.upModal.uploading = false;
+      this.upModal.open = false;
+      this.upModal.files = [];
+      this.upModal.isPublic = false;
     },
 
     // ── Send ───────────────────────────────────────────────────────────────
@@ -1697,24 +1978,22 @@ function app() {
       }
     },
 
-    async onCourseFileSelect(e) {
-      const files = Array.from(e.target.files);
-      e.target.value = '';
-      for (const f of files) await this.uploadCourseFile(f);
+    async confirmCourseUploadModal() {
+      if (!this.cpUpModal.files.length) return;
+      this.cpUpModal.uploading = true;
+      for (const f of this.cpUpModal.files) await this.uploadCourseFile(f, this.cpUpModal.isPublic);
+      this.cpUpModal.uploading = false;
+      this.cpUpModal.open = false;
+      this.cpUpModal.files = [];
+      this.cpUpModal.isPublic = false;
     },
 
-    async onCourseFileDrop(e) {
-      this.cpDragging = false;
-      const files = Array.from(e.dataTransfer.files);
-      for (const f of files) await this.uploadCourseFile(f);
-    },
-
-    async uploadCourseFile(file) {
+    async uploadCourseFile(file, isPublic=false) {
       if (!this.cpActiveCourse) return;
-      const fd = new FormData(); fd.append('file', file); fd.append('is_public', this.cpUploadPublic ? 'true' : 'false');
+      const fd = new FormData(); fd.append('file', file); fd.append('is_public', isPublic ? 'true' : 'false');
       // Optimistic UI — show pending immediately
       const tmpId = 'tmp-' + Date.now();
-      this.cpDocs.unshift({ id: tmpId, filename: file.name, status: 'pending', source_type: file.name.split('.').pop() || 'file', chunk_count: 0, is_public: this.cpUploadPublic });
+      this.cpDocs.unshift({ id: tmpId, filename: file.name, status: 'pending', source_type: file.name.split('.').pop() || 'file', chunk_count: 0, is_public: isPublic });
       try {
         const r = await this.api(`/api/courses/${this.cpActiveCourse.id}/ingest`, { method: 'POST', body: fd });
         if (r.ok) {
@@ -1793,5 +2072,6 @@ function app() {
   };
 }
 </script>
+
 </body>
 </html>

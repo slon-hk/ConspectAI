@@ -136,6 +136,7 @@ class AiChatService:
         course_id: str | None = chat.get("course_id")
         rag_images: list[dict] = []
         rag_result: dict = {}
+        auto_course: str | None = None
         if file_refs:
             try:
                 auto_course = await self._rag_engine.ensure_chat_course_and_ingest_uploads(
@@ -143,15 +144,26 @@ class AiChatService:
                     user_id=user_id,
                     file_refs=file_refs,
                 )
-                if auto_course and not course_id:
-                    course_id = auto_course
             except Exception as exc:
                 print(f"[rag] auto-ingest failed: {exc}")
 
-        if course_id:
+        # Collect primary course IDs: chat-files course (tier 1) first, then linked course (tier 2).
+        primary_ids: list[str] = []
+        for cid in [auto_course, course_id]:
+            if cid and str(cid) not in primary_ids:
+                primary_ids.append(str(cid))
+        # Keep course_id in sync for downstream billing/analytics that still reference it.
+        if not course_id and auto_course:
+            course_id = auto_course
+
+        plan_key = (user or {}).get("plan", "free")
+        _GLOBAL_KB_PLANS = frozenset({"plus", "pro", "max"})
+        use_global_kb = not primary_ids and plan_key in _GLOBAL_KB_PLANS
+
+        if primary_ids or use_global_kb:
             rag_result = await self._rag_engine.rag_query(
                 query=content or " ".join(str(part) for part in parts if isinstance(part, str)),
-                course_id=str(course_id),
+                course_ids=primary_ids or None,
                 system_prompt=system_prompt,
                 model_name=model_key,
                 conversation_history=gemini_history,
@@ -164,7 +176,7 @@ class AiChatService:
                 "rag_query",
                 user_id,
                 chat_id=str(chat_id),
-                course_id=str(course_id),
+                course_id=str(course_id) if course_id else "global",
                 sources_found=rag_result["sources_found"],
                 from_cache=rag_result["from_cache"],
             )

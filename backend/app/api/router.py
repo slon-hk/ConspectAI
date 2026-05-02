@@ -39,11 +39,12 @@ def register_routes(
             admin_user_service=container.admin_user_service,
         )
     )
-    app.include_router(create_catalog_router(container.catalog_service))
+    app.include_router(create_catalog_router(container.catalog_service, rag_service=container.rag_service))
     app.include_router(
         create_rag_router(
             current_user_id=current_user_id,
             rag_service=container.rag_service,
+            file_service=container.file_service,
         )
     )
     app.include_router(

@@ -553,6 +553,131 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;l
   </div>
 </section>
 
+<!-- ═══ KNOWLEDGE BASE STATS ══════════════════════════════════════════════ -->
+<section class="bg-section py-20 md:py-28" id="knowledge-base">
+  <div class="max-w-5xl mx-auto px-6 relative">
+
+    <div class="text-center mb-14">
+      <span class="badge-tag mb-4">Живая база знаний</span>
+      <h2 class="font-display text-[40px] md:text-[52px] mb-3" style="color:var(--text-1)">Студенты уже учатся вместе</h2>
+      <p class="text-[15px] max-w-2xl mx-auto" style="color:var(--text-2)">
+        Загруженные материалы попадают в общую базу — и RAG-поиск использует их для всех plus+ пользователей.
+      </p>
+    </div>
+
+    <!-- Counter cards -->
+    <div class="grid grid-cols-3 gap-4 mb-12" id="stat-counters">
+      <div class="card text-center py-6">
+        <p class="font-display text-[44px] md:text-[52px] leading-none mb-2" style="color:var(--accent)" id="stat-docs">—</p>
+        <p class="text-[12px] font-[500] uppercase tracking-wider" style="color:var(--text-3)">материалов загружено</p>
+      </div>
+      <div class="card text-center py-6">
+        <p class="font-display text-[44px] md:text-[52px] leading-none mb-2" style="color:var(--accent)" id="stat-chunks">—</p>
+        <p class="text-[12px] font-[500] uppercase tracking-wider" style="color:var(--text-3)">чанков проиндексировано</p>
+      </div>
+      <div class="card text-center py-6">
+        <p class="font-display text-[44px] md:text-[52px] leading-none mb-2" style="color:var(--accent)" id="stat-contributors">—</p>
+        <p class="text-[12px] font-[500] uppercase tracking-wider" style="color:var(--text-3)">авторов базы</p>
+      </div>
+    </div>
+
+    <!-- Subject progress bars -->
+    <div class="card p-6 md:p-8" id="subject-bars">
+      <h3 class="text-[15px] font-[500] mb-6" style="color:var(--text-2)">По предметам</h3>
+      <div id="bars-container" class="space-y-5">
+        <!-- populated by JS -->
+        <div class="animate-pulse space-y-5">
+          <div class="h-8 rounded-xl" style="background:var(--surface-2)"></div>
+          <div class="h-8 rounded-xl" style="background:var(--surface-2)"></div>
+          <div class="h-8 rounded-xl" style="background:var(--surface-2)"></div>
+        </div>
+      </div>
+      <p class="text-[11px] mt-6" style="color:var(--text-3)">
+        Данные обновляются в реальном времени · Любой авторизованный пользователь может добавить материал в общую базу
+      </p>
+    </div>
+
+  </div>
+</section>
+<style>
+.bar-track{background:var(--surface-2);border-radius:99px;overflow:hidden;height:8px;flex:1}
+.bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent) 0%,var(--accent-hi) 100%);transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+@keyframes countUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.stat-counted{animation:countUp .5s ease both}
+</style>
+<script>
+(function(){
+  function fmtNum(n){
+    if(n>=1000) return (n/1000).toFixed(1).replace('.0','')+'K';
+    return String(n);
+  }
+
+  function animateCount(el, target) {
+    const duration = 1200;
+    const start = performance.now();
+    const from = 0;
+    function step(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtNum(Math.round(from + (target - from) * ease));
+      if (p < 1) requestAnimationFrame(step);
+      else { el.textContent = fmtNum(target); el.classList.add('stat-counted'); }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function renderBars(subjects, total) {
+    const container = document.getElementById('bars-container');
+    if (!container) return;
+    const max = Math.max(...subjects.map(s => s.count), 1);
+    container.innerHTML = subjects
+      .filter(s => s.count > 0)
+      .map(s => {
+        const pct = Math.round((s.count / max) * 100);
+        const ofTotal = total > 0 ? Math.round((s.count / total) * 100) : 0;
+        return `
+          <div class="flex items-center gap-4">
+            <span class="text-[18px] flex-shrink-0 w-7 text-center">${s.icon}</span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[13px] font-[500]" style="color:var(--text-1)">${s.name}</span>
+                <span class="text-[12px]" style="color:var(--text-3)">${s.count} файл${s.count===1?'':'ов'} · ${ofTotal}%</span>
+              </div>
+              <div class="bar-track"><div class="bar-fill" style="width:0%" data-target="${pct}"></div></div>
+            </div>
+          </div>`;
+      }).join('') || '<p style="color:var(--text-3)" class="text-[13px]">Материалы ещё не загружены — будьте первым!</p>';
+
+    setTimeout(() => {
+      container.querySelectorAll('.bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.target + '%';
+      });
+    }, 200);
+  }
+
+  function loadStats() {
+    fetch('/api/public-stats')
+      .then(r => r.json())
+      .then(data => {
+        animateCount(document.getElementById('stat-docs'), data.doc_count || 0);
+        animateCount(document.getElementById('stat-chunks'), data.chunk_count || 0);
+        animateCount(document.getElementById('stat-contributors'), data.contributor_count || 0);
+        renderBars(data.subjects || [], data.doc_count || 0);
+      })
+      .catch(() => {});
+  }
+
+  const section = document.getElementById('knowledge-base');
+  if (section && 'IntersectionObserver' in window) {
+    new IntersectionObserver((entries, obs) => {
+      if (entries[0].isIntersecting) { loadStats(); obs.disconnect(); }
+    }, { threshold: 0, rootMargin: '0px 0px -50px 0px' }).observe(section);
+  } else {
+    loadStats();
+  }
+})();
+</script>
+
 <!-- ═══ FINAL CTA ═════════════════════════════════════════════════════════ -->
 <section class="bg-hero py-24 md:py-32 relative overflow-hidden">
   <div class="orb" style="width:400px;height:400px;background:rgba(200,145,58,.12);top:50%;left:50%;transform:translate(-50%,-50%);filter:blur(100px)"></div>

@@ -6,12 +6,14 @@ import asyncpg
 
 from app.repositories.base import BaseRepository
 
+SOURCE_BOOST = 0.10
+
 
 class RagRetrievalRepository(BaseRepository):
     async def retrieve_chunks_and_images(
         self,
         *,
-        course_id: str,
+        course_ids: list[str] | None,
         query: str,
         query_embedding_pgvector: str,
         top_k: int,
@@ -20,19 +22,30 @@ class RagRetrievalRepository(BaseRepository):
         conn: asyncpg.Connection | None = None,
     ) -> tuple[list[dict], list[dict]]:
         async with self.connection(conn) as db_conn:
-            doc_rows = await db_conn.fetch(
-                """
-                SELECT id
-                FROM rag_documents
-                WHERE status = 'ready'
-                  AND (course_id = $1 OR is_public = TRUE)
-                """,
-                course_id,
-            )
+            if course_ids:
+                doc_rows = await db_conn.fetch(
+                    """
+                    SELECT id,
+                        COALESCE(course_id = ANY($1::uuid[]), FALSE) AS is_primary
+                    FROM rag_documents
+                    WHERE status = 'ready'
+                      AND (course_id = ANY($1::uuid[]) OR is_public = TRUE)
+                    """,
+                    course_ids,
+                )
+            else:
+                doc_rows = await db_conn.fetch(
+                    """
+                    SELECT id, FALSE AS is_primary
+                    FROM rag_documents
+                    WHERE status = 'ready' AND is_public = TRUE
+                    """
+                )
             if not doc_rows:
                 return [], []
 
             doc_ids = [str(row["id"]) for row in doc_rows]
+            primary_doc_ids = [str(row["id"]) for row in doc_rows if row["is_primary"]]
             chunk_rows = await db_conn.fetch(
                 """
                 WITH semantic AS (
@@ -40,6 +53,7 @@ class RagRetrievalRepository(BaseRepository):
                         id,
                         content,
                         content_hash,
+                        document_id,
                         1 - (embedding <=> $1::vector) AS cos_sim
                     FROM rag_chunks
                     WHERE document_id = ANY($2::uuid[])
@@ -61,7 +75,8 @@ class RagRetrievalRepository(BaseRepository):
                         s.id,
                         s.content,
                         s.content_hash,
-                        ($5 * s.cos_sim + $6 * COALESCE(b.bm25_score, 0)) AS score
+                        ($5 * s.cos_sim + $6 * COALESCE(b.bm25_score, 0)
+                         + CASE WHEN s.document_id = ANY($7::uuid[]) THEN $8 ELSE 0.0 END) AS score
                     FROM semantic s
                     LEFT JOIN bm25 b ON s.id = b.id
                 )
@@ -76,6 +91,8 @@ class RagRetrievalRepository(BaseRepository):
                 query,
                 hybrid_alpha,
                 1.0 - hybrid_alpha,
+                primary_doc_ids,
+                SOURCE_BOOST,
             )
 
             chunks = [

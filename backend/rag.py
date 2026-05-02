@@ -448,26 +448,28 @@ async def ingest_document(
 
 async def retrieve(
     query: str,
-    course_id: str,
+    course_ids: list[str] | None,
     top_k: int = TOP_K,
 ) -> tuple[list[dict], list[dict]]:
     """
     Hybrid search: cosine_similarity * HYBRID_ALPHA + BM25 * (1 - HYBRID_ALPHA).
     Returns (chunks, images) where images are linked to top chunks.
+    course_ids=None queries the global knowledge base (is_public=TRUE docs only).
+    Primary course docs receive a SOURCE_BOOST in the hybrid score.
     Retrieval results are cached in Redis for 5 minutes.
     """
     q_vec_list = await embed_query(query)
     q_hash = _sha256(query)
     mgr = get_cache_manager()
 
-    # Check retrieval cache (L2 Redis, TTL=5m)
-    cached_ret = await mgr.get_retrieval_result(course_id, q_hash)
+    cache_scope = "|".join(sorted(course_ids)) if course_ids else "global"
+    cached_ret = await mgr.get_retrieval_result(cache_scope, q_hash)
     if cached_ret is not None:
         return cached_ret
 
     q_vec = to_pgvector(q_vec_list)
     chunks, images = await _rag_retrieval_repository.retrieve_chunks_and_images(
-        course_id=course_id,
+        course_ids=course_ids,
         query=query,
         query_embedding_pgvector=q_vec,
         top_k=top_k,
@@ -475,8 +477,7 @@ async def retrieve(
         image_ctx_limit=IMAGE_CTX_LIMIT,
     )
 
-    # Cache result for 5 minutes (fire and forget)
-    asyncio.create_task(mgr.set_retrieval_result(course_id, q_hash, chunks, images))
+    asyncio.create_task(mgr.set_retrieval_result(cache_scope, q_hash, chunks, images))
     return chunks, images
 
 
@@ -533,7 +534,8 @@ async def _set_answer_cache(key: str, answer: str, images: list[dict]) -> None:
 async def rag_query(
     *,
     query: str,
-    course_id: str,
+    course_id: str | None = None,
+    course_ids: list[str] | None = None,
     system_prompt: str,
     model_name: str = "gemini-2.0-flash",
     conversation_history: list[dict] | None = None,
@@ -548,10 +550,14 @@ async def rag_query(
           from_cache:    bool,
           sources_found: bool,  -- False if answer is from general knowledge
         }
+    course_ids takes precedence; course_id (singular) is kept for backward compatibility.
     """
+    if course_ids is None and course_id is not None:
+        course_ids = [course_id]
+
     started = time.perf_counter()
     # ── 1. Retrieve candidates (TOP_K=10) ──────────────────────────────────
-    chunks_raw, images = await retrieve(query, course_id)
+    chunks_raw, images = await retrieve(query, course_ids)
     query_tokens = rough_token_count(query)
 
     # ── 2. Rerank → top TOP_K_FINAL (5) ───────────────────────────────────

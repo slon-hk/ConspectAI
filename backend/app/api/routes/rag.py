@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from app.services.file_service import FileService
 from app.services.rag_service import (
     RagCourseNotFoundError,
     RagFileTooLargeError,
@@ -38,7 +39,7 @@ class IngestURLBody(BaseModel):
     title: str | None = None
 
 
-def create_rag_router(*, current_user_id: Callable, rag_service: RagService) -> APIRouter:
+def create_rag_router(*, current_user_id: Callable, rag_service: RagService, file_service: FileService) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["rag"])
 
     @router.get("/courses")
@@ -188,6 +189,32 @@ def create_rag_router(*, current_user_id: Callable, rag_service: RagService) -> 
             raise HTTPException(404, "Chat not found")
 
         return {"ok": True, "course_id": body.course_id}
+
+    @router.post("/public-kb/ingest", status_code=202)
+    async def ingest_public(
+        file: UploadFile = File(...),
+        uid: int = Depends(current_user_id),
+    ):
+        raw = await file.read()
+        filename = file.filename or "document"
+        try:
+            upload_meta = await file_service.store_upload(
+                raw=raw,
+                filename=filename,
+                content_type=file.content_type,
+            )
+            ingest_result = await rag_service.ingest_public_file(
+                user_id=uid,
+                filename=filename,
+                content_type=file.content_type,
+                raw=raw,
+            )
+        except RagFileTooLargeError as exc:
+            raise HTTPException(413, str(exc)) from exc
+        except RagUnsupportedFileError as exc:
+            raise HTTPException(415, str(exc)) from exc
+
+        return {**upload_meta, **ingest_result}
 
     return router
 

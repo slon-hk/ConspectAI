@@ -16,8 +16,12 @@ DEFAULT_CHUNK_OVERLAP = 80
 
 
 def rough_token_count(text: str) -> int:
-    """Fast approximation: 1 token ~= 4 chars for mixed RU/EN text."""
-    return max(1, len(text) // 4)
+    """Fast approximation for mixed RU/EN text.
+
+    UTF-8 byte length divided by 6 gives a better estimate than char-count/4
+    for Cyrillic (2 bytes/char) while remaining accurate for ASCII.
+    """
+    return max(1, len(text.encode("utf-8")) // 6)
 
 
 def split_text(

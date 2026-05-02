@@ -20,7 +20,11 @@ from app.workers import start_analytics_cleanup_task
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_gemini(settings)
-    container = create_container(database=database, gemini_api_key=settings.gemini_api_key)
+    container = create_container(
+        database=database,
+        gemini_api_key=settings.gemini_api_key,
+        redis_url=settings.redis_url,
+    )
 
     lifespan = create_lifespan(
         database=database,

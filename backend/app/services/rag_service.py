@@ -173,6 +173,57 @@ class RagService:
 
         return {"status": "indexing", "document_id": document_id}
 
+    async def ingest_public_file(
+        self,
+        *,
+        user_id: int,
+        filename: str,
+        content_type: str | None,
+        raw: bytes,
+    ) -> dict:
+        if len(raw) > self.MAX_FILE_MB * 1024 * 1024:
+            raise RagFileTooLargeError(f"File too large (max {self.MAX_FILE_MB}MB)")
+
+        mime = content_type or mimetypes.guess_type(filename)[0] or ""
+        if mime not in self.ALLOWED_MIME:
+            if not filename.endswith((".txt", ".md", ".pdf", ".docx", ".doc")):
+                raise RagUnsupportedFileError(f"Unsupported file type: {mime}")
+
+        ext = Path(filename).suffix.lower()
+        source_type_map = {".pdf": "pdf", ".txt": "txt", ".md": "md", ".docx": "docx", ".doc": "docx"}
+        source_type = source_type_map.get(ext, "txt")
+
+        doc_sha = self._rag_engine.sha256(raw)
+        duplicate = await self._rag_repository.find_document_duplicate(
+            course_id=None,
+            sha256=doc_sha,
+        )
+        if duplicate and duplicate["status"] == "ready":
+            return {"status": "already_indexed", "document_id": str(duplicate["id"])}
+
+        document_id = await self._rag_repository.create_file_document(
+            course_id=None,
+            user_id=user_id,
+            filename=filename,
+            source_type=source_type,
+            source_ref=filename,
+            sha256=doc_sha,
+            is_public=True,
+        )
+
+        asyncio.create_task(
+            self._rag_engine.ingest_document(
+                document_id=document_id,
+                course_id=None,
+                user_id=user_id,
+                filename=filename,
+                source_type=source_type,
+                raw_bytes=raw,
+            )
+        )
+
+        return {"status": "indexing", "document_id": document_id}
+
     async def ingest_url(
         self,
         *,
@@ -247,3 +298,6 @@ class RagService:
         if not updated:
             return "chat_not_found"
         return "ok"
+
+    async def get_public_stats(self) -> dict:
+        return await self._rag_repository.get_public_stats()

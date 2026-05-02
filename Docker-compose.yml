@@ -42,6 +42,19 @@ services:
       retries: 10
       start_period: 10s
 
+  # ── Redis (cache) ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # ── FastAPI app ────────────────────────────────────────────────────────────
   app:
     build:
@@ -52,11 +65,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DATABASE_URL:    postgresql://orion:${POSTGRES_PASSWORD}@db:5432/orion
       GEMINI_API_KEY:  ${GEMINI_API_KEY}
       SECRET_KEY:      ${SECRET_KEY}
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      REDIS_URL:       redis://redis:6379/0
     expose:
       - "8000"
     volumes:

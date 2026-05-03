@@ -6,3 +6,8 @@ services:
   caddy:
     ports:
       - "8080:80"
+    volumes:
+      - ./conf/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ./static:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config

@@ -91,4 +91,5 @@ def public_plans() -> list[dict[str, Any]]:
             "available_models": plan.get("available_models", ["gemini-2.5-flash-lite"]),
         }
         for plan in SUBSCRIPTION_PLANS
+        if plan["plan_key"] != "free"
     ]

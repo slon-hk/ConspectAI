@@ -494,7 +494,7 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
       <div class="flex-1 flex flex-col overflow-hidden">
 
         <!-- Header -->
-        <header class="flex items-center justify-between px-5 py-3 flex-shrink-0" style="border-bottom:1px solid var(--border);background:var(--bg)">
+        <header class="flex items-center justify-between px-5 h-[48px] flex-shrink-0" style="border-bottom:1px solid var(--border);background:var(--bg)">
           <div class="min-w-0 flex-1">
             <template x-if="currentChatId && currentChat">
               <div>
@@ -523,10 +523,14 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
                 </button>
               </div>
             </template>
-            <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full" style="background:var(--surface);border:1px solid var(--border)">
-              <div class="w-1.5 h-1.5 rounded-full" style="background:var(--accent)"></div>
-              <span class="text-[11px]" style="color:var(--text-2)" x-text="modelCatalog[currentChat?.model]?.name||'Gemini 3.1 Flash Lite'"></span>
-            </div>
+
+            <template x-if="currentChatId">
+              <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full" style="background:var(--surface);border:1px solid var(--border)">
+                <div class="w-1.5 h-1.5 rounded-full" style="background:var(--accent)"></div>
+                <span class="text-[11px]" style="color:var(--text-2)" x-text="modelCatalog[currentChat?.model]?.name||'Gemini 3.1 Flash Lite'"></span>
+              </div>
+            </template>
+
             <template x-if="currentChat?.course_id">
               <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer" style="background:var(--accent-dim);border:1px solid rgba(200,145,58,.3)" @click="showCourses=true;cpTab='list'" title="RAG активен — отвечаю по материалам курса">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>

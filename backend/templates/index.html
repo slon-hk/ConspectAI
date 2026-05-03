@@ -394,13 +394,10 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
             </div>
           </template>
           <!-- Collapse toggle (always visible, rotates on state) -->
-          <button @click="sidebarCollapsed=!sidebarCollapsed;localStorage.setItem('sb_collapsed',sidebarCollapsed?'true':'false')"
-                  class="sidebar-toggle flex-shrink-0 ml-auto" :title="sidebarCollapsed?'Развернуть':'Свернуть'">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-                 :style="sidebarCollapsed?'transform:rotate(180deg);transition:transform .22s':'transition:transform .22s'">
-              <polyline points="15 18 9 12 15 6"/>
+          <button @click="sidebarCollapsed=!sidebarCollapsed;localStorage.setItem('sb_collapsed',sidebarCollapsed?'true':'false')" class="sidebar-toggle flex-shrink-0 ml-auto" :class="sidebarCollapsed ? 'mx-auto -translate-x-[32px] opacity-0' : 'ml-auto'" :title="sidebarCollapsed?'Развернуть':'Свернуть'" title="Свернуть">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" :style="sidebarCollapsed?'transform:rotate(180deg);transition:transform .22s':'transition:transform .22s'" style="transition:transform .22s">
+              <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
-          </button>
         </div>
 
         <!-- ── COLLAPSED: icon strip ── -->

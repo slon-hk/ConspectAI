@@ -22,6 +22,7 @@ from app.api.routes.auth import create_auth_router
 from app.api.routes.catalog import create_catalog_router
 from app.services.catalog_service import CatalogService
 from app.api.routes.chats import create_chat_router
+from app.api.routes.feedback import create_feedback_router
 from app.api.routes.files import create_file_router
 from app.api.routes.users import create_user_router
 from app.db.pool import database
@@ -39,6 +40,7 @@ from app.repositories.olap import (
 )
 from app.repositories.oltp import (
     ChatRepository,
+    FeedbackRepository,
     FileRepository,
     MessageRepository,
     MindmapRepository,
@@ -122,6 +124,7 @@ mindmap_generation_service = MindmapGenerationService(
     model_key="gemini-2.5-flash-lite",
     system_prompt=MINDMAP_PROMPT,
 )
+feedback_repository = FeedbackRepository(database)
 ai_chat_service = AiChatService(
     chat_service=chat_service,
     user_service=user_service,
@@ -135,6 +138,7 @@ ai_chat_service = AiChatService(
     default_template="deep",
     default_model="gemini-3.1-flash-lite-preview",
     gemini_api_key=GEMINI_API_KEY,
+    rag_metric_repository=RagMetricRepository(database),
 )
 app.include_router(
     create_auth_router(
@@ -292,6 +296,12 @@ app.include_router(
         token_dependency=auth.oauth2,
         decode_token=auth.decode_token,
         analytics_tracking_service=analytics_tracking_service,
+    )
+)
+app.include_router(
+    create_feedback_router(
+        current_user_id=current_user_id,
+        feedback_repository=feedback_repository,
     )
 )
 

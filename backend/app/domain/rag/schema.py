@@ -161,4 +161,79 @@ ALTER TABLE rag_documents ALTER COLUMN course_id DROP NOT NULL;
 ALTER TABLE rag_documents DROP CONSTRAINT IF EXISTS rag_documents_course_id_fkey;
 ALTER TABLE rag_documents ADD CONSTRAINT rag_documents_course_id_fkey
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL;
+
+-- ── Data Flywheel Tables ──────────────────────────────────────────────────────
+
+-- Explicit (thumbs up/down) and implicit (regenerate, follow-up, copy) user signals.
+CREATE TABLE IF NOT EXISTS rag_feedback (
+    id           BIGSERIAL   PRIMARY KEY,
+    trace_id     BIGINT      REFERENCES rag_pipeline_traces(id) ON DELETE SET NULL,
+    user_id      INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chat_id      UUID        REFERENCES chats(id) ON DELETE SET NULL,
+    signal       TEXT        NOT NULL,
+    signal_value SMALLINT    NOT NULL DEFAULT 0,
+    comment      TEXT,
+    query_text   TEXT,
+    answer_text  TEXT,
+    chunk_ids    UUID[]      NOT NULL DEFAULT '{}',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rag_feedback_trace_idx  ON rag_feedback(trace_id);
+CREATE INDEX IF NOT EXISTS rag_feedback_user_idx   ON rag_feedback(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS rag_feedback_chunks_gin ON rag_feedback USING GIN(chunk_ids);
+
+-- Full candidate list (TOP_K=10) per query for reranker training.
+CREATE TABLE IF NOT EXISTS rag_retrieval_events (
+    id               BIGSERIAL   PRIMARY KEY,
+    trace_id         BIGINT      REFERENCES rag_pipeline_traces(id) ON DELETE CASCADE,
+    user_id          INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id        UUID        REFERENCES courses(id) ON DELETE SET NULL,
+    query_hash       TEXT        NOT NULL,
+    query_original   TEXT        NOT NULL,
+    query_rewritten  TEXT,
+    hybrid_alpha     FLOAT       NOT NULL,
+    candidates_json  JSONB       NOT NULL,
+    used_chunk_ids   UUID[]      NOT NULL,
+    reranker_type    TEXT        NOT NULL DEFAULT 'heuristic',
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rag_ret_events_trace_idx   ON rag_retrieval_events(trace_id);
+CREATE INDEX IF NOT EXISTS rag_ret_events_created_idx ON rag_retrieval_events(created_at DESC);
+
+-- Runtime signal per chunk: retrieved/used/cited counts + satisfaction signals.
+CREATE TABLE IF NOT EXISTS rag_chunk_performance (
+    chunk_id            UUID    PRIMARY KEY REFERENCES rag_chunks(id) ON DELETE CASCADE,
+    times_retrieved     BIGINT  NOT NULL DEFAULT 0,
+    times_used          BIGINT  NOT NULL DEFAULT 0,
+    times_cited         BIGINT  NOT NULL DEFAULT 0,
+    positive_signals    BIGINT  NOT NULL DEFAULT 0,
+    negative_signals    BIGINT  NOT NULL DEFAULT 0,
+    avg_rank_score      FLOAT,
+    importance_override FLOAT,
+    last_updated        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Original → rewritten query pairs for rewrite model training.
+CREATE TABLE IF NOT EXISTS rag_query_rewrites (
+    id              BIGSERIAL   PRIMARY KEY,
+    user_id         INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chat_id         UUID        REFERENCES chats(id) ON DELETE SET NULL,
+    original_query  TEXT        NOT NULL,
+    rewritten_query TEXT        NOT NULL,
+    rewrite_model   TEXT        NOT NULL,
+    rewrite_type    TEXT        NOT NULL,
+    latency_ms      INTEGER,
+    embedding_delta FLOAT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Learned HYBRID_ALPHA per (course, query_type) pair — nightly updated.
+CREATE TABLE IF NOT EXISTS rag_alpha_config (
+    course_id   UUID    REFERENCES courses(id) ON DELETE CASCADE,
+    query_type  TEXT    NOT NULL,
+    alpha       FLOAT   NOT NULL DEFAULT 0.70,
+    sample_size INTEGER NOT NULL DEFAULT 0,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (course_id, query_type)
+);
 """

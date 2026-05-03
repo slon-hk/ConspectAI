@@ -149,6 +149,7 @@ def create_container(*, database: Database, gemini_api_key: str, redis_url: str 
         system_prompt=MINDMAP_PROMPT,
     )
     budget_gate = BudgetGate(usage_repo=usage_repository, redis=cache_client)
+    rag_metric_repository = RagMetricRepository(database)
     ai_chat_service = AiChatService(
         chat_service=chat_service,
         user_service=user_service,
@@ -163,6 +164,7 @@ def create_container(*, database: Database, gemini_api_key: str, redis_url: str 
         default_model=DEFAULT_MODEL,
         gemini_api_key=gemini_api_key,
         budget_gate=budget_gate,
+        rag_metric_repository=rag_metric_repository,
     )
     return AppContainer(
         admin_access_service=admin_access_service,

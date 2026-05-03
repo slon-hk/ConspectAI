@@ -23,7 +23,9 @@ import asyncio
 import gzip
 import json
 import os
+import re
 import time
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -49,6 +51,7 @@ from app.repositories.oltp import (
 )
 from app.rag.cache_manager import configure_rag_cache, get_cache_manager
 from app.rag.context import ContextBuilder, HeuristicReranker, ImportanceScorer
+from app.rag.tracer import PipelineTracer
 
 _reranker = HeuristicReranker()
 _context_builder = ContextBuilder()
@@ -83,6 +86,30 @@ _executor = ThreadPoolExecutor(max_workers=2)  # for blocking PDF/file ops
 # Compatibility aliases for legacy imports.
 _rough_token_count = rough_token_count
 _sha256 = sha256_digest
+
+# ── Intent routing ────────────────────────────────────────────────────────────
+
+# Hybrid search score below this → context not relevant enough to inject.
+_MIN_CONTEXT_SCORE = 0.25
+
+# Greetings, thanks, and other purely social messages that must not trigger RAG.
+_SMALL_TALK_RE = re.compile(
+    r"^\s*("
+    r"привет|хай|хей|hello|hi|hey|sup|"
+    r"пока|bye|goodbye|до свидания|чао|пока-пока|"
+    r"спасибо|благодарю|thanks|thank you|thx|"
+    r"как дела|how are you|how r u|"
+    r"окей|ок|ok|okay|ладно|"
+    r"хорошо|отлично|понял|понятно|ясно|"
+    r"[👋🙋😊🤝✌️🫡]+"
+    r")\s*[!?.,]*\s*$",
+    re.UNICODE | re.IGNORECASE,
+)
+
+
+def _is_small_talk(query: str) -> bool:
+    """Return True for social/greeting messages that should bypass the RAG pipeline."""
+    return bool(_SMALL_TALK_RE.match(query.strip()))
 
 
 # ── Embedding ─────────────────────────────────────────────────────────────────
@@ -450,22 +477,23 @@ async def retrieve(
     query: str,
     course_ids: list[str] | None,
     top_k: int = TOP_K,
-) -> tuple[list[dict], list[dict]]:
+) -> tuple[list[dict], list[dict], bool]:
     """
     Hybrid search: cosine_similarity * HYBRID_ALPHA + BM25 * (1 - HYBRID_ALPHA).
-    Returns (chunks, images) where images are linked to top chunks.
+    Returns (chunks, images, retrieval_cache_hit).
     course_ids=None queries the global knowledge base (is_public=TRUE docs only).
     Primary course docs receive a SOURCE_BOOST in the hybrid score.
     Retrieval results are cached in Redis for 5 minutes.
     """
     q_vec_list = await embed_query(query)
+    q_vec_list = q_vec_list[:EMBED_DIM]  # guard against stale cache entries with wrong dim
     q_hash = _sha256(query)
     mgr = get_cache_manager()
 
     cache_scope = "|".join(sorted(course_ids)) if course_ids else "global"
     cached_ret = await mgr.get_retrieval_result(cache_scope, q_hash)
     if cached_ret is not None:
-        return cached_ret
+        return cached_ret[0], cached_ret[1], True
 
     q_vec = to_pgvector(q_vec_list)
     chunks, images = await _rag_retrieval_repository.retrieve_chunks_and_images(
@@ -478,7 +506,7 @@ async def retrieve(
     )
 
     asyncio.create_task(mgr.set_retrieval_result(cache_scope, q_hash, chunks, images))
-    return chunks, images
+    return chunks, images, False
 
 
 
@@ -539,6 +567,7 @@ async def rag_query(
     system_prompt: str,
     model_name: str = "gemini-2.0-flash",
     conversation_history: list[dict] | None = None,
+    trace_writer: Callable[[dict], Awaitable[int | None]] | None = None,
 ) -> dict:
     """
     Full RAG query pipeline.
@@ -549,19 +578,76 @@ async def rag_query(
           images:        list of image dicts to display in UI,
           from_cache:    bool,
           sources_found: bool,  -- False if answer is from general knowledge
+          trace_id:      int | None,  -- rag_pipeline_traces.id for feedback linking
         }
     course_ids takes precedence; course_id (singular) is kept for backward compatibility.
+    trace_writer is an optional async callable that persists the pipeline trace and
+    returns the generated trace_id. Callers inject it from AiChatService; passing None
+    skips tracing (used in legacy / testing code paths).
     """
     if course_ids is None and course_id is not None:
         course_ids = [course_id]
 
-    started = time.perf_counter()
-    # ── 1. Retrieve candidates (TOP_K=10) ──────────────────────────────────
-    chunks_raw, images = await retrieve(query, course_ids)
+    # ── 0. Intent check: bypass RAG for social/greeting messages ──────────
+    if _is_small_talk(query):
+        from app.infrastructure.ai.model_catalog import CHAT_PROMPT
+        tracer = PipelineTracer()
+        query_tokens = rough_token_count(query)
+        t_llm = tracer.stage("llm")
+        loop = asyncio.get_event_loop()
+        _model = genai.GenerativeModel(model_name, system_instruction=CHAT_PROMPT)
+        _chat = _model.start_chat(history=conversation_history or [])
+        response = await loop.run_in_executor(_executor, lambda: _chat.send_message(query))
+        answer = response.text
+        t_llm.stop()
+        output_tokens = rough_token_count(answer)
+        trace = tracer.build_trace()
+        trace_id: int | None = None
+        if trace_writer:
+            try:
+                trace_id = await trace_writer(trace)
+            except Exception:
+                pass
+        return {
+            "answer": answer, "chunks": [], "images": [],
+            "from_cache": False, "sources_found": False,
+            "trace_id": trace_id,
+            "query_tokens": query_tokens, "context_tokens": 0,
+            "response_tokens": output_tokens,
+            "actual_with_rag_tokens": query_tokens + output_tokens,
+            "estimated_without_rag_tokens": query_tokens + output_tokens,
+            "chunks_used": 0, "latency_ms": 0,
+        }
+
+    tracer = PipelineTracer()
     query_tokens = rough_token_count(query)
 
+    # ── 1. Retrieve candidates (TOP_K=10) ──────────────────────────────────
+    t_retrieve = tracer.stage("retrieve")
+    chunks_raw, images, retrieval_cache_hit = await retrieve(query, course_ids)
+    t_retrieve.stop(chunks_retrieved=len(chunks_raw), retrieval_cache_hit=retrieval_cache_hit)
+
     # ── 2. Rerank → top TOP_K_FINAL (5) ───────────────────────────────────
+    t_rerank = tracer.stage("rerank")
     chunks = _reranker.rerank(query, chunks_raw, top_k=TOP_K_FINAL) if chunks_raw else []
+    t_rerank.stop()
+
+    # Drop context if best chunk score is below relevance threshold — avoids
+    # injecting unrelated course material for off-topic questions.
+    if chunks and max(c.get("score", 0.0) for c in chunks_raw) < _MIN_CONTEXT_SCORE:
+        chunks = []
+
+    # Deduplicate images by image ID; cap at IMAGE_CTX_LIMIT.
+    seen_img: set[str] = set()
+    filtered_images: list[dict] = []
+    for img in images:
+        iid = img["id"]
+        if iid not in seen_img:
+            seen_img.add(iid)
+            filtered_images.append(img)
+            if len(filtered_images) >= IMAGE_CTX_LIMIT:
+                break
+    images = filtered_images
 
     # ── 3. Check answer cache ──────────────────────────────────────────────
     cache_key = _answer_cache_key(query, chunks)
@@ -572,14 +658,30 @@ async def rag_query(
         output_tokens = rough_token_count(cached["answer"])
         actual_with_rag = query_tokens + context_tokens + output_tokens
         estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
-        latency_ms = int((time.perf_counter() - started) * 1000)
+        tracer.set(
+            chunks_retrieved=len(chunks_raw),
+            chunks_used=len(chunks),
+            chunks_compressed=0,
+            context_tokens=context_tokens,
+            output_tokens=output_tokens,
+            retrieval_cache_hit=retrieval_cache_hit,
+        )
+        trace = tracer.build_trace()
+        trace_id: int | None = None
+        if trace_writer:
+            try:
+                trace_id = await trace_writer(trace)
+            except Exception:
+                pass
+        latency_ms = trace.get("latency_total_ms", 0)
         return {
             "answer":        cached["answer"],
             "chunks":        chunks,
             "images":        cached_images,
             "from_cache":    True,
             "sources_found": len(chunks) > 0,
-            "query_tokens": query_tokens,
+            "trace_id":      trace_id,
+            "query_tokens":  query_tokens,
             "context_tokens": context_tokens,
             "response_tokens": output_tokens,
             "actual_with_rag_tokens": actual_with_rag,
@@ -590,12 +692,18 @@ async def rag_query(
 
     # ── 4. Build dynamic context ───────────────────────────────────────────
     sources_found = len(chunks) > 0
+    t_context = tracer.stage("context")
     if sources_found:
-        context, context_tokens, _ctx_stats = _context_builder.build(chunks, images)
+        context, context_tokens, ctx_stats = _context_builder.build(chunks, images)
+        chunks_compressed = ctx_stats.get("chunks_compressed", 0)
+        context_reduction_pct = ctx_stats.get("context_reduction_pct", 0.0)
     else:
         context, context_tokens = "", 0
+        chunks_compressed = 0
+        context_reduction_pct = 0.0
+    t_context.stop()
 
-    # ── 4. Build prompt ────────────────────────────────────────────────────
+    # ── 5. Build prompt ────────────────────────────────────────────────────
     if sources_found:
         rag_instruction = (
             "Below are relevant excerpts from the user's course materials. "
@@ -616,7 +724,7 @@ async def rag_query(
 
     full_system = f"{system_prompt}\n\n{rag_instruction}"
 
-    # ── 5. Call LLM ────────────────────────────────────────────────────────
+    # ── 6. Call LLM ────────────────────────────────────────────────────────
     model = genai.GenerativeModel(
         model_name,
         system_instruction=full_system,
@@ -625,27 +733,49 @@ async def rag_query(
     history = conversation_history or []
     chat = model.start_chat(history=history)
 
+    t_llm = tracer.stage("llm")
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(
         _executor,
         lambda: chat.send_message(query),
     )
     answer = response.text
+    t_llm.stop()
+
     output_tokens = rough_token_count(answer)
     actual_with_rag = query_tokens + context_tokens + output_tokens
     estimated_without_rag = query_tokens + max(context_tokens * 2, context_tokens + 500)
-    latency_ms = int((time.perf_counter() - started) * 1000)
 
-    # ── 6. Cache answer ────────────────────────────────────────────────────
+    # ── 7. Cache answer ────────────────────────────────────────────────────
     asyncio.create_task(_set_answer_cache(cache_key, answer, images))
 
+    # ── 8. Write pipeline trace ────────────────────────────────────────────
+    tracer.set(
+        chunks_retrieved=len(chunks_raw),
+        chunks_used=len(chunks),
+        chunks_compressed=chunks_compressed,
+        context_tokens=context_tokens,
+        output_tokens=output_tokens,
+        context_reduction_pct=context_reduction_pct,
+        retrieval_cache_hit=retrieval_cache_hit,
+    )
+    trace = tracer.build_trace()
+    trace_id = None
+    if trace_writer:
+        try:
+            trace_id = await trace_writer(trace)
+        except Exception:
+            pass
+
+    latency_ms = trace.get("latency_total_ms", 0)
     return {
         "answer":        answer,
         "chunks":        chunks,
         "images":        images,
         "from_cache":    False,
         "sources_found": sources_found,
-        "query_tokens": query_tokens,
+        "trace_id":      trace_id,
+        "query_tokens":  query_tokens,
         "context_tokens": context_tokens,
         "response_tokens": output_tokens,
         "actual_with_rag_tokens": actual_with_rag,

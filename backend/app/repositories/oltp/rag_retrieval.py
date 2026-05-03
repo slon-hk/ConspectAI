@@ -110,10 +110,11 @@ class RagRetrievalRepository(BaseRepository):
             chunk_ids = [chunk["id"] for chunk in chunks]
             image_rows = await db_conn.fetch(
                 """
-                SELECT DISTINCT ri.id, ri.file_path, ri.caption, ri.mime_type
+                SELECT DISTINCT ON (ri.id) ri.id, rci.chunk_id, ri.file_path, ri.caption, ri.mime_type
                 FROM rag_chunk_images rci
                 JOIN rag_images ri ON ri.id = rci.image_id
                 WHERE rci.chunk_id = ANY($1::uuid[])
+                ORDER BY ri.id
                 LIMIT $2
                 """,
                 chunk_ids,
@@ -122,6 +123,7 @@ class RagRetrievalRepository(BaseRepository):
             images = [
                 {
                     "id": str(row["id"]),
+                    "chunk_id": str(row["chunk_id"]),
                     "file_path": row["file_path"],
                     "caption": row["caption"],
                     "mime_type": row["mime_type"],

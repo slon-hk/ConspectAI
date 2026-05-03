@@ -1198,6 +1198,41 @@ body{background:var(--bg);color:var(--text-1);font-family:'DM Sans',sans-serif;f
         </div>
       </template>
 
+      <!-- File size limit alert -->
+      <template x-if="fileSizeAlert.show">
+        <div class="overlay" @click.self="fileSizeAlert.show=false">
+          <div class="modal" style="max-width:380px">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-2.5">
+                <div class="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(220,38,38,.12)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <h3 class="text-[16px] font-[600]" style="color:var(--text-1)">Файл слишком большой</h3>
+              </div>
+              <button @click="fileSizeAlert.show=false" class="hover:opacity-70 flex-shrink-0" style="color:var(--text-3)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <p class="text-[13px] mb-1" style="color:var(--text-2)">
+              Файл <span class="font-[500]" style="color:var(--text-1)" x-text="`«${fileSizeAlert.filename}»`"></span> превышает лимит
+              <span class="font-[500]" style="color:var(--text-1)" x-text="`${fileSizeAlert.maxMb} МБ`"></span> для вашего тарифа.
+            </p>
+            <template x-if="fileSizeAlert.nextPlanName">
+              <p class="text-[13px] mb-5" style="color:var(--text-2)">
+                На тарифе <span class="font-[500]" style="color:var(--accent)" x-text="fileSizeAlert.nextPlanName"></span> доступна загрузка файлов большего размера.
+              </p>
+            </template>
+            <template x-if="!fileSizeAlert.nextPlanName">
+              <p class="text-[13px] mb-5" style="color:var(--text-2)">Вы уже используете максимальный тариф.</p>
+            </template>
+            <div class="flex gap-2">
+              <button @click="fileSizeAlert.show=false" class="flex-1 py-2.5 rounded-xl text-[13px] font-[500]" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-2)">Закрыть</button>
+              <template x-if="fileSizeAlert.nextPlanName">
+                <button @click="_openUpgrade()" class="flex-1 py-2.5 rounded-xl text-[13px] font-[500]" style="background:var(--accent);color:#0c0b09">Перейти к тарифам</button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+
     </div>
   </template>
 
@@ -1463,12 +1498,13 @@ function app() {
       accent: [{v:'#c8913a',n:'Золото'},{v:'#2563eb',n:'Синий'},{v:'#16a34a',n:'Зелёный'},{v:'#9333ea',n:'Пурпур'},{v:'#dc2626',n:'Красный'}],
     },
     plans: [
-      {id:'free', name:'Free', estimatedText:'без включённых AI-запросов', price:'₽0', badge:null},
-      {id:'starter', name:'Starter', estimatedText:'≈ 600 запросов в месяц', price:'₽300/мес', badge:null},
-      {id:'plus', name:'Plus', estimatedText:'≈ 1 000 запросов в месяц', price:'₽500/мес', badge:'Популярный'},
-      {id:'pro', name:'Pro', estimatedText:'≈ 3 000 запросов в месяц', price:'₽1 500/мес', badge:null},
-      {id:'max', name:'Max', estimatedText:'≈ 5 000 запросов в месяц', price:'₽2 500/мес', badge:'Выгодно'},
+      {id:'free', name:'Free', estimatedText:'без включённых AI-запросов', price:'₽0', badge:null, maxUploadMb:2},
+      {id:'starter', name:'Starter', estimatedText:'≈ 600 запросов в месяц', price:'₽300/мес', badge:null, maxUploadMb:5},
+      {id:'plus', name:'Plus', estimatedText:'≈ 1 000 запросов в месяц', price:'₽500/мес', badge:'Популярный', maxUploadMb:10},
+      {id:'pro', name:'Pro', estimatedText:'≈ 3 000 запросов в месяц', price:'₽1 500/мес', badge:null, maxUploadMb:50},
+      {id:'max', name:'Max', estimatedText:'≈ 5 000 запросов в месяц', price:'₽2 500/мес', badge:'Выгодно', maxUploadMb:50},
     ],
+    fileSizeAlert: { show: false, filename: '', maxMb: 0, nextPlanId: null, nextPlanName: '' },
 
     get currentChat() {
       return Array.isArray(this.chats)
@@ -1659,10 +1695,15 @@ function app() {
     },
     async processFiles(files, isPublic=false) {
       const endpoint = isPublic ? '/api/public-kb/ingest' : '/api/upload';
+      const currentPlan = this.plans.find(p => p.id === this.user.plan_key);
+      const maxMb = currentPlan?.maxUploadMb || 2;
       for (const f of files) {
+        if (f.size > maxMb * 1024 * 1024) { this._showFileSizeError(f.name, maxMb); continue; }
         const fd = new FormData(); fd.append('file',f);
         try {
-          const info = await this.api(endpoint,{method:'POST',body:fd}).then(r=>r.json());
+          const r = await this.api(endpoint,{method:'POST',body:fd});
+          if (r.status === 413) { this._showFileSizeError(f.name, maxMb); continue; }
+          const info = await r.json();
           this.pendingFiles.push(info);
         } catch(e) { console.error('Upload error:',e); }
       }
@@ -1873,7 +1914,17 @@ function app() {
           ? `≈ ${this.fmtNum(plan.estimated_monthly_requests)} запросов в месяц`
           : 'без включённых AI-запросов',
         badge: plan.plan_key === 'plus' ? 'Популярный' : (plan.plan_key === 'max' ? 'Выгодно' : null),
+        maxUploadMb: plan.max_upload_mb || 2,
       }));
+    },
+    _showFileSizeError(filename, maxMb) {
+      const next = this.plans.find(p => (p.maxUploadMb || 0) > maxMb);
+      this.fileSizeAlert = { show: true, filename, maxMb, nextPlanId: next?.id || null, nextPlanName: next?.name || '' };
+    },
+    _openUpgrade() {
+      this.fileSizeAlert.show = false;
+      if (this.fileSizeAlert.nextPlanId) this.selPlan = this.fileSizeAlert.nextPlanId;
+      this.showBuyModal = true;
     },
     planLabel(key) {
       const p = this.plans.find(plan => plan.id === key);
@@ -1990,15 +2041,21 @@ function app() {
 
     async uploadCourseFile(file, isPublic=false) {
       if (!this.cpActiveCourse) return;
+      const currentPlan = this.plans.find(p => p.id === this.user.plan_key);
+      const maxMb = currentPlan?.maxUploadMb || 2;
+      if (file.size > maxMb * 1024 * 1024) { this._showFileSizeError(file.name, maxMb); return; }
       const fd = new FormData(); fd.append('file', file); fd.append('is_public', isPublic ? 'true' : 'false');
-      // Optimistic UI — show pending immediately
       const tmpId = 'tmp-' + Date.now();
       this.cpDocs.unshift({ id: tmpId, filename: file.name, status: 'pending', source_type: file.name.split('.').pop() || 'file', chunk_count: 0, is_public: isPublic });
       try {
         const r = await this.api(`/api/courses/${this.cpActiveCourse.id}/ingest`, { method: 'POST', body: fd });
+        if (r.status === 413) {
+          this.cpDocs = this.cpDocs.filter(d => d.id !== tmpId);
+          this._showFileSizeError(file.name, maxMb);
+          return;
+        }
         if (r.ok) {
           const data = await r.json();
-          // Replace tmp with real doc
           const idx = this.cpDocs.findIndex(d => d.id === tmpId);
           if (idx !== -1) this.cpDocs[idx] = { ...this.cpDocs[idx], id: data.document_id, status: data.status };
           this.maybeStartDocPoll();

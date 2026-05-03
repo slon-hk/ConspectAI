@@ -5,6 +5,7 @@ from .plans import (
     DEFAULT_PLAN_KEY,
     PLAN_KEYS,
     SUBSCRIPTION_PLANS,
+    get_upload_limit_mb,
     public_plans,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "DEFAULT_PLAN_KEY",
     "PLAN_KEYS",
     "SUBSCRIPTION_PLANS",
+    "get_upload_limit_mb",
     "public_plans",
 ]

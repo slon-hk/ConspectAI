@@ -74,6 +74,13 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
 .pack-cta.secondary{background:transparent;color:var(--text-1);border:1px solid var(--border-2)}
 .pack-cta.secondary:hover{border-color:var(--accent);color:var(--accent)}
 
+/* Model chips inside plan card */
+.pack-models{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.model-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:500;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(200,145,58,.22);white-space:nowrap}
+
+/* Upload badge */
+.pack-upload{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);padding:7px 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);margin-bottom:18px}
+
 /* Models table */
 .models-table{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:48px}
 .models-table table{width:100%;border-collapse:collapse;font-size:14px}
@@ -152,15 +159,27 @@ main{max-width:1100px;margin:0 auto;padding:48px 24px 96px}
       {% for plan in plans %}
       <div class="pack{% if plan.featured %} featured{% endif %}">
         <div class="pack-name">{{ plan.display_name }}</div>
-        <p class="pack-tokens"><span class="num">{{ plan.estimated_requests_label }}</span></p>
+        <!-- <p class="pack-tokens"><span class="num">{{ plan.estimated_requests_label }}</span></p> -->
         <div class="pack-price">{{ plan.price_label }}</div>
         <p class="pack-price-sub">ориентир для {{ plan.reference_model_name }}</p>
+
+        <!-- Available models -->
+        <div class="pack-models">
+          {% for chip in plan.model_chips %}
+          <span class="model-chip">{{ chip.icon }} {{ chip.label }}</span>
+          {% endfor %}
+        </div>
+
+        <!-- Upload limit -->
+        <div class="pack-upload">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Файлы до {{ plan.max_upload_mb }} МБ
+        </div>
+
         <ul>
-          <li>{% if plan.plan_key == 'free' %}Для знакомства с интерфейсом{% else %}Для регулярной работы с AI-ассистентом{% endif %}</li>
-          <li>Все модели из каталога</li>
-          <li>Gemini 2.5 Flash Lite как базовый ориентир</li>
-          <li>Все шаблоны и карта тем</li>
-          <li>Экспорт в Markdown и PDF</li>
+          {% for feature in plan.features %}
+          <li>{{ feature }}</li>
+          {% endfor %}
         </ul>
         <a href="/app?auth=register" class="pack-cta {% if plan.featured %}primary{% else %}secondary{% endif %}">{{ plan.cta_label }}</a>
       </div>

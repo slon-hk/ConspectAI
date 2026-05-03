@@ -66,6 +66,17 @@ SUBSCRIPTION_PLANS: tuple[dict[str, Any], ...] = tuple(
 PLAN_KEYS = frozenset(plan["plan_key"] for plan in SUBSCRIPTION_PLANS)
 
 
+_UPLOAD_LIMITS: dict[str, int] = {
+    plan["plan_key"]: int(plan.get("max_upload_mb", 2))
+    for plan in _CONFIG["plans"]
+}
+_DEFAULT_UPLOAD_MB = 2
+
+
+def get_upload_limit_mb(plan_key: str) -> int:
+    return _UPLOAD_LIMITS.get(plan_key, _DEFAULT_UPLOAD_MB)
+
+
 def public_plans() -> list[dict[str, Any]]:
     return [
         {
@@ -76,6 +87,8 @@ def public_plans() -> list[dict[str, Any]]:
             "estimated_monthly_requests": plan["estimated_monthly_requests"],
             "reference_model_key": plan["reference_model_key"],
             "reference_model_name": plan["reference_model_name"],
+            "max_upload_mb": _UPLOAD_LIMITS.get(plan["plan_key"], _DEFAULT_UPLOAD_MB),
+            "available_models": plan.get("available_models", ["gemini-2.5-flash-lite"]),
         }
         for plan in SUBSCRIPTION_PLANS
     ]

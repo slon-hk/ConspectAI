@@ -42,9 +42,10 @@ class RagMetricRepository(BaseRepository):
         user_id: int,
         trace: dict[str, Any],
         conn: asyncpg.Connection | None = None,
-    ) -> None:
+    ) -> int | None:
+        """Insert a pipeline trace row and return the generated trace id."""
         async with self.connection(conn) as db_conn:
-            await db_conn.execute(
+            row = await db_conn.fetchrow(
                 """
                 INSERT INTO rag_pipeline_traces (
                     user_id, chat_id, course_id, model_tier,
@@ -63,6 +64,7 @@ class RagMetricRepository(BaseRepository):
                     $14,$15,$16,$17,$18,$19,
                     $20,$21,$22,$23,$24
                 )
+                RETURNING id
                 """,
                 user_id,
                 trace.get("chat_id"),
@@ -89,4 +91,5 @@ class RagMetricRepository(BaseRepository):
                 trace.get("context_reduction_pct"),
                 trace.get("cost_usd"),
             )
+            return row["id"] if row else None
 

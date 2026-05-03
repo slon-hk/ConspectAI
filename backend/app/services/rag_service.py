@@ -41,7 +41,6 @@ class RagService:
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }
-    MAX_FILE_MB = 50
 
     def __init__(self, rag_repository: RagRouteRepository, rag_engine: RagEngine) -> None:
         self._rag_repository = rag_repository
@@ -120,12 +119,13 @@ class RagService:
         content_type: str | None,
         raw: bytes,
         is_public: bool,
+        max_mb: int,
     ) -> dict:
         if not await self._rag_repository.user_owns_course(course_id=course_id, user_id=user_id):
             raise RagCourseNotFoundError("Course not found")
 
-        if len(raw) > self.MAX_FILE_MB * 1024 * 1024:
-            raise RagFileTooLargeError(f"File too large (max {self.MAX_FILE_MB}MB)")
+        if len(raw) > max_mb * 1024 * 1024:
+            raise RagFileTooLargeError(f"File too large (max {max_mb}MB)")
 
         mime = content_type or mimetypes.guess_type(filename)[0] or ""
         if mime not in self.ALLOWED_MIME:
@@ -180,9 +180,10 @@ class RagService:
         filename: str,
         content_type: str | None,
         raw: bytes,
+        max_mb: int,
     ) -> dict:
-        if len(raw) > self.MAX_FILE_MB * 1024 * 1024:
-            raise RagFileTooLargeError(f"File too large (max {self.MAX_FILE_MB}MB)")
+        if len(raw) > max_mb * 1024 * 1024:
+            raise RagFileTooLargeError(f"File too large (max {max_mb}MB)")
 
         mime = content_type or mimetypes.guess_type(filename)[0] or ""
         if mime not in self.ALLOWED_MIME:

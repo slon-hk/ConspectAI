@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from app.domain.subscriptions import get_upload_limit_mb
 from app.services.file_service import FileService
 from app.services.rag_service import (
     RagCourseNotFoundError,
@@ -17,6 +18,7 @@ from app.services.rag_service import (
     RagService,
     RagUnsupportedFileError,
 )
+from app.services.usage_service import UsageService
 
 
 class CourseCreate(BaseModel):
@@ -39,7 +41,9 @@ class IngestURLBody(BaseModel):
     title: str | None = None
 
 
-def create_rag_router(*, current_user_id: Callable, rag_service: RagService, file_service: FileService) -> APIRouter:
+def create_rag_router(
+    *, current_user_id: Callable, rag_service: RagService, file_service: FileService, usage_service: UsageService
+) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["rag"])
 
     @router.get("/courses")
@@ -100,6 +104,8 @@ def create_rag_router(*, current_user_id: Callable, rag_service: RagService, fil
         uid: int = Depends(current_user_id),
     ):
         raw = await file.read()
+        plan_key = await usage_service.get_plan_key(uid)
+        max_mb = get_upload_limit_mb(plan_key)
         try:
             return await rag_service.ingest_file(
                 course_id=course_id,
@@ -108,6 +114,7 @@ def create_rag_router(*, current_user_id: Callable, rag_service: RagService, fil
                 content_type=file.content_type,
                 raw=raw,
                 is_public=is_public,
+                max_mb=max_mb,
             )
         except RagCourseNotFoundError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -197,6 +204,8 @@ def create_rag_router(*, current_user_id: Callable, rag_service: RagService, fil
     ):
         raw = await file.read()
         filename = file.filename or "document"
+        plan_key = await usage_service.get_plan_key(uid)
+        max_mb = get_upload_limit_mb(plan_key)
         try:
             upload_meta = await file_service.store_upload(
                 raw=raw,
@@ -208,6 +217,7 @@ def create_rag_router(*, current_user_id: Callable, rag_service: RagService, fil
                 filename=filename,
                 content_type=file.content_type,
                 raw=raw,
+                max_mb=max_mb,
             )
         except RagFileTooLargeError as exc:
             raise HTTPException(413, str(exc)) from exc

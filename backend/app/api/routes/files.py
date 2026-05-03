@@ -7,8 +7,10 @@ from collections.abc import Callable
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
+from app.domain.subscriptions import get_upload_limit_mb
 from app.services.analytics_tracking_service import AnalyticsTrackingService
 from app.services.file_service import FileService
+from app.services.usage_service import UsageService
 
 
 def create_file_router(
@@ -16,6 +18,7 @@ def create_file_router(
     current_user_id: Callable,
     file_service: FileService,
     analytics_tracking_service: AnalyticsTrackingService,
+    usage_service: UsageService,
 ) -> APIRouter:
     router = APIRouter(tags=["files"])
 
@@ -24,8 +27,14 @@ def create_file_router(
         file: UploadFile = File(...),
         uid: int = Depends(current_user_id),
     ):
+        raw = await file.read()
+        plan_key = await usage_service.get_plan_key(uid)
+        max_mb = get_upload_limit_mb(plan_key)
+        if len(raw) > max_mb * 1024 * 1024:
+            raise HTTPException(413, f"File too large (max {max_mb}MB on your plan)")
+
         upload = await file_service.store_upload(
-            raw=await file.read(),
+            raw=raw,
             filename=file.filename,
             content_type=file.content_type,
         )

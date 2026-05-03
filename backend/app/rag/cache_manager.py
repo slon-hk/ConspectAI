@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections import OrderedDict
 from typing import Any
 
 from app.infrastructure.cache import CacheClient, NullCache
@@ -50,7 +51,8 @@ class ThreeLayerCacheManager:
     def __init__(self, redis: CacheClient, pg_cache: RagCacheRepository) -> None:
         self._redis = redis
         self._pg = pg_cache
-        self._l1: dict[str, tuple[Any, float]] = {}
+        # OrderedDict preserves insertion order; we move keys to end on access (LRU).
+        self._l1: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
     # ── Query embedding ────────────────────────────────────────────────────────
 
@@ -150,14 +152,16 @@ class ThreeLayerCacheManager:
             return None
         value, expires_at = entry
         if time.monotonic() < expires_at:
+            # Move to end to mark as recently used — O(1).
+            self._l1.move_to_end(key)
             return value
         del self._l1[key]
         return None
 
     def _l1_set(self, key: str, value: Any, ttl: int) -> None:
-        if len(self._l1) >= self._L1_MAXSIZE:
-            # Evict oldest ~10% by expiry time.
-            by_expiry = sorted(self._l1.items(), key=lambda kv: kv[1][1])
-            for k, _ in by_expiry[: self._L1_MAXSIZE // 10]:
-                del self._l1[k]
+        if key in self._l1:
+            self._l1.move_to_end(key)
+        elif len(self._l1) >= self._L1_MAXSIZE:
+            # Evict least-recently-used entry from the front — O(1).
+            self._l1.popitem(last=False)
         self._l1[key] = (value, time.monotonic() + ttl)

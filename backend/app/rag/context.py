@@ -107,14 +107,6 @@ class ContextBuilder:
             else:
                 stats["chunks_dropped"] += 1
 
-        for img in images[:IMAGE_CTX_LIMIT]:
-            caption = img.get("caption") or ""
-            line = f"[Figure: {caption}]"
-            lt = rough_token_count(line)
-            if used_tokens + lt <= budget:
-                parts.append(line)
-                used_tokens += lt
-
         return "\n\n".join(parts), used_tokens, stats
 
 

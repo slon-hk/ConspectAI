@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
+import tempfile
 import time
 from collections.abc import Mapping
 from typing import Any
@@ -17,6 +19,7 @@ from app.infrastructure.storage import FileStorage
 from app.rag.budget import BudgetGate
 from app.rag.history import HistoryManager
 from app.rag.tracer import PipelineTracer
+from app.repositories.olap import RagMetricRepository
 from app.repositories.oltp import FileRepository
 from app.services.analytics_tracking_service import AnalyticsTrackingService
 from app.services.billing_service import BillingService
@@ -61,6 +64,7 @@ class AiChatService:
         default_model: str,
         gemini_api_key: str,
         budget_gate: BudgetGate | None = None,
+        rag_metric_repository: RagMetricRepository | None = None,
     ) -> None:
         self._chat_service = chat_service
         self._user_service = user_service
@@ -76,6 +80,7 @@ class AiChatService:
         self._gemini_api_key = gemini_api_key
         self._history_manager = HistoryManager(gemini_api_key=gemini_api_key)
         self._budget_gate = budget_gate
+        self._rag_metric_repository = rag_metric_repository
 
     async def send_message(
         self,
@@ -160,13 +165,29 @@ class AiChatService:
         _GLOBAL_KB_PLANS = frozenset({"plus", "pro", "max"})
         use_global_kb = not primary_ids and plan_key in _GLOBAL_KB_PLANS
 
-        if primary_ids or use_global_kb:
+        took_rag_path = bool(primary_ids or use_global_kb)
+        if took_rag_path:
+            _uid, _cid, _course, _tier = user_id, chat_id, course_id, plan_key
+            _repo = self._rag_metric_repository
+
+            async def _trace_writer(trace: dict) -> int | None:
+                if _repo is None:
+                    return None
+                trace = {
+                    **trace,
+                    "chat_id": str(_cid),
+                    "course_id": str(_course) if _course else None,
+                    "model_tier": _tier,
+                }
+                return await _repo.record_pipeline_trace(user_id=_uid, trace=trace)
+
             rag_result = await self._rag_engine.rag_query(
                 query=content or " ".join(str(part) for part in parts if isinstance(part, str)),
                 course_ids=primary_ids or None,
                 system_prompt=system_prompt,
                 model_name=model_key,
                 conversation_history=gemini_history,
+                trace_writer=_trace_writer,
             )
             assistant_text = rag_result["answer"]
             rag_images = rag_result["images"]
@@ -191,8 +212,8 @@ class AiChatService:
             api_tokens_override = None
             cache_hit = False
 
-        if not course_id:
-            api_tokens = api_tokens_raw  # type: ignore[name-defined]
+        if not took_rag_path:
+            api_tokens = api_tokens_raw
         else:
             api_tokens = 3000 + max(1, len(assistant_text) // 4)
         if api_tokens_override is not None:
@@ -271,10 +292,15 @@ class AiChatService:
                 if meta["mime_type"].startswith("image/"):
                     parts.append(PIL.Image.open(io.BytesIO(raw)))
                 else:
-                    buffer = io.BytesIO(raw)
-                    buffer.name = file_ref["original_filename"]
-                    uploaded = genai.upload_file(buffer, mime_type=meta["mime_type"])
-                    parts.append(uploaded)
+                    suffix = os.path.splitext(file_ref["original_filename"])[1] or ""
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                        tmp.write(raw)
+                        tmp_path = tmp.name
+                    try:
+                        uploaded = genai.upload_file(tmp_path, mime_type=meta["mime_type"])
+                        parts.append(uploaded)
+                    finally:
+                        os.unlink(tmp_path)
             except Exception as exc:
                 print(f"File attach error: {exc}")
         return parts

@@ -2,6 +2,7 @@
 
 from .admin_users import AdminUserRepository
 from .chats import ChatRepository
+from .feedback import FeedbackRepository
 from .files import FileRepository
 from .messages import MessageRepository
 from .mindmaps import MindmapRepository
@@ -15,6 +16,7 @@ from .users import UserRepository
 __all__ = [
     "AdminUserRepository",
     "ChatRepository",
+    "FeedbackRepository",
     "FileRepository",
     "MessageRepository",
     "MindmapRepository",

@@ -2,10 +2,6 @@
 Полностью контейнеризованный стек: PostgreSQL + FastAPI + (опционально) Caddy с автоматическим HTTPS.
 
 ---
-# Main Link
-1. Google sheets https://docs.google.com/spreadsheets/d/16s1q8gCboe1yT4y1dk7mcKwiI1nQ0zVRVCWBCWAC8Rw/edit?gid=59453621#gid=59453621
-
----
 # TO-DO
 1. Настроить систему подписки
 

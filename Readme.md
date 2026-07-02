@@ -1,161 +1,151 @@
-# ConspectAI.tech — STEM Knowledge Architect
-Полностью контейнеризованный стек: PostgreSQL + FastAPI + (опционально) Caddy с автоматическим HTTPS.
+# ConspectAI — AI Study Platform for STEM
+
+**Upload your documents. Ask questions. Get answers grounded in your own materials.**
+
+ConspectAI is an AI-powered study platform that turns uploaded documents into a searchable, interactive knowledge base. It uses a Retrieval-Augmented Generation (RAG) pipeline to answer questions using the user's own materials, and automatically generates mind maps to visualize concepts.
+
+Fully containerized stack: **PostgreSQL + FastAPI + Caddy** with automatic HTTPS.
+
+![Landing page](./static/docs/main.png)
 
 ---
-# TO-DO
-1. Настроить систему подписки
 
-# Late
-- Desmos API
-- Anki card
+## Features
 
-
-## 🚀 Быстрый старт (локально)
-1. Скачать Docker(https://desktop.docker.com/mac/main/arm64/Docker.dmg?utm_source=docker&utm_medium=webreferral&utm_campaign=dd-smartbutton&utm_location=module)
-
-```bash
-# 2. Скопируйте конфиг и заполните три обязательных переменных
-cp .env
-# Откройте .env и заполните: GEMINI_API_KEY, SECRET_KEY, POSTGRES_PASSWORD
-# Сгенерировать SECRET_KEY: openssl rand -hex 32
-
-# 3. Соберите и запустите
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build  
-
-# 4. Откройте в браузере
-open http://localhost:8000
-```
-
-Логи приложения: `docker compose logs -f app`
-Логи БД: `docker compose logs -f db`
+- **RAG-based Q&A** — Ask questions in natural language and get answers grounded in your uploaded documents, not generic model output.
+- **Semantic search over your files** — Documents are chunked and embedded; only the most relevant context is passed to the LLM for accurate, focused answers.
+- **Automatic mind-map generation** — Background jobs turn document content into visual concept maps.
+- **User accounts & chat history** — JWT authentication with persistent chats, messages, and files per user.
+- **Content-addressed file storage** — Uploaded files are deduplicated via SHA-256 hashing and gzip-compressed to save space.
+- **Admin panel & analytics** — Usage tracking and administration tools.
+- **Subscription & billing** — Built-in billing module for paid plans.
+- **Production-ready deployment** — One-command Docker deploy with automatic TLS via Let's Encrypt.
 
 
-## 📦 Архитектура
+![Chat interface](./static/docs/chat.png)
+
+
+---
+
+## Tech Stack
+
+| Layer          | Technology                                                        |
+| -------------- | ----------------------------------------------------------------- |
+| **Backend**    | FastAPI, Uvicorn (async, multi-worker)                            |
+| **Database**   | PostgreSQL 16, asyncpg                                            |
+| **AI / RAG**   | LLM API integration, vector embeddings, semantic retrieval        |
+| **Auth**       | JWT (access + refresh)                                            |
+| **Storage**    | Content-addressed file store (SHA-256 dedup + gzip)              |
+| **Proxy / TLS**| Caddy — automatic HTTPS, gzip/zstd compression, security headers  |
+| **Infra**      | Docker & Docker Compose (dev + prod overlays)                     |
+
+---
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Caddy (prod overlay)                       │
-│  • TLS termination via Let's Encrypt        │
-│  • gzip/zstd compression                    │
-│  • Security headers                         │
-│  Listens: 80, 443                           │
-└──────────────┬──────────────────────────────┘
+│  Caddy (prod overlay)                        │
+│  • TLS termination via Let's Encrypt         │
+│  • gzip/zstd compression                     │
+│  • Security headers                          │
+│  Listens: 80, 443                            │
+└──────────────┬───────────────────────────────┘
                │ proxy → app:8000
-┌──────────────▼──────────────────────────────┐
-│  app (FastAPI + uvicorn, 2 workers)         │
-│  • REST API + JWT auth                      │
-│  • Gemini integration                       │
-│  • Background mindmap generation            │
-│  Volume: uploads_data → /app/uploads        │
-│         (content-addressed file storage)    │
-└──────────────┬──────────────────────────────┘
+┌──────────────▼───────────────────────────────┐
+│  app (FastAPI + Uvicorn, 2 workers)          │
+│  • REST API + JWT auth                        │
+│  • RAG pipeline (embeddings + retrieval)      │
+│  • LLM integration                            │
+│  • Background mind-map generation             │
+│  Volume: uploads_data → /app/uploads          │
+│         (content-addressed file storage)      │
+└──────────────┬───────────────────────────────┘
                │ asyncpg
-┌──────────────▼──────────────────────────────┐
-│  db (PostgreSQL 16)                         │
-│  • Users, chats, messages, files, mindmaps  │
-│  Volume: postgres_data                      │
-│  NOT exposed on host network                │
-└─────────────────────────────────────────────┘
+┌──────────────▼───────────────────────────────┐
+│  db (PostgreSQL 16)                           │
+│  • Users, chats, messages, files, mindmaps    │
+│  Volume: postgres_data                        │
+│  NOT exposed on host network                  │
+└───────────────────────────────────────────────┘
 ```
 
-### Volumes (постоянные данные)
+### How the RAG pipeline works
 
-| Volume                  | Что хранит                                       |
-|-------------------------|--------------------------------------------------|
-| `orion_postgres_data`   | База данных PostgreSQL                           |
-| `orion_uploads_data`    | Загруженные файлы (sha256-дедуп + gzip)          |
-| `orion_caddy_data`      | SSL-сертификаты Let's Encrypt (только prod)      |
-| `orion_caddy_config`    | Внутренний конфиг Caddy (только prod)            |
+1. A user uploads a document.
+2. The file is deduplicated (SHA-256), compressed, and stored.
+3. Content is split into chunks and converted into vector embeddings.
+4. On each question, the system runs a semantic search and selects the **best-matching** context.
+5. Only that focused context is passed to the LLM — producing accurate, grounded answers instead of hallucinations.
+
+![Admin panel](./static/docs/admin.png)
+
 
 ---
 
-## 🛡️ Безопасность
+## Quick Start (local)
 
-В продакшене обязательно:
-1. **Сильный `POSTGRES_PASSWORD`** — минимум 24 символа
-2. **`SECRET_KEY` через `openssl rand -hex 32`** — без него JWT уязвим
-3. **Файрвол**: открыты только `80` и `443` (порт 22 для SSH)
-4. **БД не торчит наружу** — `db` доступен только из Docker-сети
-5. **Регулярные бэкапы** — настройте cron для `pg_dump`
+**Prerequisites:** [Docker](https://www.docker.com/get-started) & Docker Compose
+
+```bash
+# 1. Copy the config and fill in the required variables
+cp .env.example .env
+# Open .env and set: LLM_API_KEY, SECRET_KEY, POSTGRES_PASSWORD
+# Generate SECRET_KEY:  openssl rand -hex 32
+
+# 2. Build and run
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+# 3. Open in your browser
+open http://localhost:8000
+```
+
+Application logs: `docker compose logs -f app`
+Database logs: `docker compose logs -f db`
 
 ---
 
-## 🩺 Troubleshooting
+## Configuration
 
-**Приложение не стартует, в логах `connection refused`**
-→ Подождите 10–20 с — Postgres проходит healthcheck.
-   `docker compose ps` должен показать `db ... healthy`.
-
-**Caddy показывает `unable to obtain certificate`**
-→ Проверьте, что A-запись `DOMAIN` указывает на ваш сервер
-   и что порт 80 открыт (HTTP-01 challenge).
-
-**Apple Silicon / ARM хост, ошибки сборки**
-→ Все используемые пакеты имеют ARM64-wheels. Если зависнет на Pillow:
-   `docker compose build --no-cache app`.
-
-**Хочется уменьшить потребление памяти**
-→ В `.env`: `UVICORN_WORKERS=1`.
-   Добавьте лимиты в `docker-compose.yml` под service `app`:
-   ```yaml
-   deploy:
-     resources:
-       limits:
-         memory: 512M
-   ```
+| Variable            | Description                                        |
+| ------------------- | -------------------------------------------------- |
+| `LLM_API_KEY`       | API key for the language model provider            |
+| `SECRET_KEY`        | JWT signing key — generate with `openssl rand -hex 32` |
+| `POSTGRES_PASSWORD` | Database password (min. 24 characters in prod)     |
 
 ---
 
-## 📁 Структура
+## Persistent Volumes
 
-```
-.
-├── Docker-compose.dev.yml
-├── Docker-compose.yml
-├── Readme.md
-├── backend
-│   ├── admin.py
-│   ├── analytics.py
-│   ├── auth.py
-│   ├── billing.py
-│   ├── db.py
-│   ├── main.py
-│   ├── promts.py
-│   ├── rag.py
-│   ├── rag_routes.py
-│   ├── storage.py
-│   └── templates
-│       ├── 404.html
-│       ├── 503.html
-│       ├── admin.html
-│       ├── contacts.html
-│       ├── index.html
-│       ├── landing.html
-│       ├── offer.html
-│       ├── pricing.html
-│       └── privacy.html
-├── conf
-│   ├── Caddyfile
-│   ├── Caddyfile.dev
-│   ├── Dockerfile
-│   └── requirements.txt
-└── static
-    ├── docs
-    │   └── offer.pdf
-    ├── error-bg
-    │   ├── 1.jpg
-    │   ├── 10.jpg
-    │   ├── 2.jpg
-    │   ├── 3.jpg
-    │   ├── 4.jpg
-    │   ├── 5.jpg
-    │   ├── 6.jpg
-    │   ├── 7.jpg
-    │   ├── 8.jpg
-    │   ├── 9.jpg
-    │   ├── README.md
-    │   └── manifest.json
-    ├── favicon.svg
-    ├── icon.svg
-    └── og-image.svg
-```
+| Volume                | Stores                                       |
+| --------------------- | -------------------------------------------- |
+| `postgres_data`       | PostgreSQL database                          |
+| `uploads_data`        | Uploaded files (SHA-256 dedup + gzip)        |
+| `caddy_data`          | Let's Encrypt SSL certificates (prod only)   |
+| `caddy_config`        | Caddy internal config (prod only)            |
+
+---
+
+## Security Notes
+
+For production:
+
+1. **Strong `POSTGRES_PASSWORD`** — minimum 24 characters.
+2. **`SECRET_KEY` via `openssl rand -hex 32`** — without it, JWT is vulnerable.
+3. **Firewall** — expose only ports `80` and `443` (plus `22` for SSH).
+4. **Database is not exposed** — `db` is reachable only from the internal Docker network.
+5. **Regular backups** — schedule a cron job for `pg_dump`.
+
+---
+
+## Roadmap
+
+- [ ] Subscription system
+- [ ] Desmos API integration
+- [ ] Anki card export
+
+---
+
+## License
+
+MIT
